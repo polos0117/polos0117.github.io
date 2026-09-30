@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>공방 모음</title>
+<meta name="description" content="건담 · 삼국지 · 포켓몬 · 신화 무기 — 네 공방을 한곳에서 골라 들어간다.">
+<meta name="theme-color" content="#0f0e12">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%230f0e12%22/%3E%3Cpath d=%22M32 10l6 16h16l-13 10 5 17-14-10-14 10 5-17-13-10h16z%22 fill=%22%23d9b45a%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&display=swap">
+<style>
+:root {
+  --bg: #0f0e12; --card: #18161d; --line: #ffffff1a; --text: #f1ece2; --muted: #a8a09a; --gold: #d9b45a;
+  --serif: 'Noto Serif KR', 'Apple Myungjo', 'Nanum Myeongjo', Georgia, serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: radial-gradient(1200px 600px at 50% -10%, #2a2230 0%, var(--bg) 60%) fixed, var(--bg); color: var(--text);
+  font: 15px/1.55 system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; min-height: 100vh; }
+main { max-width: 1180px; margin: 0 auto; padding: 40px 16px 56px; }
+header { text-align: center; margin-bottom: 32px; }
+header .eyebrow { color: var(--gold); font: 700 12px/1 var(--serif); letter-spacing: .32em; }
+header h1 { margin: 12px 0 8px; font: 900 clamp(30px, 6vw, 48px)/1.15 var(--serif); letter-spacing: -.01em; }
+header p { margin: 0; color: var(--muted); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 18px; }
+.site { position: relative; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 16px; overflow: hidden;
+  background: var(--card); box-shadow: 0 10px 30px #0006; transition: transform .2s ease, border-color .2s ease; }
+.site:hover, .site:focus-within { transform: translateY(-3px); border-color: var(--accent); }
+.cover { position: relative; display: block; aspect-ratio: 4 / 5; overflow: hidden; background: var(--tint); }
+.cover img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; display: block; transition: transform .5s ease; }
+.site:hover .cover img { transform: scale(1.04); }
+.cover::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 45%, #000c 100%); }
+.cover .name { position: absolute; left: 16px; right: 16px; bottom: 14px; z-index: 1; }
+.cover .tag { display: inline-block; padding: 3px 9px; border-radius: 99px; background: var(--accent); color: #111; font: 700 11px/1.4 var(--serif); letter-spacing: .06em; }
+.cover h2 { margin: 8px 0 2px; font: 900 26px/1.2 var(--serif); color: #fff; text-shadow: 0 2px 10px #000a; }
+.cover .sub { color: #e8e2d8cc; font-size: 13px; }
+.body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+.body p { margin: 0; color: var(--muted); font-size: 14px; }
+.links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+.links a { min-height: 36px; display: inline-flex; align-items: center; padding: 0 12px; border: 1px solid var(--line); border-radius: 99px;
+  color: var(--text); text-decoration: none; font-size: 13px; font-weight: 600; background: #ffffff08; }
+.links a:hover, .links a:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
+.links a.main { background: var(--accent); border-color: var(--accent); color: #111; }
+.links a.main:hover { color: #111; filter: brightness(1.08); }
+footer { margin-top: 36px; text-align: center; color: #6f6973; font-size: 12px; }
+@media (max-width: 560px) {
+  main { padding-top: 28px; }
+  .grid { grid-template-columns: 1fr; }
+  .cover { aspect-ratio: 16 / 11; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">ATELIER</div>
+    <h1>공방 모음</h1>
+    <p>네 공방 중 하나를 골라 들어간다.</p>
+  </header>
+
+  <section class="grid" aria-label="공방">
+    <article class="site" style="--accent:#7fb3ff;--tint:#151a21">
+      <a class="cover" href="/atelier/" aria-label="건담 드래프트 열기">
+        <img src="/atelier/img/thumb/RX-78-2_건담_f.webp" alt="" loading="lazy">
+        <div class="name"><span class="tag">GUNDAM</span><h2>건담 드래프트</h2><div class="sub">기동전사 · 모빌슈트 의인화</div></div>
+      </a>
+      <div class="body">
+        <p>모빌슈트를 뽑아 부대를 짜고 겨룬다. 도감과 그림 프롬프트 툴킷.</p>
+        <nav class="links" aria-label="건담">
+          <a class="main" href="/atelier/">드래프트</a><a href="/atelier/play.html">DOCK</a><a href="/atelier/dex.html">도감</a><a href="/atelier/prompt.html">프롬프트</a>
+        </nav>
+      </div>
+    </article>
+
+    <article class="site" style="--accent:#c9a227;--tint:#17130f">
+      <a class="cover" href="/atelier/sam/" aria-label="삼국지 드래프트 열기">
+        <img src="/atelier/sam/images/large/관우.jpg" alt="" loading="lazy">
+        <div class="name"><span class="tag">三國志</span><h2>삼국지 드래프트</h2><div class="sub">竹簡 · 장수 드래프트</div></div>
+      </a>
+      <div class="body">
+        <p>위·촉·오의 장수를 뽑아 진영을 꾸리는 드래프트.</p>
+        <nav class="links" aria-label="삼국지">
+          <a class="main" href="/atelier/sam/">들어가기</a>
+        </nav>
+      </div>
+    </article>
+
+    <article class="site" style="--accent:#f4c542;--tint:#2a2718">
+      <a class="cover" href="/pkm-atelier/" aria-label="포켓몬 메카 연구소 열기">
+        <img src="/pkm-atelier-img/img/thumb/피카츄_heavy_cinematic_semi_real_f.webp" alt="" loading="lazy">
+        <div class="name"><span class="tag">POKÉMON</span><h2>포켓몬 메카 연구소</h2><div class="sub">메카 의인화 · 연구소</div></div>
+      </a>
+      <div class="body">
+        <p>포켓몬을 메카로 의인화한 도감과 전투, 일곱 판 달리기.</p>
+        <nav class="links" aria-label="포켓몬">
+          <a class="main" href="/pkm-atelier/">연구소</a><a href="/pkm-atelier/dex.html">도감</a><a href="/pkm-atelier/battle.html">전투</a><a href="/pkm-atelier/run.html">런</a><a href="/pkm-atelier/prompt.html">프롬프트</a>
+        </nav>
+      </div>
+    </article>
+
+    <article class="site" style="--accent:#d9b45a;--tint:#121016">
+      <a class="cover" href="/myth-atelier/" aria-label="신화 무기 공방 열기">
+        <img src="/myth-atelier-img/img/thumb/묠니르_game_keyart_f.webp" alt="" loading="lazy">
+        <div class="name"><span class="tag">MYTH</span><h2>신화 무기 공방</h2><div class="sub">열한 권 · 백예순다섯 자루</div></div>
+      </a>
+      <div class="body">
+        <p>신화 속 무기가 사람이 되어 싸운다. 오토 배틀러와 3D 박물관.</p>
+        <nav class="links" aria-label="신화 무기">
+          <a class="main" href="/myth-atelier/">공방</a><a href="/myth-atelier/auto.html">오토 배틀</a><a href="/myth-atelier/dex.html">도감</a><a href="/myth-atelier/museum.html">박물관</a><a href="/myth-atelier/draft.html">드래프트</a><a href="/myth-atelier/run.html">던전</a><a href="/myth-atelier/prompt.html">프롬프트</a>
+        </nav>
+      </div>
+    </article>
+  </section>
+
+  <footer>polos0117 · 개인 공방</footer>
+</main>
+</body>
+</html>
