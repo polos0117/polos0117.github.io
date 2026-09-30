@@ -6,7 +6,13 @@
 <title>공방 모음</title>
 <meta name="description" content="건담 · 삼국지 · 포켓몬 · 신화 무기 — 네 공방을 한곳에서 골라 들어간다.">
 <meta name="theme-color" content="#0f0e12">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%230f0e12%22/%3E%3Cpath d=%22M32 10l6 16h16l-13 10 5 17-14-10-14 10 5-17-13-10h16z%22 fill=%22%23d9b45a%22/%3E%3C/svg%3E">
+<link rel="icon" href="icon-192.png">
+<link rel="manifest" href="app.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="공방">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&display=swap">
@@ -19,7 +25,7 @@
 html, body { margin: 0; }
 body { background: radial-gradient(1200px 600px at 50% -10%, #2a2230 0%, var(--bg) 60%) fixed, var(--bg); color: var(--text);
   font: 15px/1.55 system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; min-height: 100vh; }
-main { max-width: 1180px; margin: 0 auto; padding: 40px 16px 56px; }
+main { max-width: 1180px; margin: 0 auto; padding: calc(40px + env(safe-area-inset-top)) 16px calc(56px + env(safe-area-inset-bottom)); }
 header { text-align: center; margin-bottom: 32px; }
 header .eyebrow { color: var(--gold); font: 700 12px/1 var(--serif); letter-spacing: .32em; }
 header h1 { margin: 12px 0 8px; font: 900 clamp(30px, 6vw, 48px)/1.15 var(--serif); letter-spacing: -.01em; }
@@ -46,7 +52,7 @@ header p { margin: 0; color: var(--muted); }
 .links a.main:hover { color: #111; filter: brightness(1.08); }
 footer { margin-top: 36px; text-align: center; color: #6f6973; font-size: 12px; }
 @media (max-width: 560px) {
-  main { padding-top: 28px; }
+  main { padding-top: calc(28px + env(safe-area-inset-top)); }
   .grid { grid-template-columns: 1fr; }
   .cover { aspect-ratio: 16 / 11; }
 }
@@ -114,7 +120,7 @@ footer { margin-top: 36px; text-align: center; color: #6f6973; font-size: 12px; 
     </article>
   </section>
 
-  <footer>polos0117 · 개인 공방</footer>
+  <footer>polos0117 · 개인 공방 · 홈 화면에 추가하면 앱처럼 열린다</footer>
 </main>
 </body>
 </html>

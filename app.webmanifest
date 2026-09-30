@@ -1,0 +1,16 @@
+{
+  "name": "공방 모음",
+  "short_name": "공방",
+  "description": "건담 · 삼국지 · 포켓몬 · 신화 무기 — 네 공방으로 들어가는 메인.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f0e12",
+  "theme_color": "#0f0e12",
+  "lang": "ko",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
