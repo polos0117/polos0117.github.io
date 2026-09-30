@@ -18,109 +18,318 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&display=swap">
 <style>
 :root {
-  --bg: #0f0e12; --card: #18161d; --line: #ffffff1a; --text: #f1ece2; --muted: #a8a09a; --gold: #d9b45a;
+  --bg: #0b0a0e; --card: #18161d; --line: #ffffff1a; --text: #f1ece2; --muted: #a8a09a; --gold: #d9b45a;
   --serif: 'Noto Serif KR', 'Apple Myungjo', 'Nanum Myeongjo', Georgia, serif;
+  --sans: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
-body { background: radial-gradient(1200px 600px at 50% -10%, #2a2230 0%, var(--bg) 60%) fixed, var(--bg); color: var(--text);
-  font: 15px/1.55 system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; min-height: 100vh; }
-main { max-width: 1180px; margin: 0 auto; padding: calc(40px + env(safe-area-inset-top)) 16px calc(56px + env(safe-area-inset-bottom)); }
-header { text-align: center; margin-bottom: 32px; }
-header .eyebrow { color: var(--gold); font: 700 12px/1 var(--serif); letter-spacing: .32em; }
-header h1 { margin: 12px 0 8px; font: 900 clamp(30px, 6vw, 48px)/1.15 var(--serif); letter-spacing: -.01em; }
-header p { margin: 0; color: var(--muted); }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 18px; }
-.site { position: relative; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 16px; overflow: hidden;
-  background: var(--card); box-shadow: 0 10px 30px #0006; transition: transform .2s ease, border-color .2s ease; }
-.site:hover, .site:focus-within { transform: translateY(-3px); border-color: var(--accent); }
-.cover { position: relative; display: block; aspect-ratio: 4 / 5; overflow: hidden; background: var(--tint); }
-.cover img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; display: block; transition: transform .5s ease; }
-.site:hover .cover img { transform: scale(1.04); }
-.cover::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 45%, #000c 100%); }
-.cover .name { position: absolute; left: 16px; right: 16px; bottom: 14px; z-index: 1; }
-.cover .tag { display: inline-block; padding: 3px 9px; border-radius: 99px; background: var(--accent); color: #111; font: 700 11px/1.4 var(--serif); letter-spacing: .06em; }
-.cover h2 { margin: 8px 0 2px; font: 900 26px/1.2 var(--serif); color: #fff; text-shadow: 0 2px 10px #000a; }
-.cover .sub { color: #e8e2d8cc; font-size: 13px; }
-.body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
-.body p { margin: 0; color: var(--muted); font-size: 14px; }
-.links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
-.links a { min-height: 36px; display: inline-flex; align-items: center; padding: 0 12px; border: 1px solid var(--line); border-radius: 99px;
-  color: var(--text); text-decoration: none; font-size: 13px; font-weight: 600; background: #ffffff08; }
-.links a:hover, .links a:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
-.links a.main { background: var(--accent); border-color: var(--accent); color: #111; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font: 15px/1.55 var(--sans); overflow-x: hidden; }
+a { color: inherit; }
+
+/* ── 한 장면: 긴 구역 안에 화면 높이의 무대가 붙어 있고, 스크롤 진행(--in·--out)으로 층이 따로 움직인다.
+   다음 장면은 앞 장면의 마지막 한 화면과 겹친다 — 올라오는 동안에도 무대는 화면에 붙어(--lift) 앞 장면 위로 스며든다 ── */
+.scene { position: relative; height: 280vh; }
+.site { margin-top: -100vh; }
+#myth { height: 180vh; }
+.stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; perspective: 1100px; isolation: isolate; transform: translate3d(0, calc(var(--lift, 0) * -1px), 0); }
+.scene.hide .stage { visibility: hidden; }
+.site:not(.live) .links { pointer-events: none; }
+.layer { position: absolute; inset: 0; pointer-events: none; will-change: transform, opacity; }
+
+/* 처음 화면 */
+.intro { height: 240vh; }
+.intro .stage { display: grid; place-items: center; background: radial-gradient(900px 620px at 50% 38%, #2a2230 0%, var(--bg) 70%); }
+#dust { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hero { position: relative; text-align: center; padding: 0 16px; transform: translateZ(0) scale(calc(1 - .35 * var(--out, 0))); opacity: calc(1 - var(--out, 0) * 1.2); filter: blur(calc(var(--out, 0) * 6px)); }
+.hero .eyebrow { color: var(--gold); font: 700 12px/1 var(--serif); letter-spacing: .4em; }
+.hero h1 { margin: 16px 0 10px; font: 900 clamp(44px, 11vw, 104px)/1.05 var(--serif); letter-spacing: -.02em;
+  background: linear-gradient(180deg, #fff 30%, var(--gold) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.hero p { margin: 0; color: var(--muted); font-size: clamp(14px, 2.4vw, 17px); }
+.hero .four { display: flex; gap: 10px; justify-content: center; margin-top: 22px; }
+.hero .four i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); box-shadow: 0 0 12px var(--c); }
+.cue { position: absolute; left: 50%; bottom: calc(26px + env(safe-area-inset-bottom)); transform: translateX(-50%); color: var(--muted); font-size: 12px; letter-spacing: .2em; opacity: calc(1 - var(--out, 0) * 3); text-align: center; }
+.cue::after { content: ''; display: block; width: 1px; height: 38px; margin: 10px auto 0; background: linear-gradient(var(--gold), transparent); animation: cue 1.8s ease-in-out infinite; }
+@keyframes cue { 0% { transform: scaleY(0); transform-origin: top; } 50% { transform: scaleY(1); transform-origin: top; } 51% { transform-origin: bottom; } 100% { transform: scaleY(0); transform-origin: bottom; } }
+
+/* 공방 장면 */
+.site .stage::before { content: ''; position: absolute; inset: 0; background: var(--tint); opacity: var(--in, 0); }
+.site .bg { background: center / cover no-repeat var(--bgimg); filter: blur(22px) saturate(1.2) brightness(.55);
+  transform: scale(calc(1.3 - .12 * var(--in, 0) + .35 * var(--out, 0))); opacity: calc(var(--in, 0) * (1 - var(--out, 0))); }
+.site .glow { background: radial-gradient(60% 55% at var(--gx, 68%) 45%, color-mix(in srgb, var(--accent) 42%, transparent), transparent 70%);
+  opacity: calc(var(--in, 0) * (1 - var(--out, 0))); }
+.site .deco { opacity: calc(.9 * var(--in, 0) * (1 - var(--out, 0))); transform: translate3d(calc(var(--mx, 0) * -14px), calc(var(--my, 0) * -10px + (1 - var(--in, 0)) * 60px), 0); }
+.site .vign { background: radial-gradient(120% 90% at 50% 50%, transparent 45%, #000c 100%); opacity: var(--in, 0); }
+
+.art { position: absolute; top: 50%; left: 64%; width: min(46vh, 40vw); aspect-ratio: 2 / 3; transform-style: preserve-3d;
+  transform: translate3d(calc(-50% + var(--mx, 0) * 16px), calc(-50% + var(--my, 0) * 12px + (1 - var(--in, 0)) * 22vh), 0)
+    rotateY(calc((1 - var(--in, 0)) * -22deg + var(--mx, 0) * 5deg)) rotateX(calc(var(--my, 0) * -4deg))
+    scale(calc(.68 + .32 * var(--in, 0) + .9 * var(--out, 0)));
+  opacity: calc(var(--in, 0) * (1 - var(--out, 0) * 1.3)); will-change: transform, opacity; }
+.art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 14px; box-shadow: 0 30px 80px #000c, 0 0 0 1px #ffffff22, 0 0 60px color-mix(in srgb, var(--accent) 35%, transparent); }
+.art .shine { position: absolute; inset: 0; border-radius: 14px; background: linear-gradient(115deg, transparent 35%, #ffffff30 48%, transparent 60%); background-size: 250% 100%;
+  background-position: calc(120% - var(--in, 0) * 140%) 0; mix-blend-mode: overlay; }
+/* 삼국지 — 초상 넷이 겹쳐 선다 */
+.art.trio { aspect-ratio: 1 / 1.25; }
+.art.trio img { width: 72%; height: auto; aspect-ratio: 1; inset: auto; border-radius: 50%; border: 3px solid var(--accent); }
+.art.trio img:nth-child(1) { left: 14%; top: 18%; z-index: 3; width: 72%; transform: translateZ(40px); }
+.art.trio img:nth-child(2) { left: -12%; top: 0; width: 46%; filter: brightness(.75); transform: translateZ(-60px) translateX(calc(var(--in, 0) * -8%)); }
+.art.trio img:nth-child(3) { right: -12%; left: auto; top: 4%; width: 46%; filter: brightness(.75); transform: translateZ(-60px) translateX(calc(var(--in, 0) * 8%)); }
+.art.trio img:nth-child(4) { left: 26%; bottom: -6%; top: auto; width: 40%; filter: brightness(.7); transform: translateZ(-90px); }
+
+.copy { position: absolute; left: max(6vw, 16px); top: 50%; width: min(460px, 44vw);
+  transform: translate3d(calc(var(--mx, 0) * 6px), calc(-50% + (1 - var(--in2, 0)) * 50px - var(--out, 0) * 60px), 0);
+  opacity: calc(var(--in2, 0) - var(--out, 0) * 1.6); }
+.copy .num { color: var(--accent); font: 700 12px/1 var(--serif); letter-spacing: .3em; }
+.copy .tag { display: inline-block; margin-top: 14px; padding: 4px 11px; border-radius: 99px; background: var(--accent); color: #111; font: 700 12px/1.4 var(--serif); letter-spacing: .08em; }
+.copy h2 { word-break: keep-all; margin: 12px 0 6px; font: 900 clamp(34px, 5.4vw, 64px)/1.1 var(--serif); letter-spacing: -.02em; text-shadow: 0 4px 30px #000a; }
+.copy .sub { color: color-mix(in srgb, var(--accent) 70%, #fff); font-weight: 600; font-size: 15px; }
+.copy p { margin: 14px 0 20px; color: #d8d2c8; font-size: 15px; max-width: 34em; }
+.links { display: flex; flex-wrap: wrap; gap: 8px; pointer-events: auto; }
+.links a { min-height: 42px; display: inline-flex; align-items: center; padding: 0 16px; border: 1px solid #ffffff33; border-radius: 99px; background: #0008;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); text-decoration: none; font-size: 14px; font-weight: 600; transition: border-color .15s, color .15s, transform .15s; }
+.links a:hover, .links a:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; transform: translateY(-1px); }
+.links a.main { background: var(--accent); border-color: var(--accent); color: #111; font-weight: 800; }
 .links a.main:hover { color: #111; filter: brightness(1.08); }
-footer { margin-top: 36px; text-align: center; color: #6f6973; font-size: 12px; }
-@media (max-width: 560px) {
-  main { padding-top: calc(28px + env(safe-area-inset-top)); }
-  .grid { grid-template-columns: 1fr; }
-  .cover { aspect-ratio: 16 / 11; }
+
+/* 공방마다 장식 */
+.hud { background:
+  linear-gradient(transparent 49.6%, #7fb3ff33 50%, transparent 50.4%) 0 0 / 100% 80px,
+  linear-gradient(90deg, transparent 49.6%, #7fb3ff22 50%, transparent 50.4%) 0 0 / 80px 100%;
+  mask-image: radial-gradient(70% 70% at 64% 50%, #000 20%, transparent 75%); -webkit-mask-image: radial-gradient(70% 70% at 64% 50%, #000 20%, transparent 75%); }
+.hud::after { content: ''; position: absolute; left: 0; right: 0; height: 30%; background: linear-gradient(transparent, #7fb3ff22, transparent); animation: scan 4s linear infinite; }
+@keyframes scan { from { top: -30%; } to { top: 100%; } }
+.slats { background: repeating-linear-gradient(90deg, #c9a22714 0 38px, transparent 38px 46px);
+  mask-image: linear-gradient(90deg, transparent 40%, #000 60%, #000 90%, transparent); -webkit-mask-image: linear-gradient(90deg, transparent 40%, #000 60%, #000 90%, transparent); }
+.bolt { background: repeating-linear-gradient(115deg, transparent 0 60px, #f4c54218 60px 64px, transparent 64px 140px); }
+.rays { background: repeating-conic-gradient(from 0deg at 64% 45%, #d9b45a18 0 4deg, transparent 4deg 16deg);
+  mask-image: radial-gradient(60% 60% at 64% 45%, #000, transparent 75%); -webkit-mask-image: radial-gradient(60% 60% at 64% 45%, #000, transparent 75%); }
+
+/* 오른쪽 점 — 지금 장면, 눌러서 건너뛰기 */
+.dots { position: fixed; right: calc(14px + env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); z-index: 10; display: flex; flex-direction: column; gap: 12px; transition: opacity .3s; }
+.dots.gone { opacity: 0; pointer-events: none; }
+.dots a { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #ffffff66; background: transparent; transition: .2s; position: relative; }
+.dots a.on { background: var(--c); border-color: var(--c); box-shadow: 0 0 12px var(--c); transform: scale(1.2); }
+.dots a span { position: absolute; right: 22px; top: 50%; transform: translateY(-50%); white-space: nowrap; font-size: 12px; color: #fff; opacity: 0; transition: .2s; pointer-events: none; }
+.dots a:hover span, .dots a.on span { opacity: .85; }
+
+/* 맨 아래 — 모든 공방 한눈에 */
+.all { padding: 80px 16px calc(64px + env(safe-area-inset-bottom)); max-width: 1180px; margin: 0 auto; }
+.all h2 { text-align: center; margin: 0 0 6px; font: 900 32px/1.2 var(--serif); }
+.all > p { text-align: center; margin: 0 0 28px; color: var(--muted); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.card { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: var(--card); transition: transform .2s, border-color .2s; }
+.card:hover, .card:focus-within { transform: translateY(-3px); border-color: var(--accent); }
+.card .cover { position: relative; display: block; aspect-ratio: 4 / 5; overflow: hidden; background: var(--tint); }
+.card .cover img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; display: block; }
+.card .cover::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 50%, #000c); }
+.card .name { position: absolute; left: 14px; right: 14px; bottom: 12px; z-index: 1; font: 900 22px/1.2 var(--serif); color: #fff; }
+.card .links { padding: 12px 14px 14px; gap: 6px; }
+.card .links a { min-height: 36px; padding: 0 12px; font-size: 13px; background: #ffffff08; }
+.card .links a.main { background: var(--accent); }
+footer { text-align: center; color: #6f6973; font-size: 12px; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+
+/* 폰 — 그림은 위, 글은 아래 */
+@media (max-width: 760px) {
+  .scene { height: 250vh; }
+  .intro { height: 210vh; }
+  #myth { height: 170vh; }
+  .art { left: 50%; top: 34%; width: min(56vw, 36vh); }
+  .art.trio { width: min(62vw, 34vh); }
+  .copy { left: 16px; right: 16px; width: auto; top: auto; bottom: calc(22px + env(safe-area-inset-bottom));
+    transform: translate3d(0, calc((1 - var(--in2, 0)) * 50px - var(--out, 0) * 60px), 0); }
+  .copy h2 { font-size: clamp(30px, 9vw, 40px); margin-top: 8px; }
+  .copy p { margin: 8px 0 14px; font-size: 14px; }
+  .copy .tag { margin-top: 8px; }
+  .links a { min-height: 38px; padding: 0 13px; font-size: 13px; }
+  .site .vign { background: linear-gradient(180deg, transparent 40%, #000d 78%); }
+  .dots { right: 8px; top: 26%; }
+  .dots a span { display: none; }
+  .hud, .rays { mask-image: radial-gradient(80% 50% at 50% 34%, #000 20%, transparent 75%); -webkit-mask-image: radial-gradient(80% 50% at 50% 34%, #000 20%, transparent 75%); }
+}
+/* 움직임 줄이기 — 연출 없이 바로 목록 */
+@media (prefers-reduced-motion: reduce) {
+  .intro, .site, .dots { display: none; }
+  html { scroll-behavior: auto; }
 }
 </style>
 </head>
 <body>
-<main>
-  <header>
-    <div class="eyebrow">ATELIER</div>
-    <h1>공방 모음</h1>
-    <p>네 공방 중 하나를 골라 들어간다.</p>
-  </header>
 
-  <section class="grid" aria-label="공방">
-    <article class="site" style="--accent:#7fb3ff;--tint:#151a21">
-      <a class="cover" href="/atelier/" aria-label="건담 격납고 열기">
-        <img src="/atelier/img/thumb/RX-78-2_건담_f.webp" alt="" loading="lazy">
-        <div class="name"><span class="tag">GUNDAM</span><h2>건담 드래프트</h2><div class="sub">기동전사 · 3D 격납고</div></div>
-      </a>
-      <div class="body">
-        <p>3D 격납고를 걸어 다니며 기체를 둘러보고, 드래프트로 출격한다.</p>
-        <nav class="links" aria-label="건담">
-          <a class="main" href="/atelier/">격납고</a><a href="/atelier/play.html">드래프트</a><a href="/atelier/dex.html">도감</a><a href="/atelier/prompt.html">프롬프트</a>
-        </nav>
-      </div>
+<nav class="dots" aria-label="장면">
+  <a href="#gundam" style="--c:#7fb3ff" aria-label="건담"><span>건담</span></a>
+  <a href="#samguk" style="--c:#c9a227" aria-label="삼국지"><span>삼국지</span></a>
+  <a href="#pokemon" style="--c:#f4c542" aria-label="포켓몬"><span>포켓몬</span></a>
+  <a href="#myth" style="--c:#d9b45a" aria-label="신화 무기"><span>신화 무기</span></a>
+</nav>
+
+<section class="scene intro" id="top">
+  <div class="stage">
+    <canvas id="dust" aria-hidden="true"></canvas>
+    <div class="hero">
+      <div class="eyebrow">ATELIER</div>
+      <h1>공방 모음</h1>
+      <p>건담 · 삼국지 · 포켓몬 · 신화 무기</p>
+      <div class="four" aria-hidden="true"><i style="--c:#7fb3ff"></i><i style="--c:#c9a227"></i><i style="--c:#f4c542"></i><i style="--c:#d9b45a"></i></div>
+    </div>
+    <div class="cue">SCROLL</div>
+  </div>
+</section>
+
+<section class="scene site" id="gundam" style="--accent:#7fb3ff;--tint:#0c1118;--bgimg:url('/atelier/img/thumb/RX-78-2_건담_f.webp')">
+  <div class="stage">
+    <div class="layer bg"></div><div class="layer glow"></div><div class="layer deco hud"></div><div class="layer vign"></div>
+    <div class="art"><img src="/atelier/img/RX-78-2_건담_f.webp" alt="" decoding="async"><div class="shine"></div></div>
+    <div class="copy">
+      <div class="num">01 / HANGAR</div><span class="tag">GUNDAM</span>
+      <h2>건담 드래프트</h2><div class="sub">기동전사 · 3D 격납고</div>
+      <p>3D 격납고를 걸어 다니며 기체를 둘러보고, 드래프트로 출격한다.</p>
+      <nav class="links" aria-label="건담"><a class="main" href="/atelier/">격납고</a><a href="/atelier/play.html">드래프트</a><a href="/atelier/dex.html">도감</a><a href="/atelier/prompt.html">프롬프트</a></nav>
+    </div>
+  </div>
+</section>
+
+<section class="scene site" id="samguk" style="--accent:#c9a227;--tint:#120e0a;--bgimg:url('/atelier/sam/images/large/관우.jpg')">
+  <div class="stage">
+    <div class="layer bg"></div><div class="layer glow"></div><div class="layer deco slats"></div><div class="layer vign"></div>
+    <div class="art trio">
+      <img src="/atelier/sam/images/large/관우.jpg" alt="" decoding="async">
+      <img src="/atelier/sam/images/large/여포.jpg" alt="" decoding="async">
+      <img src="/atelier/sam/images/large/조운.jpg" alt="" decoding="async">
+      <img src="/atelier/sam/images/large/장비.jpg" alt="" decoding="async">
+    </div>
+    <div class="copy">
+      <div class="num">02 / 竹簡</div><span class="tag">三國志</span>
+      <h2>삼국지 드래프트</h2><div class="sub">장수를 뽑아 진영을 꾸린다</div>
+      <p>위·촉·오의 장수들을 드래프트로 모아 한 진영을 짠다.</p>
+      <nav class="links" aria-label="삼국지"><a class="main" href="/atelier/sam/">들어가기</a></nav>
+    </div>
+  </div>
+</section>
+
+<section class="scene site" id="pokemon" style="--accent:#f4c542;--tint:#15130a;--bgimg:url('/pkm-atelier-img/img/thumb/피카츄_heavy_cinematic_semi_real_f.webp')">
+  <div class="stage">
+    <div class="layer bg"></div><div class="layer glow"></div><div class="layer deco bolt"></div><div class="layer vign"></div>
+    <div class="art"><img src="/pkm-atelier-img/img/피카츄_heavy_cinematic_semi_real_f.webp" alt="" decoding="async"><div class="shine"></div></div>
+    <div class="copy">
+      <div class="num">03 / LAB</div><span class="tag">POKÉMON</span>
+      <h2>포켓몬 메카 연구소</h2><div class="sub">메카 의인화 · 연구소</div>
+      <p>포켓몬을 메카로 의인화한 도감과 전투, 일곱 판 달리기.</p>
+      <nav class="links" aria-label="포켓몬"><a class="main" href="/pkm-atelier/">연구소</a><a href="/pkm-atelier/dex.html">도감</a><a href="/pkm-atelier/battle.html">전투</a><a href="/pkm-atelier/run.html">런</a><a href="/pkm-atelier/prompt.html">프롬프트</a></nav>
+    </div>
+  </div>
+</section>
+
+<section class="scene site" id="myth" style="--accent:#d9b45a;--tint:#100d12;--bgimg:url('/myth-atelier-img/img/thumb/묠니르_game_keyart_f.webp')">
+  <div class="stage">
+    <div class="layer bg"></div><div class="layer glow"></div><div class="layer deco rays"></div><div class="layer vign"></div>
+    <div class="art"><img src="/myth-atelier-img/img/묠니르_game_keyart_f.webp" alt="" decoding="async"><div class="shine"></div></div>
+    <div class="copy">
+      <div class="num">04 / MYTH</div><span class="tag">MYTH</span>
+      <h2>신화 무기 공방</h2><div class="sub">열한 권 · 백예순다섯 자루</div>
+      <p>신화 속 무기가 사람이 되어 싸운다. 오토 배틀러와 3D 박물관.</p>
+      <nav class="links" aria-label="신화 무기"><a class="main" href="/myth-atelier/">공방</a><a href="/myth-atelier/auto.html">오토 배틀</a><a href="/myth-atelier/museum.html">박물관</a><a href="/myth-atelier/dex.html">도감</a><a href="/myth-atelier/draft.html">드래프트</a><a href="/myth-atelier/run.html">던전</a><a href="/myth-atelier/prompt.html">프롬프트</a></nav>
+    </div>
+  </div>
+</section>
+
+<section class="all" id="all" aria-label="모든 공방">
+  <h2>모든 공방</h2>
+  <p>바로 들어가기</p>
+  <div class="grid">
+    <article class="card" style="--accent:#7fb3ff;--tint:#151a21">
+      <a class="cover" href="/atelier/" aria-label="건담 격납고 열기"><img src="/atelier/img/thumb/RX-78-2_건담_f.webp" alt="" loading="lazy"><div class="name">건담 드래프트</div></a>
+      <nav class="links" aria-label="건담"><a class="main" href="/atelier/">격납고</a><a href="/atelier/play.html">드래프트</a><a href="/atelier/dex.html">도감</a><a href="/atelier/prompt.html">프롬프트</a></nav>
     </article>
-
-    <article class="site" style="--accent:#c9a227;--tint:#17130f">
-      <a class="cover" href="/atelier/sam/" aria-label="삼국지 드래프트 열기">
-        <img src="/atelier/sam/images/large/관우.jpg" alt="" loading="lazy">
-        <div class="name"><span class="tag">三國志</span><h2>삼국지 드래프트</h2><div class="sub">竹簡 · 장수 드래프트</div></div>
-      </a>
-      <div class="body">
-        <p>위·촉·오의 장수를 뽑아 진영을 꾸리는 드래프트.</p>
-        <nav class="links" aria-label="삼국지">
-          <a class="main" href="/atelier/sam/">들어가기</a>
-        </nav>
-      </div>
+    <article class="card" style="--accent:#c9a227;--tint:#17130f">
+      <a class="cover" href="/atelier/sam/" aria-label="삼국지 드래프트 열기"><img src="/atelier/sam/images/large/관우.jpg" alt="" loading="lazy"><div class="name">삼국지 드래프트</div></a>
+      <nav class="links" aria-label="삼국지"><a class="main" href="/atelier/sam/">들어가기</a></nav>
     </article>
-
-    <article class="site" style="--accent:#f4c542;--tint:#2a2718">
-      <a class="cover" href="/pkm-atelier/" aria-label="포켓몬 메카 연구소 열기">
-        <img src="/pkm-atelier-img/img/thumb/피카츄_heavy_cinematic_semi_real_f.webp" alt="" loading="lazy">
-        <div class="name"><span class="tag">POKÉMON</span><h2>포켓몬 메카 연구소</h2><div class="sub">메카 의인화 · 연구소</div></div>
-      </a>
-      <div class="body">
-        <p>포켓몬을 메카로 의인화한 도감과 전투, 일곱 판 달리기.</p>
-        <nav class="links" aria-label="포켓몬">
-          <a class="main" href="/pkm-atelier/">연구소</a><a href="/pkm-atelier/dex.html">도감</a><a href="/pkm-atelier/battle.html">전투</a><a href="/pkm-atelier/run.html">런</a><a href="/pkm-atelier/prompt.html">프롬프트</a>
-        </nav>
-      </div>
+    <article class="card" style="--accent:#f4c542;--tint:#2a2718">
+      <a class="cover" href="/pkm-atelier/" aria-label="포켓몬 메카 연구소 열기"><img src="/pkm-atelier-img/img/thumb/피카츄_heavy_cinematic_semi_real_f.webp" alt="" loading="lazy"><div class="name">포켓몬 메카 연구소</div></a>
+      <nav class="links" aria-label="포켓몬"><a class="main" href="/pkm-atelier/">연구소</a><a href="/pkm-atelier/dex.html">도감</a><a href="/pkm-atelier/battle.html">전투</a><a href="/pkm-atelier/run.html">런</a><a href="/pkm-atelier/prompt.html">프롬프트</a></nav>
     </article>
-
-    <article class="site" style="--accent:#d9b45a;--tint:#121016">
-      <a class="cover" href="/myth-atelier/" aria-label="신화 무기 공방 열기">
-        <img src="/myth-atelier-img/img/thumb/묠니르_game_keyart_f.webp" alt="" loading="lazy">
-        <div class="name"><span class="tag">MYTH</span><h2>신화 무기 공방</h2><div class="sub">열한 권 · 백예순다섯 자루</div></div>
-      </a>
-      <div class="body">
-        <p>신화 속 무기가 사람이 되어 싸운다. 오토 배틀러와 3D 박물관.</p>
-        <nav class="links" aria-label="신화 무기">
-          <a class="main" href="/myth-atelier/">공방</a><a href="/myth-atelier/auto.html">오토 배틀</a><a href="/myth-atelier/dex.html">도감</a><a href="/myth-atelier/museum.html">박물관</a><a href="/myth-atelier/draft.html">드래프트</a><a href="/myth-atelier/run.html">던전</a><a href="/myth-atelier/prompt.html">프롬프트</a>
-        </nav>
-      </div>
+    <article class="card" style="--accent:#d9b45a;--tint:#121016">
+      <a class="cover" href="/myth-atelier/" aria-label="신화 무기 공방 열기"><img src="/myth-atelier-img/img/thumb/묠니르_game_keyart_f.webp" alt="" loading="lazy"><div class="name">신화 무기 공방</div></a>
+      <nav class="links" aria-label="신화 무기"><a class="main" href="/myth-atelier/">공방</a><a href="/myth-atelier/auto.html">오토 배틀</a><a href="/myth-atelier/museum.html">박물관</a><a href="/myth-atelier/dex.html">도감</a><a href="/myth-atelier/draft.html">드래프트</a><a href="/myth-atelier/run.html">던전</a><a href="/myth-atelier/prompt.html">프롬프트</a></nav>
     </article>
-  </section>
+  </div>
+</section>
+<footer>polos0117 · 개인 공방 · 홈 화면에 추가하면 앱처럼 열린다</footer>
 
-  <footer>polos0117 · 개인 공방 · 홈 화면에 추가하면 앱처럼 열린다</footer>
-</main>
+<script>
+(() => {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const clamp = v => Math.max(0, Math.min(1, v));
+  const ease = t => t * t * (3 - 2 * t);
+  const scenes = [...document.querySelectorAll('.scene')];
+  const sites = scenes.filter(s => s.classList.contains('site'));
+  const dotBar = document.querySelector('.dots'), dots = [...dotBar.querySelectorAll('a')];
+
+  /* 스크롤 진행 → 장면마다 --in(올라옴) --in2(글, 조금 늦게) --out(다음 장면이 덮으며 빨려 나감) */
+  const all = document.getElementById('all');
+  let ticking = false, introLive = true;
+  function frame() {
+    ticking = false;
+    const vh = innerHeight, top = scenes.map(s => s.getBoundingClientRect().top);
+    const rise = top.map((t, i) => i ? clamp(1 - t / vh) : 1);   // 화면 아래에서 올라오는 동안 0 → 1
+    scenes.forEach((s, i) => {
+      const out = i === scenes.length - 1 ? 0 : ease(rise[i + 1]);
+      if (i) {
+        s.style.setProperty('--in', ease(rise[i]).toFixed(3));
+        s.style.setProperty('--in2', ease(clamp((rise[i] - .5) / .5)).toFixed(3));
+        s.style.setProperty('--lift', Math.max(0, top[i]).toFixed(1));
+      }
+      s.style.setProperty('--out', out.toFixed(3));
+      s.classList.toggle('hide', rise[i] <= 0 || out >= 1);
+    });
+    introLive = rise[1] < 1;
+    let on = -1;
+    sites.forEach((s, i) => { if (top[i + 1] <= vh * .5) on = i; });
+    sites.forEach((s, i) => s.classList.toggle('live', i === on));
+    dots.forEach((d, i) => d.classList.toggle('on', i === on));
+    dotBar.classList.toggle('gone', on < 0 || all.getBoundingClientRect().top < vh * .5);
+  }
+  const ask = () => { if (!ticking) { ticking = true; requestAnimationFrame(frame); } };
+  addEventListener('scroll', ask, { passive: true });
+  addEventListener('resize', ask);
+  frame();
+
+  /* 손가락·마우스 위치로 살짝 시점이 따라온다 */
+  let mx = 0, my = 0, tx = 0, ty = 0;
+  addEventListener('pointermove', e => { tx = e.clientX / innerWidth * 2 - 1; ty = e.clientY / innerHeight * 2 - 1; }, { passive: true });
+  const root = document.documentElement;
+  (function drift() {
+    const nx = mx + (tx - mx) * .06, ny = my + (ty - my) * .06;
+    if (Math.abs(nx - mx) + Math.abs(ny - my) > .0005) { mx = nx; my = ny; root.style.setProperty('--mx', mx.toFixed(3)); root.style.setProperty('--my', my.toFixed(3)); }
+    requestAnimationFrame(drift);
+  })();
+
+  /* 첫 화면 금가루 — 첫 화면이 보일 때만 그린다 */
+  const cv = document.getElementById('dust'), g = cv.getContext('2d');
+  let W = 0, H = 0, D = 1, pts = [];
+  const cols = ['#d9b45a', '#7fb3ff', '#c9a227', '#f4c542'];
+  function size() {
+    D = Math.min(devicePixelRatio || 1, 2);
+    W = cv.width = cv.clientWidth * D; H = cv.height = cv.clientHeight * D;
+    pts = Array.from({ length: Math.round(Math.min(140, W * H / (18000 * D * D))) }, () => ({
+      x: Math.random() * W, y: Math.random() * H, z: Math.random() * .8 + .2, r: Math.random() * 1.6 + .4,
+      c: cols[Math.random() * 4 | 0], s: Math.random() * .4 + .1 }));
+  }
+  size(); addEventListener('resize', size);
+  (function dust() {
+    if (introLive) {
+      g.clearRect(0, 0, W, H);
+      for (const p of pts) {
+        p.y -= p.s * p.z * 1.4 * D; if (p.y < -10) { p.y = H + 10; p.x = Math.random() * W; }
+        g.globalAlpha = .35 + .5 * p.z; g.fillStyle = p.c;
+        g.beginPath(); g.arc(p.x + mx * 30 * p.z * D, p.y + my * 20 * p.z * D, p.r * p.z * D, 0, 6.283); g.fill();
+      }
+    }
+    requestAnimationFrame(dust);
+  })();
+})();
+</script>
 </body>
 </html>
