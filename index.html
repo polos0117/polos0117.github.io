@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>공방 모음</title>
-<meta name="description" content="건담 · 삼국지 · 포켓몬 · 신화 무기 — 네 공방을 한곳에서 골라 들어간다.">
+<meta name="description" content="건담 · 삼국지 · 포켓몬 · 신화 무기 · 책 — 다섯 공방을 한곳에서 골라 들어간다.">
 <meta name="theme-color" content="#0f0e12">
 <link rel="icon" href="icon-192.png">
 <link rel="manifest" href="app.webmanifest">
@@ -33,7 +33,7 @@ a { color: inherit; }
    무대가 스크롤을 따라 움직이지 않으니 폰에서도 흔들리지 않고, 값은 스크롤을 부드럽게 쫓아간다 ── */
 .scene { position: relative; height: 280vh; }
 .site { margin-top: -100vh; }
-#myth { height: 180vh; }
+#book { height: 180vh; }
 .stage { position: fixed; inset: 0; overflow: hidden; perspective: 1100px; isolation: isolate; pointer-events: none; }
 .scene.hide .stage { visibility: hidden; }
 .stage .links { pointer-events: none; }
@@ -106,6 +106,20 @@ a { color: inherit; }
 .slats { background: repeating-linear-gradient(90deg, #c9a22714 0 38px, transparent 38px 46px);
   mask-image: linear-gradient(90deg, transparent 40%, #000 60%, #000 90%, transparent); -webkit-mask-image: linear-gradient(90deg, transparent 40%, #000 60%, #000 90%, transparent); }
 .bolt { background: repeating-linear-gradient(115deg, transparent 0 60px, #f4c54218 60px 64px, transparent 64px 140px); }
+/* 책 — 책등이 빽빽한 서가가 뒤에 선다 */
+.shelf { background:
+  repeating-linear-gradient(180deg, transparent 0 150px, #e39b6b22 150px 154px),
+  repeating-linear-gradient(90deg, #e39b6b14 0 14px, transparent 14px 18px, #e39b6b0c 18px 34px, transparent 34px 40px, #e39b6b1a 40px 48px, transparent 48px 58px);
+  mask-image: radial-gradient(70% 70% at 64% 50%, #000 25%, transparent 78%); -webkit-mask-image: radial-gradient(70% 70% at 64% 50%, #000 25%, transparent 78%); }
+/* 책 — 그림이 올라오기 전까지는 가죽 장정 한 권을 그린다 */
+.tome-cover { position: absolute; inset: 0; display: grid; place-content: center; gap: 10px; text-align: center; border-radius: 6px 14px 14px 6px;
+  background: linear-gradient(90deg, #2a1410 0 8%, #e39b6b55 8% 8.6%, transparent 8.6%), radial-gradient(120% 90% at 60% 30%, #8a4433, #4a1f19 70%);
+  border: 1px solid #e39b6b88; box-shadow: 0 30px 80px #000c, inset 0 0 0 10px #00000022, inset 0 0 0 11px #e39b6b55, 0 0 60px #e39b6b40, 6px 0 0 -1px #efe2c8, 9px 0 0 -2px #d9c9a8; }
+.tome-cover b { font: 900 clamp(22px, 4vh, 40px)/1.15 var(--serif); color: #f3d7b4; letter-spacing: .04em; text-shadow: 0 2px 10px #0008; }
+.tome-cover i { font: 700 11px/1 var(--serif); font-style: normal; letter-spacing: .4em; color: #e39b6b; }
+.tome-cover::before, .tome-cover::after { content: ''; position: absolute; left: 22%; right: 12%; height: 1px; background: #e39b6b88; }
+.tome-cover::before { top: 12%; } .tome-cover::after { bottom: 12%; }
+.card .cover .tome-cover { border-radius: 0; box-shadow: inset 0 0 0 10px #00000022, inset 0 0 0 11px #e39b6b55; }
 .rays { background: repeating-conic-gradient(from 0deg at 64% 45%, #d9b45a18 0 4deg, transparent 4deg 16deg);
   mask-image: radial-gradient(60% 60% at 64% 45%, #000, transparent 75%); -webkit-mask-image: radial-gradient(60% 60% at 64% 45%, #000, transparent 75%); }
 
@@ -141,7 +155,7 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
 @media (max-width: 760px) {
   .scene { height: 250vh; }
   .intro { height: 210vh; }
-  #myth { height: 170vh; }
+  #book { height: 170vh; }
   .art { left: 50%; top: 34%; width: min(56vw, 36vh); }
   .art.trio { width: min(62vw, 34vh); }
   .copy { left: 16px; right: 16px; width: auto; top: auto; bottom: calc(22px + env(safe-area-inset-bottom));
@@ -169,6 +183,7 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
   <a href="#samguk" style="--c:#c9a227" aria-label="삼국지"><span>삼국지</span></a>
   <a href="#pokemon" style="--c:#f4c542" aria-label="포켓몬"><span>포켓몬</span></a>
   <a href="#myth" style="--c:#d9b45a" aria-label="신화 무기"><span>신화 무기</span></a>
+  <a href="#book" style="--c:#e39b6b" aria-label="책"><span>책</span></a>
 </nav>
 
 <section class="scene intro" id="top">
@@ -177,8 +192,8 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
     <div class="hero">
       <div class="eyebrow">ATELIER</div>
       <h1>공방 모음</h1>
-      <p>건담 · 삼국지 · 포켓몬 · 신화 무기</p>
-      <div class="four" aria-hidden="true"><i style="--c:#7fb3ff"></i><i style="--c:#c9a227"></i><i style="--c:#f4c542"></i><i style="--c:#d9b45a"></i></div>
+      <p>건담 · 삼국지 · 포켓몬 · 신화 무기 · 책</p>
+      <div class="four" aria-hidden="true"><i style="--c:#7fb3ff"></i><i style="--c:#c9a227"></i><i style="--c:#f4c542"></i><i style="--c:#d9b45a"></i><i style="--c:#e39b6b"></i></div>
     </div>
     <div class="cue">SCROLL</div>
   </div>
@@ -241,6 +256,19 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
   </div>
 </section>
 
+<section class="scene site" id="book" style="--accent:#e39b6b;--tint:#130c0b">
+  <div class="stage">
+    <div class="layer bg"></div><div class="layer glow"></div><div class="layer deco shelf"></div><div class="layer vign"></div>
+    <div class="art"><div class="tome-cover"><i>BOOK / 001</i><b>책의<br>공방</b></div><div class="shine"></div></div>
+    <div class="copy">
+      <div class="num">05 / LIBRARY</div><span class="tag">BOOK</span>
+      <h2>책의 공방</h2><div class="sub">고전 · 발단 · 전개 · 결말</div>
+      <p>도서관에서 깨어난 책들이, 자신의 이야기를 세상에 남기기 위해 싸운다. 책 한 권이 한 사람이 된다.</p>
+      <nav class="links" aria-label="책"><a class="main" href="/book-atelier/">서재</a><a href="/book-atelier/dex.html">서가</a><a href="/book-atelier/prompt.html">프롬프트</a></nav>
+    </div>
+  </div>
+</section>
+
 <section class="all" id="all" aria-label="모든 공방">
   <h2>모든 공방</h2>
   <p>바로 들어가기</p>
@@ -260,6 +288,10 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
     <article class="card" style="--accent:#d9b45a;--tint:#121016">
       <a class="cover" href="/myth-atelier/" aria-label="신화 무기 공방 열기"><img src="/myth-atelier-img/img/thumb/묠니르_game_keyart_f.webp" alt="" loading="lazy"><div class="name">신화 무기 공방</div></a>
       <nav class="links" aria-label="신화 무기"><a class="main" href="/myth-atelier/">공방</a><a href="/myth-atelier/auto.html">오토 배틀</a><a href="/myth-atelier/museum.html">박물관</a><a href="/myth-atelier/dex.html">도감</a><a href="/myth-atelier/draft.html">드래프트</a><a href="/myth-atelier/run.html">던전</a><a href="/myth-atelier/duel.html">결투</a><a href="/myth-atelier/prompt.html">프롬프트</a></nav>
+    </article>
+    <article class="card" style="--accent:#e39b6b;--tint:#1c1210">
+      <a class="cover" href="/book-atelier/" aria-label="책의 공방 열기"><div class="tome-cover" aria-hidden="true"><i>BOOK / 001</i><b>책의<br>공방</b></div><div class="name">책의 공방</div></a>
+      <nav class="links" aria-label="책"><a class="main" href="/book-atelier/">서재</a><a href="/book-atelier/dex.html">서가</a><a href="/book-atelier/prompt.html">프롬프트</a></nav>
     </article>
   </div>
 </section>
@@ -338,13 +370,13 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
   /* 첫 화면 금가루 — 첫 화면이 보일 때만 그린다 */
   const cv = document.getElementById('dust'), g = cv.getContext('2d');
   let W = 0, H = 0, D = 1, pts = [];
-  const cols = ['#d9b45a', '#7fb3ff', '#c9a227', '#f4c542'];
+  const cols = ['#d9b45a', '#7fb3ff', '#c9a227', '#f4c542', '#e39b6b'];
   function size() {
     D = Math.min(devicePixelRatio || 1, 2);
     W = cv.width = cv.clientWidth * D; H = cv.height = cv.clientHeight * D;
     pts = Array.from({ length: Math.round(Math.min(140, W * H / (18000 * D * D))) }, () => ({
       x: Math.random() * W, y: Math.random() * H, z: Math.random() * .8 + .2, r: Math.random() * 1.6 + .4,
-      c: cols[Math.random() * 4 | 0], s: Math.random() * .4 + .1 }));
+      c: cols[Math.random() * cols.length | 0], s: Math.random() * .4 + .1 }));
   }
   size(); addEventListener('resize', size);
   (function dust() {
