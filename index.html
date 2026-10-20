@@ -99,6 +99,7 @@ a { color: inherit; }
   .map { padding-top: calc(4px + env(safe-area-inset-top)); }
   .stage { width: min(100%, calc((100dvh - 8px - env(safe-area-inset-top)) * 1448 / 1086)); }
   .hint { display: none; }
+  body.zoomed .head p { display: none; }   /* 다가가면 문 패널과 겹치는 안내 글은 숨긴다 */
   .doors { padding: 10px 12px 12px; } .doors h2 { font-size: 22px; } .doors p { margin: 6px 0 10px; font-size: 13px; }
   .links a, .links button { min-height: 38px; padding: 0 12px; font-size: 13px; }
 }
@@ -257,7 +258,7 @@ function fit() {
 function enter(k, push) {
   const r = ROOMS.find(q => q.key === k); if (!r) return leave(push);
   on = k; setHot(k);
-  map.classList.add('zoomed'); map.style.setProperty('--c', r.c);
+  map.classList.add('zoomed'); document.body.classList.add('zoomed'); map.style.setProperty('--c', r.c);
   for (const el of rooms.querySelectorAll('.room')) el.classList.toggle('on', el.dataset.key === k);
   doors.innerHTML = `<div class="num">${esc(r.num)}</div><h2>${esc(r.title)}</h2><div class="sub">${esc(r.sub)}</div><p>${esc(r.desc)}</p>
     <nav class="links" aria-label="${esc(r.title)}">${linksHTML(r)}</nav>
@@ -269,7 +270,7 @@ function enter(k, push) {
 }
 function leave(push) {
   on = null; setHot(null);
-  map.classList.remove('zoomed'); map.style.removeProperty('--c');
+  map.classList.remove('zoomed'); document.body.classList.remove('zoomed'); map.style.removeProperty('--c');
   for (const el of rooms.querySelectorAll('.room')) el.classList.remove('on');
   doors.innerHTML = '';
   inner.style.transform = '';
