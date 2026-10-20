@@ -48,6 +48,7 @@ const ROOMS = ['gundam', 'book', 'samguk', 'pokemon', 'myth'];
       const d = await p.locator('#doors').boundingBox(), s2 = await p.locator('#stage').boundingBox();
       if (vp.width > vp.height) assert(d.x >= s2.x + s2.width - 1, name + ' 가로 — 문 패널은 지도 오른쪽'); else assert(d.y >= s2.y + s2.height - 1, name + ' 세로 — 문 패널은 지도 아래');
       for (const b of await p.locator('#doors a, #doors button').all()) { const r = await b.boundingBox(); assert(r.height >= 36, '누르는 자리'); }
+      if (vp.width > vp.height && vp.height <= 500) assert(!(await p.locator('.head').isVisible()), name + ' 가로 폰 — 다가가면 제목이 지도 위에 겹치지 않게 숨는다');
       await noOverflow();
       /* 다른 방은 어두워지고, 이름표는 숨는다 */
       assert.equal(await p.locator('.room.on').getAttribute('data-key'), 'book'); assert.equal(await p.locator('.pin').first().evaluate(e => getComputedStyle(e).opacity), '0', '다가가면 이름표는 숨는다');
