@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>공방 모음</title>
-<meta name="description" content="건담 · 삼국지 · 포켓몬 · 신화 무기 · 책 — 다섯 공방을 한곳에서 골라 들어간다.">
+<meta name="description" content="건담 · 삼국지 · 포켓몬 · 신화 무기 · 책 — 공방 지도에서 방을 골라 들어간다.">
 <meta name="theme-color" content="#0f0e12">
 <link rel="icon" href="icon-192.png">
 <link rel="manifest" href="app.webmanifest">
@@ -16,6 +16,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&display=swap">
+<!--
+  첫 화면 = 공방 지도 한 장(img/map.webp — 지붕을 걷어낸 큰 건물, 방 다섯). 방 자리는 ROOMS 표의 다각형(그림 픽셀 좌표, 1448×1086)이고
+  SVG viewBox 가 그림 크기라 화면이 바뀌어도 같이 늘어난다. 글자는 그림에 없다 — 이름표·미리보기는 화면이 얹는다.
+  방에 올리면 빛나고 이름·대표 그림이 뜬다. 누르면 지도가 그 방으로 다가가고(transform) 그 공방의 문들(하위 링크)이 보인다.
+  주소에 #gundam 처럼 남아 뒤로 가기·공유가 된다. 등불이 복도를 오간다(SMIL). 지도 아래 "모든 공방" 목록은 지도가 불편한 사람·화면 읽기 프로그램의 길.
+  그림을 바꾸면 ROOMS 의 다각형 숫자만 다시 잰다.
+-->
 <style>
 :root {
   --bg: #0b0a0e; --card: #18161d; --line: #ffffff1a; --text: #f1ece2; --muted: #a8a09a; --gold: #d9b45a;
@@ -27,116 +34,76 @@ html, body { margin: 0; }
 html { scroll-behavior: smooth; }
 body { background: var(--bg); color: var(--text); font: 15px/1.55 var(--sans); overflow-x: hidden; }
 a { color: inherit; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-/* ── 한 장면: 긴 구역 안에 화면 높이의 무대가 붙어 있고, 스크롤 진행(--in·--out)으로 층이 따로 움직인다.
-   무대는 화면에 고정돼 있고 구역은 스크롤 길이만 잡는다. 다음 장면 구역은 앞 장면의 마지막 한 화면과 겹쳐, 그동안 앞 장면 위로 스며든다.
-   무대가 스크롤을 따라 움직이지 않으니 폰에서도 흔들리지 않고, 값은 스크롤을 부드럽게 쫓아간다 ── */
-.scene { position: relative; height: 280vh; }
-.site { margin-top: -100vh; }
-#book { height: 180vh; }
-.stage { position: fixed; inset: 0; overflow: hidden; perspective: 1100px; isolation: isolate; pointer-events: none; }
-.scene.hide .stage { visibility: hidden; }
-.stage .links { pointer-events: none; }
-.site.live .stage .links { pointer-events: auto; }
-.layer { position: absolute; inset: 0; pointer-events: none; will-change: transform, opacity; }
-
-/* 처음 화면 */
-.intro { height: 240vh; }
-.intro .stage { display: grid; place-items: center; background: radial-gradient(900px 620px at 50% 38%, #2a2230 0%, var(--bg) 70%); }
-#dust { position: absolute; inset: 0; width: 100%; height: 100%; }
-.hero { position: relative; text-align: center; padding: 0 16px; transform: translateZ(0) scale(calc(1 - .35 * var(--out, 0))); opacity: calc(1 - var(--out, 0) * 1.2); will-change: transform, opacity; }
-.hero .eyebrow { color: var(--gold); font: 700 12px/1 var(--serif); letter-spacing: .4em; }
-.hero h1 { margin: 16px 0 10px; font: 900 clamp(44px, 11vw, 104px)/1.05 var(--serif); letter-spacing: -.02em;
+/* ── 머리 — 작게. 지도가 주인공 ── */
+.head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: calc(14px + env(safe-area-inset-top)) 16px 6px; max-width: 1280px; margin: 0 auto; }
+.head h1 { margin: 0; font: 900 clamp(22px, 3.4vw, 34px)/1.1 var(--serif); letter-spacing: -.02em;
   background: linear-gradient(180deg, #fff 30%, var(--gold) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.hero p { margin: 0; color: var(--muted); font-size: clamp(14px, 2.4vw, 17px); }
-.hero .four { display: flex; gap: 10px; justify-content: center; margin-top: 22px; }
-.hero .four i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); box-shadow: 0 0 12px var(--c); }
-.cue { position: absolute; left: 50%; bottom: calc(26px + env(safe-area-inset-bottom)); transform: translateX(-50%); color: var(--muted); font-size: 12px; letter-spacing: .2em; opacity: calc(1 - var(--out, 0) * 3); text-align: center; }
-.cue::after { content: ''; display: block; width: 1px; height: 38px; margin: 10px auto 0; background: linear-gradient(var(--gold), transparent); animation: cue 1.8s ease-in-out infinite; }
-@keyframes cue { 0% { transform: scaleY(0); transform-origin: top; } 50% { transform: scaleY(1); transform-origin: top; } 51% { transform-origin: bottom; } 100% { transform: scaleY(0); transform-origin: bottom; } }
+.head h1 small { display: block; margin-top: 4px; -webkit-text-fill-color: var(--gold); color: var(--gold); font: 700 11px/1 var(--serif); letter-spacing: .4em; }
+.head p { margin: 0; color: var(--muted); font-size: 12px; text-align: right; }
+.head p a { color: var(--gold); text-decoration: none; }
 
-/* 공방 장면 */
-.site .stage::before { content: ''; position: absolute; inset: 0; background: var(--tint); opacity: var(--in, 0); }
-/* 흐린 배경은 처음 한 번 캔버스로 만들어 둔다 — 움직일 때마다 흐림 필터를 다시 계산하지 않게 */
-.site .bg { background: center / cover no-repeat;
-  transform: scale(calc(1.3 - .12 * var(--in, 0) + .35 * var(--out, 0))); opacity: calc(var(--in, 0) * (1 - var(--out, 0))); }
-.site .glow { background: radial-gradient(60% 55% at var(--gx, 68%) 45%, color-mix(in srgb, var(--accent) 42%, transparent), transparent 70%);
-  opacity: calc(var(--in, 0) * (1 - var(--out, 0))); }
-.site .deco { opacity: calc(.9 * var(--in, 0) * (1 - var(--out, 0))); transform: translate3d(calc(var(--mx, 0) * -14px), calc(var(--my, 0) * -10px + (1 - var(--in, 0)) * 60px), 0); }
-.site .vign { background: radial-gradient(120% 90% at 50% 50%, transparent 45%, #000c 100%); opacity: var(--in, 0); }
-
-.art { position: absolute; top: 50%; left: 64%; width: min(46vh, 40vw); aspect-ratio: 2 / 3; transform-style: preserve-3d;
-  transform: translate3d(calc(-50% + var(--mx, 0) * 16px), calc(-50% + var(--my, 0) * 12px + (1 - var(--in, 0)) * 22vh), 0)
-    rotateY(calc((1 - var(--in, 0)) * -22deg + var(--mx, 0) * 5deg)) rotateX(calc(var(--my, 0) * -4deg))
-    scale(calc(.68 + .32 * var(--in, 0) + .9 * var(--out, 0)));
-  opacity: calc(var(--in, 0) * (1 - var(--out, 0) * 1.3)); will-change: transform, opacity; }
-.art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 14px; box-shadow: 0 30px 80px #000c, 0 0 0 1px #ffffff22, 0 0 60px color-mix(in srgb, var(--accent) 35%, transparent); }
-.art .shine { position: absolute; inset: 0; border-radius: 14px; background: linear-gradient(115deg, transparent 35%, #ffffff26 48%, transparent 60%); background-size: 250% 100%;
-  background-position: calc(120% - var(--in, 0) * 140%) 0; opacity: .5; }
-/* 삼국지 — 초상 넷이 겹쳐 선다 */
-.art.trio { aspect-ratio: 1 / 1.25; }
-.art.trio img { width: 72%; height: auto; aspect-ratio: 1; inset: auto; border-radius: 50%; border: 3px solid var(--accent); }
-.art.trio img:nth-child(1) { left: 14%; top: 18%; z-index: 3; width: 72%; transform: translateZ(40px); }
-.art.trio img:nth-child(2) { left: -12%; top: 0; width: 46%; filter: brightness(.75); transform: translateZ(-60px) translateX(calc(var(--in, 0) * -8%)); }
-.art.trio img:nth-child(3) { right: -12%; left: auto; top: 4%; width: 46%; filter: brightness(.75); transform: translateZ(-60px) translateX(calc(var(--in, 0) * 8%)); }
-.art.trio img:nth-child(4) { left: 26%; bottom: -6%; top: auto; width: 40%; filter: brightness(.7); transform: translateZ(-90px); }
-
-.copy { position: absolute; left: max(6vw, 16px); top: 50%; width: min(460px, 44vw);
-  transform: translate3d(calc(var(--mx, 0) * 6px), calc(-50% + (1 - var(--in2, 0)) * 50px - var(--out, 0) * 60px), 0);
-  opacity: calc(var(--in2, 0) - var(--out, 0) * 1.6); }
-.copy .num { color: var(--accent); font: 700 12px/1 var(--serif); letter-spacing: .3em; }
-.copy .tag { display: inline-block; margin-top: 14px; padding: 4px 11px; border-radius: 99px; background: var(--accent); color: #111; font: 700 12px/1.4 var(--serif); letter-spacing: .08em; }
-.copy h2 { word-break: keep-all; margin: 12px 0 6px; font: 900 clamp(34px, 5.4vw, 64px)/1.1 var(--serif); letter-spacing: -.02em; text-shadow: 0 4px 30px #000a; }
-.copy .sub { color: color-mix(in srgb, var(--accent) 70%, #fff); font-weight: 600; font-size: 15px; }
-.copy p { margin: 14px 0 20px; color: #d8d2c8; font-size: 15px; max-width: 34em; }
-.links { display: flex; flex-wrap: wrap; gap: 8px; pointer-events: auto; }
-.links a { min-height: 42px; display: inline-flex; align-items: center; padding: 0 16px; border: 1px solid #ffffff33; border-radius: 99px; background: #000b;
-  text-decoration: none; font-size: 14px; font-weight: 600; transition: border-color .15s, color .15s, transform .15s; }
-.links a:hover, .links a:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; transform: translateY(-1px); }
-.links a.main { background: var(--accent); border-color: var(--accent); color: #111; font-weight: 800; }
+/* ── 지도 ── */
+.map { position: relative; max-width: 1280px; margin: 0 auto; padding: 0 8px; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+.stage { position: relative; aspect-ratio: 1448 / 1086; width: 100%; overflow: hidden; border-radius: 14px; background: #06070b radial-gradient(70% 60% at 50% 45%, #1b1726, #06070b 70%); isolation: isolate; }
+.inner { position: absolute; inset: 0; transform-origin: 0 0; transition: transform .7s cubic-bezier(.2, .8, .2, 1); will-change: transform; }
+.inner > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; display: block; }
+.inner > svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* 방 — 다각형. 올리면 빛나고, 다가간 방은 더 밝게. 다른 방은 다가가는 동안 어두워진다 */
+.room polygon { fill: var(--c); fill-opacity: 0; stroke: var(--c); stroke-opacity: 0; stroke-width: 6; stroke-linejoin: round; transition: fill-opacity .25s, stroke-opacity .25s; cursor: pointer; }
+.room:hover polygon, .room:focus-visible polygon, .room.hot polygon { fill-opacity: .16; stroke-opacity: .85; filter: url(#glow); }
+.room:focus-visible { outline: none; }
+.map.zoomed .room:not(.on) polygon { fill: #000; fill-opacity: .55; stroke-opacity: 0; filter: none; pointer-events: none; }
+.map.zoomed .room.on polygon { fill-opacity: 0; stroke-opacity: .6; }
+/* 이름표 — 늘 보이는 작은 패. 올리면 미리보기 카드가 그 위에 */
+.pins { position: absolute; inset: 0; pointer-events: none; }
+.pin { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 6px; transition: opacity .3s; }
+.pin b { padding: 4px 11px; border-radius: 99px; background: #000b; border: 1px solid color-mix(in srgb, var(--c) 60%, transparent); color: #fff; font: 700 12px/1.3 var(--serif); letter-spacing: .04em; white-space: nowrap; box-shadow: 0 2px 10px #0009; }
+.pin .peek { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%) translateY(6px); width: 150px; padding: 8px; border-radius: 12px; background: #0c0b11f2; border: 1px solid color-mix(in srgb, var(--c) 55%, transparent); box-shadow: 0 16px 40px #000c, 0 0 30px color-mix(in srgb, var(--c) 30%, transparent); opacity: 0; transition: opacity .2s, transform .2s; }
+.pin .peek img { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; object-position: 50% 15%; border-radius: 8px; }
+.pin .peek i { display: block; margin-top: 6px; color: var(--muted); font: 600 11px/1.4 var(--sans); font-style: normal; white-space: normal; text-align: center; word-break: keep-all; }
+.pin.hot .peek { opacity: 1; transform: translateX(-50%) translateY(0); }
+.map.zoomed .pin { opacity: 0; }
+@media (max-width: 760px) { .pin b { padding: 3px 8px; font-size: 10px; } .pin .peek { width: 118px; } }
+/* 등불 — 복도를 오간다 */
+.lamp { fill: #ffd27a; filter: url(#lamp); }
+.lamp.b { fill: #9fc8ff; }
+/* 다가갔을 때 문 패널 */
+.doors { display: none; padding: 14px 16px 16px; border: 1px solid color-mix(in srgb, var(--c, var(--gold)) 50%, transparent); border-radius: 14px; background: var(--card); box-shadow: 0 0 40px color-mix(in srgb, var(--c, var(--gold)) 18%, transparent); }
+.map.zoomed .doors { display: block; }
+.doors .num { color: var(--c); font: 700 12px/1 var(--serif); letter-spacing: .3em; }
+.doors h2 { margin: 8px 0 2px; font: 900 clamp(24px, 3.6vw, 36px)/1.15 var(--serif); letter-spacing: -.02em; }
+.doors .sub { color: color-mix(in srgb, var(--c) 70%, #fff); font-weight: 600; font-size: 14px; }
+.doors p { margin: 10px 0 14px; color: #d8d2c8; font-size: 14px; max-width: 34em; word-break: keep-all; }
+.links { display: flex; flex-wrap: wrap; gap: 8px; }
+.links a, .links button { min-height: 42px; display: inline-flex; align-items: center; padding: 0 16px; border: 1px solid #ffffff33; border-radius: 99px; background: #000b; color: var(--text);
+  text-decoration: none; font: 600 14px/1 var(--sans); cursor: pointer; transition: border-color .15s, color .15s, transform .15s; }
+.links a:hover, .links a:focus-visible, .links button:hover, .links button:focus-visible { border-color: var(--c, var(--accent)); color: var(--c, var(--accent)); outline: none; transform: translateY(-1px); }
+.links a.main { background: var(--c, var(--accent)); border-color: var(--c, var(--accent)); color: #111; font-weight: 800; }
 .links a.main:hover { color: #111; filter: brightness(1.08); }
+.doors .back { margin-top: 12px; }
+.hint { max-width: 1280px; margin: 6px auto 0; padding: 0 16px; color: #6f6973; font-size: 12px; text-align: center; }
+/* 가로 — 지도가 화면 높이에 들어가게(4:3 그대로, 너비를 줄인다). 다가가면 문 패널이 오른쪽에 */
+@media (orientation: landscape) {
+  .stage { width: min(100%, calc((100dvh - 96px) * 1448 / 1086)); margin: 0 auto; }
+  .map.zoomed { grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); align-items: start; }
+  .map.zoomed .stage { width: 100%; }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .head { padding-top: calc(8px + env(safe-area-inset-top)); padding-bottom: 4px; }
+  .head h1 { font-size: 20px; } .head h1 small { display: none; }
+  .doors { padding: 10px 12px 12px; } .doors h2 { font-size: 22px; } .doors p { margin: 6px 0 10px; font-size: 13px; }
+  .links a, .links button { min-height: 38px; padding: 0 12px; font-size: 13px; }
+}
+/* 폰 세로 — 다가가면 무대를 조금 키워(4:3 보다 높게) 방이 크게 보이게 */
+@media (max-width: 760px) and (orientation: portrait) {
+  .map.zoomed .stage { aspect-ratio: auto; height: 58vh; }
+}
 
-/* 공방마다 장식 */
-.hud { background:
-  linear-gradient(transparent 49.6%, #7fb3ff33 50%, transparent 50.4%) 0 0 / 100% 80px,
-  linear-gradient(90deg, transparent 49.6%, #7fb3ff22 50%, transparent 50.4%) 0 0 / 80px 100%;
-  mask-image: radial-gradient(70% 70% at 64% 50%, #000 20%, transparent 75%); -webkit-mask-image: radial-gradient(70% 70% at 64% 50%, #000 20%, transparent 75%); }
-.hud::after { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 30%; will-change: transform; background: linear-gradient(transparent, #7fb3ff22, transparent); animation: scan 4s linear infinite; }
-@keyframes scan { from { transform: translateY(-100%); } to { transform: translateY(334%); } }
-.slats { background: repeating-linear-gradient(90deg, #c9a22714 0 38px, transparent 38px 46px);
-  mask-image: linear-gradient(90deg, transparent 40%, #000 60%, #000 90%, transparent); -webkit-mask-image: linear-gradient(90deg, transparent 40%, #000 60%, #000 90%, transparent); }
-.bolt { background: repeating-linear-gradient(115deg, transparent 0 60px, #f4c54218 60px 64px, transparent 64px 140px); }
-/* 책 — 책등이 빽빽한 서가가 뒤에 선다 */
-.shelf { background:
-  repeating-linear-gradient(180deg, transparent 0 150px, #e39b6b22 150px 154px),
-  repeating-linear-gradient(90deg, #e39b6b14 0 14px, transparent 14px 18px, #e39b6b0c 18px 34px, transparent 34px 40px, #e39b6b1a 40px 48px, transparent 48px 58px);
-  mask-image: radial-gradient(70% 70% at 64% 50%, #000 25%, transparent 78%); -webkit-mask-image: radial-gradient(70% 70% at 64% 50%, #000 25%, transparent 78%); }
-/* 책 — 그림이 올라오기 전까지는 가죽 장정 한 권을 그린다 */
-.tome-cover { position: absolute; inset: 0; display: grid; place-content: center; gap: 10px; text-align: center; border-radius: 6px 14px 14px 6px;
-  background: linear-gradient(90deg, #2a1410 0 8%, #e39b6b55 8% 8.6%, transparent 8.6%), radial-gradient(120% 90% at 60% 30%, #8a4433, #4a1f19 70%);
-  border: 1px solid #e39b6b88; box-shadow: 0 30px 80px #000c, inset 0 0 0 10px #00000022, inset 0 0 0 11px #e39b6b55, 0 0 60px #e39b6b40, 6px 0 0 -1px #efe2c8, 9px 0 0 -2px #d9c9a8; }
-.tome-cover b { font: 900 clamp(22px, 4vh, 40px)/1.15 var(--serif); color: #f3d7b4; letter-spacing: .04em; text-shadow: 0 2px 10px #0008; }
-.tome-cover i { font: 700 11px/1 var(--serif); font-style: normal; letter-spacing: .4em; color: #e39b6b; }
-.tome-cover::before, .tome-cover::after { content: ''; position: absolute; left: 22%; right: 12%; height: 1px; background: #e39b6b88; }
-.tome-cover::before { top: 12%; } .tome-cover::after { bottom: 12%; }
-.card .cover .tome-cover { border-radius: 0; box-shadow: inset 0 0 0 10px #00000022, inset 0 0 0 11px #e39b6b55; }
-.rays { background: repeating-conic-gradient(from 0deg at 64% 45%, #d9b45a18 0 4deg, transparent 4deg 16deg);
-  mask-image: radial-gradient(60% 60% at 64% 45%, #000, transparent 75%); -webkit-mask-image: radial-gradient(60% 60% at 64% 45%, #000, transparent 75%); }
-
-/* 오른쪽 점 — 지금 장면, 눌러서 건너뛰기 */
-.dots { position: fixed; right: calc(14px + env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); z-index: 10; display: flex; flex-direction: column; gap: 12px; transition: opacity .3s; }
-.dots.gone { opacity: 0; pointer-events: none; }
-.dots a { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #ffffff66; background: transparent; transition: .2s; position: relative; }
-.dots a.on { background: var(--c); border-color: var(--c); box-shadow: 0 0 12px var(--c); transform: scale(1.2); }
-.dots a span { position: absolute; right: 22px; top: 50%; transform: translateY(-50%); white-space: nowrap; font-size: 12px; color: #fff; opacity: 0; transition: .2s; pointer-events: none; }
-.dots a:hover span, .dots a.on span { opacity: .85; }
-
-/* 맨 아래 — 모든 공방 한눈에 */
-/* 목록은 마지막 장면 위로 막이 올라오듯 덮는다 */
-.all { position: relative; z-index: 2; padding: 80px 16px calc(64px + env(safe-area-inset-bottom));
-  background: var(--bg); }
+/* ── 맨 아래 — 모든 공방 한눈에 ── */
+.all { position: relative; z-index: 2; padding: 56px 16px calc(64px + env(safe-area-inset-bottom)); background: var(--bg); }
 .all > * { max-width: 1180px; margin-left: auto; margin-right: auto; }
-.all::before { content: ''; position: absolute; left: 0; right: 0; bottom: 100%; height: 140px; background: linear-gradient(transparent, var(--bg)); pointer-events: none; }
 .all h2 { text-align: center; margin: 0 0 6px; font: 900 32px/1.2 var(--serif); }
 .all > p { text-align: center; margin: 0 0 28px; color: var(--muted); }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
@@ -148,249 +115,166 @@ a { color: inherit; }
 .card .name { position: absolute; left: 14px; right: 14px; bottom: 12px; z-index: 1; font: 900 22px/1.2 var(--serif); color: #fff; }
 .card .links { padding: 12px 14px 14px; gap: 6px; }
 .card .links a { min-height: 36px; padding: 0 12px; font-size: 13px; background: #ffffff08; }
-.card .links a.main { background: var(--accent); }
+.card .links a.main { background: var(--accent); border-color: var(--accent); }
+.card .links a:hover, .card .links a:focus-visible { border-color: var(--accent); color: var(--accent); }
 footer { position: relative; z-index: 2; background: var(--bg); text-align: center; color: #6f6973; font-size: 12px; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
 
-/* 폰 — 그림은 위, 글은 아래 */
-@media (max-width: 760px) {
-  .scene { height: 250vh; }
-  .intro { height: 210vh; }
-  #book { height: 170vh; }
-  .art { left: 50%; top: 34%; width: min(56vw, 36vh); }
-  .art.trio { width: min(62vw, 34vh); }
-  .copy { left: 16px; right: 16px; width: auto; top: auto; bottom: calc(22px + env(safe-area-inset-bottom));
-    transform: translate3d(0, calc((1 - var(--in2, 0)) * 50px - var(--out, 0) * 60px), 0); }
-  .copy h2 { font-size: clamp(30px, 9vw, 40px); margin-top: 8px; }
-  .copy p { margin: 8px 0 14px; font-size: 14px; }
-  .copy .tag { margin-top: 8px; }
-  .links a { min-height: 38px; padding: 0 13px; font-size: 13px; }
-  .site .vign { background: linear-gradient(180deg, transparent 40%, #000d 78%); }
-  .dots { right: 8px; top: 26%; }
-  .dots a span { display: none; }
-  .hud, .rays { mask-image: radial-gradient(80% 50% at 50% 34%, #000 20%, transparent 75%); -webkit-mask-image: radial-gradient(80% 50% at 50% 34%, #000 20%, transparent 75%); }
-}
-/* 움직임 줄이기 — 연출 없이 바로 목록 */
 @media (prefers-reduced-motion: reduce) {
-  .intro, .site, .dots { display: none; }
   html { scroll-behavior: auto; }
+  .inner, .pin, .pin .peek, .room polygon { transition: none; }
+  .lamp { display: none; }
 }
 </style>
 </head>
 <body>
 
-<nav class="dots" aria-label="장면">
-  <a href="#gundam" style="--c:#7fb3ff" aria-label="건담"><span>건담</span></a>
-  <a href="#samguk" style="--c:#c9a227" aria-label="삼국지"><span>삼국지</span></a>
-  <a href="#pokemon" style="--c:#f4c542" aria-label="포켓몬"><span>포켓몬</span></a>
-  <a href="#myth" style="--c:#d9b45a" aria-label="신화 무기"><span>신화 무기</span></a>
-  <a href="#book" style="--c:#e39b6b" aria-label="책"><span>책</span></a>
-</nav>
+<header class="head">
+  <h1><small>ATELIER</small>공방 모음</h1>
+  <p>방을 누르면 들어간다 · <a href="#all">목록으로 보기</a></p>
+</header>
 
-<section class="scene intro" id="top">
-  <div class="stage">
-    <canvas id="dust" aria-hidden="true"></canvas>
-    <div class="hero">
-      <div class="eyebrow">ATELIER</div>
-      <h1>공방 모음</h1>
-      <p>건담 · 삼국지 · 포켓몬 · 신화 무기 · 책</p>
-      <div class="four" aria-hidden="true"><i style="--c:#7fb3ff"></i><i style="--c:#c9a227"></i><i style="--c:#f4c542"></i><i style="--c:#d9b45a"></i><i style="--c:#e39b6b"></i></div>
+<section class="map" id="map" aria-label="공방 지도">
+  <div class="stage" id="stage">
+    <div class="inner" id="inner">
+      <img src="img/map.webp" alt="지붕을 걷어낸 큰 건물 안에 방 다섯 — 격납고·서재·군막·연구소·대장간" decoding="async" fetchpriority="high">
+      <svg id="svg" viewBox="0 0 1448 1086" aria-hidden="true" focusable="false">
+        <defs>
+          <filter id="glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          <filter id="lamp" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          <!-- 복도 — 등불이 다니는 길. 그림을 바꾸면 같이 다시 긋는다 -->
+          <path id="way1" d="M 640 905 C 650 760, 640 600, 660 470 C 700 440, 800 440, 900 450 C 980 455, 1000 480, 960 500"/>
+          <path id="way2" d="M 660 470 C 640 420, 600 420, 560 410 C 480 395, 300 400, 150 420 C 280 405, 500 410, 630 430"/>
+          <path id="way3" d="M 1300 560 C 1200 540, 1100 520, 980 500 C 900 480, 760 460, 690 480 C 760 500, 900 520, 1300 560"/>
+        </defs>
+        <g id="rooms"></g>
+        <g id="lamps">
+          <circle class="lamp" r="5"><animateMotion dur="22s" repeatCount="indefinite" rotate="0"><mpath href="#way1"/></animateMotion></circle>
+          <circle class="lamp b" r="4"><animateMotion dur="26s" begin="-9s" repeatCount="indefinite"><mpath href="#way2"/></animateMotion></circle>
+          <circle class="lamp" r="4"><animateMotion dur="30s" begin="-5s" repeatCount="indefinite"><mpath href="#way3"/></animateMotion></circle>
+        </g>
+      </svg>
     </div>
-    <div class="cue">SCROLL</div>
+    <div class="pins" id="pins" aria-hidden="true"></div>
   </div>
+  <aside class="doors" id="doors" aria-live="polite"></aside>
 </section>
-
-<section class="scene site" id="gundam" style="--accent:#7fb3ff;--tint:#0c1118;--bgimg:url('/atelier/img/thumb/RX-78-2_건담_f.webp')">
-  <div class="stage">
-    <div class="layer bg"></div><div class="layer glow"></div><div class="layer deco hud"></div><div class="layer vign"></div>
-    <div class="art"><img src="/atelier/img/RX-78-2_건담_f.webp" alt="" decoding="async"><div class="shine"></div></div>
-    <div class="copy">
-      <div class="num">01 / HANGAR</div><span class="tag">GUNDAM</span>
-      <h2>건담 드래프트</h2><div class="sub">기동전사 · 3D 격납고</div>
-      <p>3D 격납고를 걸어 다니며 기체를 둘러보고, 드래프트로 출격한다.</p>
-      <nav class="links" aria-label="건담"><a class="main" href="/atelier/">격납고</a><a href="/atelier/play.html">드래프트</a><a href="/atelier/dex.html">도감</a><a href="/atelier/prompt.html">프롬프트</a></nav>
-    </div>
-  </div>
-</section>
-
-<section class="scene site" id="samguk" style="--accent:#c9a227;--tint:#120e0a;--bgimg:url('/sam-atelier/images/large/관우.jpg')">
-  <div class="stage">
-    <div class="layer bg"></div><div class="layer glow"></div><div class="layer deco slats"></div><div class="layer vign"></div>
-    <div class="art trio">
-      <img src="/sam-atelier/images/large/관우.jpg" alt="" decoding="async">
-      <img src="/sam-atelier/images/large/여포.jpg" alt="" decoding="async">
-      <img src="/sam-atelier/images/large/조운.jpg" alt="" decoding="async">
-      <img src="/sam-atelier/images/large/장비.jpg" alt="" decoding="async">
-    </div>
-    <div class="copy">
-      <div class="num">02 / 竹簡</div><span class="tag">三國志</span>
-      <h2>삼국지 쟁탈전</h2><div class="sub">장수를 뽑아 진영을 꾸린다</div>
-      <p>위·촉·오의 장수들을 드래프트로 모아 한 진영을 짠다.</p>
-      <nav class="links" aria-label="삼국지"><a class="main" href="/sam-atelier/">들어가기</a></nav>
-    </div>
-  </div>
-</section>
-
-<section class="scene site" id="pokemon" style="--accent:#f4c542;--tint:#15130a;--bgimg:url('/pkm-atelier-img/img/thumb/피카츄_heavy_cinematic_semi_real_f.webp')">
-  <div class="stage">
-    <div class="layer bg"></div><div class="layer glow"></div><div class="layer deco bolt"></div><div class="layer vign"></div>
-    <div class="art"><img src="/pkm-atelier-img/img/피카츄_heavy_cinematic_semi_real_f.webp" alt="" decoding="async"><div class="shine"></div></div>
-    <div class="copy">
-      <div class="num">03 / LAB</div><span class="tag">POKÉMON</span>
-      <h2>포켓몬 메카 연구소</h2><div class="sub">메카 의인화 · 연구소</div>
-      <p>포켓몬을 메카로 의인화한 도감과 전투, 일곱 판 달리기, 진화 결투, 폼 결투.</p>
-      <nav class="links" aria-label="포켓몬"><a class="main" href="/pkm-atelier/">연구소</a><a href="/pkm-atelier/dex.html">도감</a><a href="/pkm-atelier/battle.html">전투</a><a href="/pkm-atelier/run.html">런</a><a href="/pkm-atelier/lane.html">결투</a><a href="/pkm-atelier/gwent.html">폼 결투</a><a href="/pkm-atelier/prompt.html">프롬프트</a></nav>
-    </div>
-  </div>
-</section>
-
-<section class="scene site" id="myth" style="--accent:#d9b45a;--tint:#100d12;--bgimg:url('/myth-atelier-img/img/thumb/묠니르_game_keyart_f.webp')">
-  <div class="stage">
-    <div class="layer bg"></div><div class="layer glow"></div><div class="layer deco rays"></div><div class="layer vign"></div>
-    <div class="art"><img src="/myth-atelier-img/img/묠니르_game_keyart_f.webp" alt="" decoding="async"><div class="shine"></div></div>
-    <div class="copy">
-      <div class="num">04 / MYTH</div><span class="tag">MYTH</span>
-      <h2>신화 무기 공방</h2><div class="sub">열한 권 · 백여든일곱 자루</div>
-      <p>신화 속 무기가 사람이 되어 싸운다. 오토 배틀러·결투와 3D 박물관.</p>
-      <nav class="links" aria-label="신화 무기"><a class="main" href="/myth-atelier/">공방</a><a href="/myth-atelier/auto.html">오토 배틀</a><a href="/myth-atelier/museum.html">박물관</a><a href="/myth-atelier/dex.html">도감</a><a href="/myth-atelier/draft.html">드래프트</a><a href="/myth-atelier/run.html">던전</a><a href="/myth-atelier/duel.html">결투</a><a href="/myth-atelier/prompt.html">프롬프트</a></nav>
-    </div>
-  </div>
-</section>
-
-<section class="scene site" id="book" style="--accent:#e39b6b;--tint:#130c0b">
-  <div class="stage">
-    <div class="layer bg"></div><div class="layer glow"></div><div class="layer deco shelf"></div><div class="layer vign"></div>
-    <div class="art"><div class="tome-cover"><i>BOOK / 001</i><b>책의<br>공방</b></div><div class="shine"></div></div>
-    <div class="copy">
-      <div class="num">05 / LIBRARY</div><span class="tag">BOOK</span>
-      <h2>책의 공방</h2><div class="sub">고전 · 발단 · 전개 · 결말</div>
-      <p>도서관에서 깨어난 책들이, 자신의 이야기를 세상에 남기기 위해 싸운다. 책 한 권이 한 사람이 된다.</p>
-      <nav class="links" aria-label="책"><a class="main" href="/book-atelier/">서재</a><a href="/book-atelier/dex.html">서가</a><a href="/book-atelier/prompt.html">프롬프트</a></nav>
-    </div>
-  </div>
-</section>
+<p class="hint" id="hint">방에 올리면 이름이, 누르면 그 공방의 문이 보인다 · Esc 로 돌아온다</p>
 
 <section class="all" id="all" aria-label="모든 공방">
   <h2>모든 공방</h2>
   <p>바로 들어가기</p>
-  <div class="grid">
-    <article class="card" style="--accent:#7fb3ff;--tint:#151a21">
-      <a class="cover" href="/atelier/" aria-label="건담 격납고 열기"><img src="/atelier/img/thumb/RX-78-2_건담_f.webp" alt="" loading="lazy"><div class="name">건담 드래프트</div></a>
-      <nav class="links" aria-label="건담"><a class="main" href="/atelier/">격납고</a><a href="/atelier/play.html">드래프트</a><a href="/atelier/dex.html">도감</a><a href="/atelier/prompt.html">프롬프트</a></nav>
-    </article>
-    <article class="card" style="--accent:#c9a227;--tint:#17130f">
-      <a class="cover" href="/sam-atelier/" aria-label="삼국지 쟁탈전 열기"><img src="/sam-atelier/images/large/관우.jpg" alt="" loading="lazy"><div class="name">삼국지 쟁탈전</div></a>
-      <nav class="links" aria-label="삼국지"><a class="main" href="/sam-atelier/">들어가기</a></nav>
-    </article>
-    <article class="card" style="--accent:#f4c542;--tint:#2a2718">
-      <a class="cover" href="/pkm-atelier/" aria-label="포켓몬 메카 연구소 열기"><img src="/pkm-atelier-img/img/thumb/피카츄_heavy_cinematic_semi_real_f.webp" alt="" loading="lazy"><div class="name">포켓몬 메카 연구소</div></a>
-      <nav class="links" aria-label="포켓몬"><a class="main" href="/pkm-atelier/">연구소</a><a href="/pkm-atelier/dex.html">도감</a><a href="/pkm-atelier/battle.html">전투</a><a href="/pkm-atelier/run.html">런</a><a href="/pkm-atelier/lane.html">결투</a><a href="/pkm-atelier/gwent.html">폼 결투</a><a href="/pkm-atelier/prompt.html">프롬프트</a></nav>
-    </article>
-    <article class="card" style="--accent:#d9b45a;--tint:#121016">
-      <a class="cover" href="/myth-atelier/" aria-label="신화 무기 공방 열기"><img src="/myth-atelier-img/img/thumb/묠니르_game_keyart_f.webp" alt="" loading="lazy"><div class="name">신화 무기 공방</div></a>
-      <nav class="links" aria-label="신화 무기"><a class="main" href="/myth-atelier/">공방</a><a href="/myth-atelier/auto.html">오토 배틀</a><a href="/myth-atelier/museum.html">박물관</a><a href="/myth-atelier/dex.html">도감</a><a href="/myth-atelier/draft.html">드래프트</a><a href="/myth-atelier/run.html">던전</a><a href="/myth-atelier/duel.html">결투</a><a href="/myth-atelier/prompt.html">프롬프트</a></nav>
-    </article>
-    <article class="card" style="--accent:#e39b6b;--tint:#1c1210">
-      <a class="cover" href="/book-atelier/" aria-label="책의 공방 열기"><div class="tome-cover" aria-hidden="true"><i>BOOK / 001</i><b>책의<br>공방</b></div><div class="name">책의 공방</div></a>
-      <nav class="links" aria-label="책"><a class="main" href="/book-atelier/">서재</a><a href="/book-atelier/dex.html">서가</a><a href="/book-atelier/prompt.html">프롬프트</a></nav>
-    </article>
-  </div>
+  <div class="grid" id="cards"></div>
 </section>
 <footer>polos0117 · 개인 공방 · 홈 화면에 추가하면 앱처럼 열린다</footer>
 
 <script>
-(() => {
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const clamp = v => Math.max(0, Math.min(1, v));
-  const ease = t => t * t * (3 - 2 * t);
-  const scenes = [...document.querySelectorAll('.scene')];
-  const sites = scenes.filter(s => s.classList.contains('site'));
-  const dotBar = document.querySelector('.dots'), dots = [...dotBar.querySelectorAll('a')];
+/* 방 표 — 다각형은 img/map.webp 의 픽셀 좌표(1448×1086). 그림을 바꾸면 여기만 다시 잰다.
+   at: 이름표 자리, peek: 미리보기 그림(각 공방의 그림 저장소), links: 문들(첫 번째가 큰 문) */
+const ROOMS = [
+  { key: 'gundam', name: '건담 격납고', title: '건담 드래프트', sub: '기동전사 · 3D 격납고', num: '01 / HANGAR', c: '#7fb3ff', tint: '#151a21',
+    poly: [[150, 100], [600, 50], [612, 400], [142, 405]], at: [380, 230],
+    peek: '/atelier/img/thumb/RX-78-2_건담_f.webp', cover: '/atelier/img/thumb/RX-78-2_건담_f.webp',
+    desc: '3D 격납고를 걸어 다니며 기체를 둘러보고, 드래프트로 출격한다.',
+    links: [['격납고', '/atelier/'], ['드래프트', '/atelier/play.html'], ['도감', '/atelier/dex.html'], ['프롬프트', '/atelier/prompt.html']] },
+  { key: 'book', name: '책의 서재', title: '책의 공방', sub: '고전 · 발단 · 전개 · 결말', num: '02 / LIBRARY', c: '#e39b6b', tint: '#1c1210',
+    poly: [[602, 108], [938, 128], [946, 440], [596, 425]], at: [770, 270],
+    peek: '/book-atelier-img/img/thumb/don_quixote_middle_literary_fantasy_f.webp', cover: '/book-atelier-img/img/thumb/don_quixote_middle_literary_fantasy_f.webp',
+    desc: '도서관에서 깨어난 책들이, 자신의 이야기를 세상에 남기기 위해 싸운다. 책 한 권이 한 사람이 된다.',
+    links: [['서재', '/book-atelier/'], ['서가', '/book-atelier/dex.html'], ['결투', '/book-atelier/duel.html'], ['프롬프트', '/book-atelier/prompt.html']] },
+  { key: 'samguk', name: '삼국지 군막', title: '삼국지 쟁탈전', sub: '장수를 뽑아 진영을 꾸린다', num: '03 / 竹簡', c: '#c9a227', tint: '#17130f',
+    poly: [[940, 132], [1395, 195], [1400, 560], [952, 482]], at: [1170, 330],
+    peek: '/sam-atelier/images/large/관우.jpg', cover: '/sam-atelier/images/large/관우.jpg',
+    desc: '위·촉·오의 장수들을 드래프트로 모아 한 진영을 짠다.',
+    links: [['들어가기', '/sam-atelier/']] },
+  { key: 'pokemon', name: '포켓몬 연구소', title: '포켓몬 메카 연구소', sub: '메카 의인화 · 연구소', num: '04 / LAB', c: '#f4c542', tint: '#2a2718',
+    poly: [[48, 440], [606, 422], [612, 740], [566, 800], [66, 792]], at: [330, 610],
+    peek: '/pkm-atelier-img/img/thumb/피카츄_heavy_cinematic_semi_real_f.webp', cover: '/pkm-atelier-img/img/thumb/피카츄_heavy_cinematic_semi_real_f.webp',
+    desc: '포켓몬을 메카로 의인화한 도감과 전투, 일곱 판 달리기, 진화 결투, 폼 결투.',
+    links: [['연구소', '/pkm-atelier/'], ['도감', '/pkm-atelier/dex.html'], ['전투', '/pkm-atelier/battle.html'], ['런', '/pkm-atelier/run.html'], ['결투', '/pkm-atelier/lane.html'], ['폼 결투', '/pkm-atelier/gwent.html'], ['프롬프트', '/pkm-atelier/prompt.html']] },
+  { key: 'myth', name: '신화 무기 대장간', title: '신화 무기 공방', sub: '열한 권 · 백여든일곱 자루', num: '05 / FORGE', c: '#d9b45a', tint: '#121016',
+    poly: [[706, 540], [1396, 582], [1398, 872], [740, 918]], at: [1050, 720],
+    peek: '/myth-atelier-img/img/thumb/묠니르_game_keyart_f.webp', cover: '/myth-atelier-img/img/thumb/묠니르_game_keyart_f.webp',
+    desc: '신화 속 무기가 사람이 되어 싸운다. 오토 배틀러·결투와 3D 박물관.',
+    links: [['공방', '/myth-atelier/'], ['오토 배틀', '/myth-atelier/auto.html'], ['박물관', '/myth-atelier/museum.html'], ['도감', '/myth-atelier/dex.html'], ['드래프트', '/myth-atelier/draft.html'], ['던전', '/myth-atelier/run.html'], ['결투', '/myth-atelier/duel.html'], ['프롬프트', '/myth-atelier/prompt.html']] },
+];
+const IW = 1448, IH = 1086;
+const $ = s => document.querySelector(s);
+const map = $('#map'), stage = $('#stage'), inner = $('#inner'), rooms = $('#rooms'), pins = $('#pins'), doors = $('#doors'), cards = $('#cards');
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const linksHTML = (r, big) => r.links.map(([t, href], i) => `<a href="${href}"${i === 0 ? ' class="main"' : ''}>${esc(t)}</a>`).join('');
 
-  /* 스크롤 진행 → 장면마다 --in(올라옴) --in2(글, 조금 늦게) --out(다음 장면이 덮으며 빨려 나감).
-     값은 스크롤 위치를 바로 따르지 않고 조금씩 쫓아간다 — 휠이 뚝뚝 끊겨도 화면은 미끄러지듯 */
-  const all = document.getElementById('all'), root = document.documentElement;
-  const cur = scenes.map(() => null), seen = new Map();
-  const put = (el, k, v) => { const id = el.id + k; if (seen.get(id) !== v) { seen.set(id, v); el.style.setProperty(k, v); } };
-  let running = false, last = 0, introLive = true, mx = 0, my = 0, tx = 0, ty = 0, curAll = 0;
-  const follow = (c, want, a) => Math.abs(want - c) < .0008 ? want : c + (want - c) * a;
-  function loop(t) {
-    const dt = last ? Math.min(64, t - last) : 16.7; last = t;
-    const a = 1 - Math.pow(1 - .14, dt / 16.7);          // 60fps에서 한 프레임에 14%씩
-    const vh = innerHeight, top = scenes.map(s => s.getBoundingClientRect().top), allTop = all.getBoundingClientRect().top;
-    let busy = false;
-    const rise = top.map((tp, i) => {                    // 화면 아래에서 올라오는 동안 0 → 1
-      const want = i ? clamp(1 - tp / vh) : 1;
-      cur[i] = cur[i] == null ? want : follow(cur[i], want, a);
-      if (cur[i] !== want) busy = true;
-      return cur[i];
-    });
-    const wantAll = clamp(1 - allTop / vh); curAll = follow(curAll, wantAll, a); if (curAll !== wantAll) busy = true;
-    scenes.forEach((s, i) => {
-      const out = i === scenes.length - 1 ? ease(curAll) * .7 : ease(rise[i + 1]);
-      if (i) {
-        put(s, '--in', ease(rise[i]).toFixed(3));
-        put(s, '--in2', ease(clamp((rise[i] - .5) / .5)).toFixed(3));
-      }
-      put(s, '--out', out.toFixed(3));
-      const hide = rise[i] <= 0 || out >= 1 || (i === scenes.length - 1 && allTop <= 0);
-      if (s.classList.contains('hide') !== hide) s.classList.toggle('hide', hide);
-    });
-    introLive = rise[1] < 1;
-    let on = -1;
-    sites.forEach((s, i) => { if (top[i + 1] <= vh * .5) on = i; });
-    sites.forEach((s, i) => { if (s.classList.contains('live') !== (i === on)) s.classList.toggle('live', i === on); });
-    dots.forEach((d, i) => d.classList.toggle('on', i === on));
-    dotBar.classList.toggle('gone', on < 0 || allTop < vh * .5);
-    /* 마우스 위치로 살짝 시점이 따라온다 */
-    const nx = follow(mx, tx, a * .45), ny = follow(my, ty, a * .45);
-    if (nx !== mx || ny !== my) { mx = nx; my = ny; busy = true; put(root, '--mx', mx.toFixed(3)); put(root, '--my', my.toFixed(3)); }
-    if (busy) requestAnimationFrame(loop); else { running = false; last = 0; }
-  }
-  const kick = () => { if (!running) { running = true; requestAnimationFrame(loop); } };
-  addEventListener('scroll', kick, { passive: true });
-  addEventListener('resize', kick);
-  addEventListener('pointermove', e => { if (e.pointerType !== 'mouse') return; tx = e.clientX / innerWidth * 2 - 1; ty = e.clientY / innerHeight * 2 - 1; kick(); }, { passive: true });
-  kick();
+/* 방 다각형(SVG) + 이름표(HTML) + 아래 카드 */
+for (const r of ROOMS) {
+  const a = document.createElementNS('http://www.w3.org/2000/svg', 'a');
+  a.setAttribute('href', '#' + r.key); a.setAttribute('class', 'room'); a.setAttribute('data-key', r.key); a.style.setProperty('--c', r.c);
+  a.setAttribute('aria-label', r.name + ' — ' + r.title);
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+  p.setAttribute('points', r.poly.map(q => q.join(',')).join(' '));
+  a.appendChild(p); rooms.appendChild(a);
+  const pin = document.createElement('div'); pin.className = 'pin'; pin.dataset.key = r.key; pin.style.setProperty('--c', r.c);
+  pin.style.left = (r.at[0] / IW * 100) + '%'; pin.style.top = (r.at[1] / IH * 100) + '%';
+  pin.innerHTML = `<div class="peek"><img src="${r.peek}" alt="" loading="lazy"><i>${esc(r.title)}</i></div><b>${esc(r.name)}</b>`;
+  pins.appendChild(pin);
+  const card = document.createElement('article'); card.className = 'card'; card.style.setProperty('--accent', r.c); card.style.setProperty('--tint', r.tint);
+  card.innerHTML = `<a class="cover" href="${r.links[0][1]}" aria-label="${esc(r.title)} 열기"><img src="${r.cover}" alt="" loading="lazy"><div class="name">${esc(r.title)}</div></a>
+    <nav class="links" aria-label="${esc(r.title)}">${linksHTML(r)}</nav>`;
+  cards.appendChild(card);
+}
+const roomEl = k => rooms.querySelector(`.room[data-key="${k}"]`), pinEl = k => pins.querySelector(`.pin[data-key="${k}"]`);
 
-  /* 흐린 배경 — 작은 캔버스에 한 번 그려 늘려 쓴다 */
-  document.querySelectorAll('.site').forEach(s => {
-    const m = /url\(['"]?([^'")]+)/.exec(s.style.getPropertyValue('--bgimg')); if (!m) return;
-    const img = new Image();
-    img.onload = () => {
-      const c = document.createElement('canvas'), g = c.getContext('2d'), W = 60, H = Math.round(W * img.height / img.width);
-      c.width = W; c.height = H;
-      if ('filter' in g) g.filter = 'blur(2.5px) saturate(1.2)';
-      g.drawImage(img, -4, -4, W + 8, H + 8);
-      g.filter = 'none'; g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(0, 0, W, H);
-      s.querySelector('.bg').style.backgroundImage = 'url(' + c.toDataURL('image/jpeg', .85) + ')';
-    };
-    img.src = m[1];
-  });
+/* 올리면 빛난다 — 다각형과 이름표가 같이 */
+let hot = null;
+function setHot(k) {
+  if (hot === k) return;
+  if (hot) { roomEl(hot).classList.remove('hot'); pinEl(hot).classList.remove('hot'); }
+  hot = k;
+  if (k) { roomEl(k).classList.add('hot'); pinEl(k).classList.add('hot'); }
+}
+rooms.addEventListener('pointerover', e => { const a = e.target.closest('.room'); if (a) setHot(a.dataset.key); });
+rooms.addEventListener('pointerout', e => { const a = e.target.closest('.room'); if (a && !map.classList.contains('zoomed')) setHot(null); });
+rooms.addEventListener('focusin', e => { const a = e.target.closest('.room'); if (a) setHot(a.dataset.key); });
+rooms.addEventListener('focusout', () => { if (!map.classList.contains('zoomed')) setHot(null); });
 
-  /* 첫 화면 금가루 — 첫 화면이 보일 때만 그린다 */
-  const cv = document.getElementById('dust'), g = cv.getContext('2d');
-  let W = 0, H = 0, D = 1, pts = [];
-  const cols = ['#d9b45a', '#7fb3ff', '#c9a227', '#f4c542', '#e39b6b'];
-  function size() {
-    D = Math.min(devicePixelRatio || 1, 2);
-    W = cv.width = cv.clientWidth * D; H = cv.height = cv.clientHeight * D;
-    pts = Array.from({ length: Math.round(Math.min(140, W * H / (18000 * D * D))) }, () => ({
-      x: Math.random() * W, y: Math.random() * H, z: Math.random() * .8 + .2, r: Math.random() * 1.6 + .4,
-      c: cols[Math.random() * cols.length | 0], s: Math.random() * .4 + .1 }));
-  }
-  size(); addEventListener('resize', size);
-  (function dust() {
-    if (introLive) {
-      g.clearRect(0, 0, W, H);
-      for (const p of pts) {
-        p.y -= p.s * p.z * 1.4 * D; if (p.y < -10) { p.y = H + 10; p.x = Math.random() * W; }
-        g.globalAlpha = .35 + .5 * p.z; g.fillStyle = p.c;
-        g.beginPath(); g.arc(p.x + mx * 30 * p.z * D, p.y + my * 20 * p.z * D, p.r * p.z * D, 0, 6.283); g.fill();
-      }
-    }
-    requestAnimationFrame(dust);
-  })();
-})();
+/* 누르면 다가간다 — 그 방의 사각형이 무대에 차게 transform. 주소에 #key */
+let on = null;
+function bbox(r) { const xs = r.poly.map(q => q[0]), ys = r.poly.map(q => q[1]); const x = Math.min(...xs), y = Math.min(...ys); return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y }; }
+function fit() {
+  if (!on) { inner.style.transform = ''; return; }
+  const r = ROOMS.find(q => q.key === on), b = bbox(r), W = stage.clientWidth, H = stage.clientHeight, pad = .06;
+  /* 무대 안 그림은 무대를 꽉 채운다(object-fit:fill) — 그림 픽셀 → 무대 픽셀 */
+  const sx = W / IW, sy = H / IH;
+  const bw = (b.w * (1 + pad * 2)) * sx, bh = (b.h * (1 + pad * 2)) * sy;
+  const s = Math.min(W / bw, H / bh);
+  const cx = (b.x + b.w / 2) * sx, cy = (b.y + b.h / 2) * sy;
+  inner.style.transform = `translate(${(W / 2 - cx * s).toFixed(1)}px, ${(H / 2 - cy * s).toFixed(1)}px) scale(${s.toFixed(4)})`;
+}
+function enter(k, push) {
+  const r = ROOMS.find(q => q.key === k); if (!r) return leave(push);
+  on = k; setHot(k);
+  map.classList.add('zoomed'); map.style.setProperty('--c', r.c);
+  for (const el of rooms.querySelectorAll('.room')) el.classList.toggle('on', el.dataset.key === k);
+  doors.innerHTML = `<div class="num">${esc(r.num)}</div><h2>${esc(r.title)}</h2><div class="sub">${esc(r.sub)}</div><p>${esc(r.desc)}</p>
+    <nav class="links" aria-label="${esc(r.title)}">${linksHTML(r)}</nav>
+    <div class="links back"><button type="button" id="back">← 지도로</button></div>`;
+  $('#back').addEventListener('click', () => leave(true));
+  if (push && location.hash !== '#' + k) history.pushState({ room: k }, '', '#' + k);
+  requestAnimationFrame(fit);
+  if (innerWidth < 900 || innerHeight < innerWidth) stage.scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+function leave(push) {
+  on = null; setHot(null);
+  map.classList.remove('zoomed'); map.style.removeProperty('--c');
+  for (const el of rooms.querySelectorAll('.room')) el.classList.remove('on');
+  doors.innerHTML = '';
+  inner.style.transform = '';
+  if (push && location.hash && location.hash !== '#all') history.pushState({}, '', location.pathname + location.search);
+}
+rooms.addEventListener('click', e => { const a = e.target.closest('.room'); if (!a) return; e.preventDefault(); if (on === a.dataset.key) leave(true); else enter(a.dataset.key, true); });
+stage.addEventListener('click', e => { if (on && !e.target.closest('.room.on')) leave(true); });
+addEventListener('keydown', e => { if (e.key === 'Escape' && on) leave(true); });
+addEventListener('popstate', () => { const k = location.hash.slice(1); if (ROOMS.some(r => r.key === k)) enter(k, false); else if (on) leave(false); });
+addEventListener('resize', fit);
+addEventListener('load', () => { const k = location.hash.slice(1); if (ROOMS.some(r => r.key === k)) enter(k, false); });
 </script>
 </body>
 </html>
