@@ -185,31 +185,31 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
 <footer>polos0117 · 개인 공방 · 홈 화면에 추가하면 앱처럼 열린다</footer>
 
 <script>
-/* 방 표 — 다각형은 img/map.webp 의 픽셀 좌표(1448×1086). 그림을 바꾸면 여기만 다시 잰다.
+/* 방 표 — 다각형은 img/map.webp 의 픽셀 좌표(1448×1086). 꼭짓점은 방을 두른 벽 윗면의 안쪽 모서리(그림 위에 겹쳐 따 맞춘다 — 2026-10-20 처음 것은 기울기가 반대로 돌아 있었다). 그림을 바꾸면 여기만 다시 잰다.
    at: 이름표 자리, peek: 미리보기 그림(각 공방의 그림 저장소), links: 문들(첫 번째가 큰 문) */
 const ROOMS = [
   { key: 'gundam', name: '건담 격납고', title: '건담 드래프트', sub: '기동전사 · 3D 격납고', num: '01 / HANGAR', c: '#7fb3ff', tint: '#151a21',
-    poly: [[205, 72], [562, 42], [600, 374], [150, 384]], at: [380, 230],
+    poly: [[232, 48], [578, 62], [505, 388], [92, 358]], at: [380, 230],
     peek: '/atelier/img/thumb/RX-78-2_건담_f.webp', cover: '/atelier/img/thumb/RX-78-2_건담_f.webp',
     desc: '3D 격납고를 걸어 다니며 기체를 둘러보고, 드래프트로 출격한다.',
     links: [['격납고', '/atelier/'], ['드래프트', '/atelier/play.html'], ['도감', '/atelier/dex.html'], ['프롬프트', '/atelier/prompt.html']] },
   { key: 'book', name: '책의 서재', title: '책의 공방', sub: '고전 · 발단 · 전개 · 결말', num: '02 / LIBRARY', c: '#e39b6b', tint: '#1c1210',
-    poly: [[612, 58], [905, 110], [938, 445], [608, 388]], at: [770, 270],
+    poly: [[615, 65], [952, 108], [885, 440], [548, 400]], at: [770, 270],
     peek: '/book-atelier-img/img/thumb/don_quixote_middle_literary_fantasy_f.webp', cover: '/book-atelier-img/img/thumb/don_quixote_middle_literary_fantasy_f.webp',
     desc: '도서관에서 깨어난 책들이, 자신의 이야기를 세상에 남기기 위해 싸운다. 책 한 권이 한 사람이 된다.',
     links: [['서재', '/book-atelier/'], ['서가', '/book-atelier/dex.html'], ['결투', '/book-atelier/duel.html'], ['프롬프트', '/book-atelier/prompt.html']] },
   { key: 'samguk', name: '삼국지 군막', title: '삼국지 쟁탈전', sub: '장수를 뽑아 진영을 꾸린다', num: '03 / 竹簡', c: '#c9a227', tint: '#17130f',
-    poly: [[918, 114], [1302, 172], [1355, 538], [950, 460]], at: [1150, 320],
+    poly: [[962, 112], [1340, 172], [1300, 548], [898, 462]], at: [1150, 320],
     peek: '/sam-atelier/images/large/관우.jpg', cover: '/sam-atelier/images/large/관우.jpg',
     desc: '위·촉·오의 장수들을 드래프트로 모아 한 진영을 짠다.',
     links: [['들어가기', '/sam-atelier/']] },
   { key: 'pokemon', name: '포켓몬 연구소', title: '포켓몬 메카 연구소', sub: '메카 의인화 · 연구소', num: '04 / LAB', c: '#f4c542', tint: '#2a2718',
-    poly: [[85, 448], [600, 420], [622, 790], [125, 775]], at: [330, 610],
+    poly: [[95, 425], [505, 440], [640, 498], [565, 778], [105, 700]], at: [330, 610],
     peek: '/pkm-atelier-img/img/thumb/피카츄_heavy_cinematic_semi_real_f.webp', cover: '/pkm-atelier-img/img/thumb/피카츄_heavy_cinematic_semi_real_f.webp',
     desc: '포켓몬을 메카로 의인화한 도감과 전투, 일곱 판 달리기, 진화 결투, 폼 결투.',
     links: [['연구소', '/pkm-atelier/'], ['도감', '/pkm-atelier/dex.html'], ['전투', '/pkm-atelier/battle.html'], ['런', '/pkm-atelier/run.html'], ['결투', '/pkm-atelier/lane.html'], ['폼 결투', '/pkm-atelier/gwent.html'], ['프롬프트', '/pkm-atelier/prompt.html']] },
   { key: 'myth', name: '신화 무기 대장간', title: '신화 무기 공방', sub: '열한 권 · 백여든일곱 자루', num: '05 / FORGE', c: '#d9b45a', tint: '#121016',
-    poly: [[715, 560], [1340, 590], [1372, 862], [745, 898]], at: [1050, 720],
+    poly: [[790, 548], [1342, 612], [1305, 878], [712, 830]], at: [1050, 720],
     peek: '/myth-atelier-img/img/thumb/묠니르_game_keyart_f.webp', cover: '/myth-atelier-img/img/thumb/묠니르_game_keyart_f.webp',
     desc: '신화 속 무기가 사람이 되어 싸운다. 오토 배틀러·결투와 3D 박물관.',
     links: [['공방', '/myth-atelier/'], ['오토 배틀', '/myth-atelier/auto.html'], ['박물관', '/myth-atelier/museum.html'], ['도감', '/myth-atelier/dex.html'], ['드래프트', '/myth-atelier/draft.html'], ['던전', '/myth-atelier/run.html'], ['결투', '/myth-atelier/duel.html'], ['프롬프트', '/myth-atelier/prompt.html']] },
