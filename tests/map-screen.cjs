@@ -67,7 +67,7 @@ const NOW = Date.now(), SEED = {
       assert.equal(await p.evaluate(() => location.hash), '#book', name + ' 주소에 방');
       assert(/scale\(/.test(await p.locator('#inner').evaluate(e => e.style.transform)), '지도가 다가간다');
       const links = await p.locator('#doorlinks a:not(.daily)').evaluateAll(es => es.map(e => [e.textContent, e.getAttribute('href')]));
-      assert.deepEqual(links.map(x => x[1]), ['/book-atelier/', '/book-atelier/dex.html', '/book-atelier/duel.html', '/book-atelier/prompt.html'], name + ' 책의 공방 문들(결투까지)');
+      assert.deepEqual(links.map(x => x[1]), ['/book-atelier/', '/book-atelier/dex.html', '/book-atelier/duel.html', '/book-atelier/run.html', '/book-atelier/prompt.html'], name + ' 책의 공방 문들(결투·탐험까지)');
       assert(await p.locator('#doors h2').textContent() === '책의 공방' && await p.locator('#doors a.main').isVisible(), '문 패널');
       assert.equal(await p.locator('#doors a.daily').getAttribute('href'), '/book-atelier/duel.html?daily', name + ' 문 패널의 오늘의 판');
       assert.match(await p.locator('#doors a.daily').textContent(), /끝냈다/, name + ' 끝낸 오늘의 판은 표');
