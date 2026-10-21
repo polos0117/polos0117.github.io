@@ -22,6 +22,10 @@
   방에 올리면 빛나고 이름·대표 그림이 뜬다. 누르면 지도가 그 방으로 다가가고(transform) 그 공방의 문들(하위 링크)이 보인다.
   주소에 #gundam 처럼 남아 뒤로 가기·공유가 된다. 등불이 복도를 오간다(SMIL). 지도 아래 "모든 공방" 목록은 지도가 불편한 사람·화면 읽기 프로그램의 길.
   그림을 바꾸면 ROOMS 의 다각형 숫자만 다시 잰다.
+  살아 있는 불 — 다섯 공방이 한 출처(polos0117.github.io)라 localStorage 를 같이 쓴다. 각 공방은 판이 끝나면 atelier_today_v1:<방> 에 오늘 기록
+  {d, n, w, daily, at, seen} 한 칸을 적고(today.js — 다섯 저장소에 같은 파일, 약속은 README 「오늘 기록」), 지도는 그걸 읽어 오늘 다녀간 방에 불을 켜고
+  이름표 아래 "오늘 n판 · w승"을, 문 패널에 「오늘의 판」(?daily — 날짜가 씨앗) 을 둔다. 공방의 첫 화면을 HEAD 로 물어 Last-Modified 가 마지막으로
+  다녀간 뒤(seen)라면 이름표에 초록 점 — 새 소식. 문을 누르면 그 방에 다녀간 자국(seen)을 남긴다.
 -->
 <style>
 :root {
@@ -69,6 +73,21 @@ a { color: inherit; }
 /* 등불 — 복도를 오간다 */
 .lamp { fill: #ffd27a; filter: url(#lamp); }
 .lamp.b { fill: #9fc8ff; }
+/* 오늘 불 — 오늘 판을 둔 방은 불이 켜져 있다(각 공방이 atelier_today_v1:<방> 에 적은 기록을 읽는다) */
+.room.lit polygon { fill-opacity: .07; }
+.glow { fill: #ffb763; filter: url(#lamp); transform-box: fill-box; transform-origin: center; animation: breathe 3.4s ease-in-out infinite; }
+@keyframes breathe { 0%, 100% { opacity: .35; transform: scale(.85); } 50% { opacity: .7; transform: scale(1.15); } }
+.pin .today { padding: 2px 8px; border-radius: 99px; background: #2a1d10e6; border: 1px solid #ffb76366; color: #ffd9a8; font: 600 10px/1.3 var(--sans); white-space: nowrap; }
+.pin .today[hidden] { display: none; }
+.pin.news b::after { content: ''; display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%; background: #7cf0a8; box-shadow: 0 0 8px #7cf0a8; vertical-align: middle; }
+.doors .status { margin: 4px 0 10px; color: #ffd9a8; font-size: 13px; }
+.doors .status:empty { display: none; }
+.news-word { color: #7cf0a8; }
+/* 오늘의 판 — 문들 줄 끝의 따뜻한 단추. 끝냈으면 초록 표 */
+.links a.daily { gap: 6px; border-color: #ffb76388; background: #2a1d10b3; color: #ffd9a8; }
+.links a.daily:hover, .links a.daily:focus-visible { border-color: #ffd9a8; color: #ffd9a8; }
+.links a.daily .done { color: #7cf0a8; }
+@media (max-width: 760px) { .pin .today { font-size: 9px; padding: 1px 6px; } }
 /* 다가갔을 때 문 패널 */
 .doors { display: none; padding: 14px 16px 16px; border: 1px solid color-mix(in srgb, var(--c, var(--gold)) 50%, transparent); border-radius: 14px; background: var(--card); box-shadow: 0 0 40px color-mix(in srgb, var(--c, var(--gold)) 18%, transparent); }
 .map.zoomed .doors { display: block; }
@@ -140,6 +159,7 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
   html { scroll-behavior: auto; }
   .inner, .pin, .pin .peek, .room polygon { transition: none; }
   .lamp { display: none; }
+  .glow { animation: none; opacity: .55; }
 }
 </style>
 </head>
@@ -164,6 +184,7 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
           <path id="way3" d="M 1300 560 C 1200 540, 1100 520, 980 500 C 900 480, 760 460, 690 480 C 760 500, 900 520, 1300 560"/>
         </defs>
         <g id="rooms"></g>
+        <g id="glows"></g>
         <g id="lamps">
           <circle class="lamp" r="5"><animateMotion dur="22s" repeatCount="indefinite" rotate="0"><mpath href="#way1"/></animateMotion></circle>
           <circle class="lamp b" r="4"><animateMotion dur="26s" begin="-9s" repeatCount="indefinite"><mpath href="#way2"/></animateMotion></circle>
@@ -175,7 +196,7 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
   </div>
   <aside class="doors" id="doors" aria-live="polite"></aside>
 </section>
-<p class="hint" id="hint">방에 올리면 이름이, 누르면 그 공방의 문이 보인다 · Esc 로 돌아온다</p>
+<p class="hint" id="hint">방에 올리면 이름이, 누르면 그 공방의 문이 보인다 · 오늘 판을 둔 방은 불이 켜진다 · Esc 로 돌아온다</p>
 
 <section class="all" id="all" aria-label="모든 공방">
   <h2>모든 공방</h2>
@@ -184,39 +205,41 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
 </section>
 <footer>polos0117 · 개인 공방 · 홈 화면에 추가하면 앱처럼 열린다</footer>
 
+<script src="today.js"></script>
 <script>
 /* 방 표 — 다각형은 img/map.webp 의 픽셀 좌표(1448×1086). 꼭짓점은 방을 두른 벽 윗면의 안쪽 모서리(그림 위에 겹쳐 따 맞춘다 — 2026-10-20 처음 것은 기울기가 반대로 돌아 있었다). 그림을 바꾸면 여기만 다시 잰다.
-   at: 이름표 자리, peek: 미리보기 그림(각 공방의 그림 저장소), links: 문들(첫 번째가 큰 문) */
+   at: 이름표 자리, peek: 미리보기 그림(각 공방의 그림 저장소), links: 문들(첫 번째가 큰 문), daily: 오늘의 판(날짜가 씨앗 — 그 공방이 ?daily 를 읽는다) */
 const ROOMS = [
   { key: 'gundam', name: '건담 격납고', title: '건담 드래프트', sub: '기동전사 · 3D 격납고', num: '01 / HANGAR', c: '#7fb3ff', tint: '#151a21',
     poly: [[232, 48], [578, 62], [505, 388], [92, 358]], at: [380, 230],
     peek: '/atelier/img/thumb/RX-78-2_건담_f.webp', cover: '/atelier/img/thumb/RX-78-2_건담_f.webp',
     desc: '3D 격납고를 걸어 다니며 기체를 둘러보고, 드래프트로 출격한다.',
-    links: [['격납고', '/atelier/'], ['드래프트', '/atelier/play.html'], ['도감', '/atelier/dex.html'], ['프롬프트', '/atelier/prompt.html']] },
+    links: [['격납고', '/atelier/'], ['드래프트', '/atelier/play.html'], ['도감', '/atelier/dex.html'], ['프롬프트', '/atelier/prompt.html']], daily: '/atelier/play.html?daily' },
   { key: 'book', name: '책의 서재', title: '책의 공방', sub: '고전 · 발단 · 전개 · 결말', num: '02 / LIBRARY', c: '#e39b6b', tint: '#1c1210',
     poly: [[615, 65], [952, 108], [885, 440], [548, 400]], at: [770, 270],
     peek: '/book-atelier-img/img/thumb/don_quixote_middle_literary_fantasy_f.webp', cover: '/book-atelier-img/img/thumb/don_quixote_middle_literary_fantasy_f.webp',
     desc: '도서관에서 깨어난 책들이, 자신의 이야기를 세상에 남기기 위해 싸운다. 책 한 권이 한 사람이 된다.',
-    links: [['서재', '/book-atelier/'], ['서가', '/book-atelier/dex.html'], ['결투', '/book-atelier/duel.html'], ['프롬프트', '/book-atelier/prompt.html']] },
+    links: [['서재', '/book-atelier/'], ['서가', '/book-atelier/dex.html'], ['결투', '/book-atelier/duel.html'], ['프롬프트', '/book-atelier/prompt.html']], daily: '/book-atelier/duel.html?daily' },
   { key: 'samguk', name: '삼국지 군막', title: '삼국지 쟁탈전', sub: '장수를 뽑아 진영을 꾸린다', num: '03 / 竹簡', c: '#c9a227', tint: '#17130f',
     poly: [[962, 112], [1340, 172], [1300, 548], [898, 462]], at: [1150, 320],
     peek: '/sam-atelier/images/large/관우.jpg', cover: '/sam-atelier/images/large/관우.jpg',
     desc: '위·촉·오의 장수들을 드래프트로 모아 한 진영을 짠다.',
-    links: [['들어가기', '/sam-atelier/']] },
+    links: [['들어가기', '/sam-atelier/']], daily: '/sam-atelier/?daily' },
   { key: 'pokemon', name: '포켓몬 연구소', title: '포켓몬 메카 연구소', sub: '메카 의인화 · 연구소', num: '04 / LAB', c: '#f4c542', tint: '#2a2718',
     poly: [[95, 425], [505, 440], [640, 498], [565, 778], [105, 700]], at: [330, 610],
     peek: '/pkm-atelier-img/img/thumb/피카츄_heavy_cinematic_semi_real_f.webp', cover: '/pkm-atelier-img/img/thumb/피카츄_heavy_cinematic_semi_real_f.webp',
     desc: '포켓몬을 메카로 의인화한 도감과 전투, 일곱 판 달리기, 진화 결투, 폼 결투.',
-    links: [['연구소', '/pkm-atelier/'], ['도감', '/pkm-atelier/dex.html'], ['전투', '/pkm-atelier/battle.html'], ['런', '/pkm-atelier/run.html'], ['결투', '/pkm-atelier/lane.html'], ['폼 결투', '/pkm-atelier/gwent.html'], ['프롬프트', '/pkm-atelier/prompt.html']] },
+    links: [['연구소', '/pkm-atelier/'], ['도감', '/pkm-atelier/dex.html'], ['전투', '/pkm-atelier/battle.html'], ['런', '/pkm-atelier/run.html'], ['결투', '/pkm-atelier/lane.html'], ['폼 결투', '/pkm-atelier/gwent.html'], ['프롬프트', '/pkm-atelier/prompt.html']], daily: '/pkm-atelier/survey.html?daily' },
   { key: 'myth', name: '신화 무기 대장간', title: '신화 무기 공방', sub: '열한 권 · 백여든일곱 자루', num: '05 / FORGE', c: '#d9b45a', tint: '#121016',
     poly: [[790, 548], [1342, 612], [1305, 878], [712, 830]], at: [1050, 720],
     peek: '/myth-atelier-img/img/thumb/묠니르_game_keyart_f.webp', cover: '/myth-atelier-img/img/thumb/묠니르_game_keyart_f.webp',
     desc: '신화 속 무기가 사람이 되어 싸운다. 오토 배틀러·결투와 3D 박물관.',
-    links: [['공방', '/myth-atelier/'], ['오토 배틀', '/myth-atelier/auto.html'], ['박물관', '/myth-atelier/museum.html'], ['도감', '/myth-atelier/dex.html'], ['드래프트', '/myth-atelier/draft.html'], ['던전', '/myth-atelier/run.html'], ['결투', '/myth-atelier/duel.html'], ['프롬프트', '/myth-atelier/prompt.html']] },
+    links: [['공방', '/myth-atelier/'], ['오토 배틀', '/myth-atelier/auto.html'], ['박물관', '/myth-atelier/museum.html'], ['도감', '/myth-atelier/dex.html'], ['드래프트', '/myth-atelier/draft.html'], ['던전', '/myth-atelier/run.html'], ['결투', '/myth-atelier/duel.html'], ['프롬프트', '/myth-atelier/prompt.html']], daily: '/myth-atelier/duel.html?daily' },
 ];
 const IW = 1448, IH = 1086;
 const $ = s => document.querySelector(s);
-const map = $('#map'), stage = $('#stage'), inner = $('#inner'), rooms = $('#rooms'), pins = $('#pins'), doors = $('#doors'), cards = $('#cards');
+const map = $('#map'), stage = $('#stage'), inner = $('#inner'), rooms = $('#rooms'), pins = $('#pins'), doors = $('#doors'), cards = $('#cards'), glows = $('#glows');
+const T = window.AtelierToday;   /* 오늘 기록(today.js) — 각 공방이 적고 지도가 읽는다 */
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const linksHTML = (r, big) => r.links.map(([t, href], i) => `<a href="${href}"${i === 0 ? ' class="main"' : ''}>${esc(t)}</a>`).join('');
 
@@ -230,15 +253,44 @@ for (const r of ROOMS) {
   a.appendChild(p); rooms.appendChild(a);
   const pin = document.createElement('div'); pin.className = 'pin'; pin.dataset.key = r.key; pin.style.setProperty('--c', r.c);
   pin.style.left = (r.at[0] / IW * 100) + '%'; pin.style.top = (r.at[1] / IH * 100) + '%';
-  pin.innerHTML = `<div class="peek"><img src="${r.peek}" alt="" loading="lazy"><i>${esc(r.title)}</i></div><b>${esc(r.name)}</b>`;
+  pin.innerHTML = `<div class="peek"><img src="${r.peek}" alt="" loading="lazy"><i>${esc(r.title)}</i></div><b>${esc(r.name)}</b><span class="today" hidden></span>`;
   pins.appendChild(pin);
-  const card = document.createElement('article'); card.className = 'card'; card.style.setProperty('--accent', r.c); card.style.setProperty('--tint', r.tint);
+  /* 오늘 불 — 방 가운데 숨 쉬는 빛. 오늘 판을 둔 방에만 보인다 */
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  g.setAttribute('class', 'glow'); g.setAttribute('data-key', r.key); g.setAttribute('r', '26'); g.setAttribute('cx', r.at[0]); g.setAttribute('cy', r.at[1] - 40); g.style.display = 'none';
+  glows.appendChild(g);
+  const card = document.createElement('article'); card.className = 'card'; card.dataset.key = r.key; card.style.setProperty('--accent', r.c); card.style.setProperty('--tint', r.tint);
   card.innerHTML = `<a class="cover" href="${r.links[0][1]}" aria-label="${esc(r.title)} 열기" tabindex="-1"><img src="${r.cover}" alt="" loading="lazy"></a>
     <div class="head2"><a class="name" href="${r.links[0][1]}">${esc(r.title)}</a><span class="sub">${esc(r.sub)}</span></div>
-    <nav class="links" aria-label="${esc(r.title)}">${linksHTML(r)}</nav>`;
+    <nav class="links" aria-label="${esc(r.title)}">${linksHTML(r)}${dailyHTML(r)}</nav>`;
   cards.appendChild(card);
 }
-const roomEl = k => rooms.querySelector(`.room[data-key="${k}"]`), pinEl = k => pins.querySelector(`.pin[data-key="${k}"]`);
+const roomEl = k => rooms.querySelector(`.room[data-key="${k}"]`), pinEl = k => pins.querySelector(`.pin[data-key="${k}"]`), glowEl = k => glows.querySelector(`.glow[data-key="${k}"]`);
+
+/* ── 오늘 불 · 새 소식 ── */
+const NEWS = {};   /* 방 → 그 공방 첫 화면의 Last-Modified(ms). HEAD 로 한 번 묻는다 */
+const todayText = t => !t.n ? '' : `오늘 ${t.n}판 · ${t.w}승${t.daily ? ' · 오늘의 판 ✓' : ''}`;
+const isNews = k => { const t = T.read(k); return !!(NEWS[k] && t.seen > 0 && NEWS[k] > t.seen); };
+function dailyHTML(r) { const t = T.read(r.key); return `<a class="daily" href="${r.daily}">오늘의 판${t.daily ? ' <span class="done">✓ 끝냈다</span>' : ''}</a>`; }
+function statusText(r) { const t = T.read(r.key), parts = []; if (t.n) parts.push(todayText(t)); if (isNews(r.key)) parts.push('<span class="news-word">새 소식 — 지난번 다녀간 뒤 바뀌었다</span>'); return parts.join(' · '); }
+/* 기록을 다시 읽어 그린다 — 열 때, 다른 공방에서 돌아올 때(pageshow·focus·visibilitychange) */
+function paint() {
+  for (const r of ROOMS) {
+    const t = T.read(r.key), lit = t.n > 0, pin = pinEl(r.key), line = pin.querySelector('.today');
+    roomEl(r.key).classList.toggle('lit', lit); pin.classList.toggle('lit', lit); pin.classList.toggle('news', isNews(r.key));
+    line.textContent = todayText(t); line.hidden = !lit; glowEl(r.key).style.display = lit ? '' : 'none';
+    const d = cards.querySelector(`.card[data-key="${r.key}"] a.daily`); if (d) d.outerHTML = dailyHTML(r);
+  }
+  if (on) { const r = ROOMS.find(q => q.key === on), st = $('#status'), d = doors.querySelector('a.daily'); if (st) st.innerHTML = statusText(r); if (d) d.outerHTML = dailyHTML(r); }
+}
+async function sniff() {
+  await Promise.all(ROOMS.map(async r => { try { const res = await fetch(r.links[0][1], { method: 'HEAD', cache: 'no-store' }); const lm = Date.parse(res.headers.get('last-modified')); if (res.ok && isFinite(lm)) NEWS[r.key] = lm; } catch (e) {} }));
+  paint();
+}
+addEventListener('pageshow', paint); addEventListener('focus', paint); document.addEventListener('visibilitychange', () => { if (!document.hidden) paint(); });
+/* 문을 누르면 그 방에 다녀간 자국 — 다음에 "새 소식"을 가릴 기준 */
+document.addEventListener('click', e => { const a = e.target.closest('a[href]'); if (!a) return; const card = a.closest('.card'); const key = card ? card.dataset.key : a.closest('#doors') ? on : null; if (key) T.visit(key); });
+
 
 /* 올리면 빛난다 — 다각형과 이름표가 같이 */
 let hot = null;
@@ -272,7 +324,8 @@ function enter(k, push) {
   map.classList.add('zoomed'); document.body.classList.add('zoomed'); map.style.setProperty('--c', r.c);
   for (const el of rooms.querySelectorAll('.room')) el.classList.toggle('on', el.dataset.key === k);
   doors.innerHTML = `<div class="num">${esc(r.num)}</div><h2>${esc(r.title)}</h2><div class="sub">${esc(r.sub)}</div><p>${esc(r.desc)}</p>
-    <nav class="links" aria-label="${esc(r.title)}">${linksHTML(r)}</nav>
+    <p class="status" id="status">${statusText(r)}</p>
+    <nav class="links" id="doorlinks" aria-label="${esc(r.title)}">${linksHTML(r)}${dailyHTML(r)}</nav>
     <div class="links back"><button type="button" id="back">← 지도로</button></div>`;
   $('#back').addEventListener('click', () => leave(true));
   if (push && location.hash !== '#' + k) history.pushState({ room: k }, '', '#' + k);
@@ -293,6 +346,7 @@ addEventListener('keydown', e => { if (e.key === 'Escape' && on) leave(true); })
 addEventListener('popstate', () => { const k = location.hash.slice(1); if (ROOMS.some(r => r.key === k)) enter(k, false); else if (on) leave(false); });
 addEventListener('resize', fit);
 addEventListener('load', () => { const k = location.hash.slice(1); if (ROOMS.some(r => r.key === k)) enter(k, false); });
+paint(); if (window.fetch) sniff();   /* 맨 끝에 — paint 가 on(다가간 방)을 보므로 그 선언 뒤여야 한다 */
 </script>
 </body>
 </html>
