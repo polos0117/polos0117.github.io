@@ -272,7 +272,14 @@ const NEWS = {};   /* 방 → 그 공방 첫 화면의 Last-Modified(ms). HEAD �
 const todayText = t => !t.n ? '' : `오늘 ${t.n}판 · ${t.w}승${t.daily ? ' · 오늘의 판 ✓' : ''}`;
 const isNews = k => { const t = T.read(k); return !!(NEWS[k] && t.seen > 0 && NEWS[k] > t.seen); };
 function dailyHTML(r) { const t = T.read(r.key); return `<a class="daily" href="${r.daily}">오늘의 판${t.daily ? ' <span class="done">✓ 끝냈다</span>' : ''}</a>`; }
-function statusText(r) { const t = T.read(r.key), parts = []; if (t.n) parts.push(todayText(t)); if (isNews(r.key)) parts.push('<span class="news-word">새 소식 — 지난번 다녀간 뒤 바뀌었다</span>'); return parts.join(' · '); }
+function statusText(r) {
+  const t = T.read(r.key), life = T.record(r.key), parts = [];
+  if (t.n) parts.push(todayText(t));
+  if (life.n) parts.push(`통산 ${life.n}판 ${life.w}승${life.streak > 1 ? ' · ' + life.streak + '연승' : ''}`);
+  if (life.dstreak > 0 && T.dailyAlive(r.key)) parts.push(`오늘의 판 연속 ${life.dstreak}일`);
+  if (isNews(r.key)) parts.push('<span class="news-word">새 소식 — 지난번 다녀간 뒤 바뀌었다</span>');
+  return parts.join(' · ');
+}
 /* 기록을 다시 읽어 그린다 — 열 때, 다른 공방에서 돌아올 때(pageshow·focus·visibilitychange) */
 function paint() {
   for (const r of ROOMS) {

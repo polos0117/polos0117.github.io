@@ -23,6 +23,8 @@ const NOW = Date.now(), SEED = {
   'atelier_today_v1:book': { d: T.today(), n: 2, w: 1, daily: true, at: NOW, seen: NOW + 3600e3 },
   'atelier_today_v1:myth': { d: T.today(), n: 1, w: 0, daily: false, at: NOW, seen: NOW },
   'atelier_today_v1:gundam': { d: T.today(), n: 0, w: 0, daily: false, at: 0, seen: NOW - 86400e3 },
+  /* 통산 — 서재는 12판 7승 3연승, 오늘의 판 연속 이틀 */
+  'atelier_record_v1:book': { n: 12, w: 7, streak: 3, best: 5, days: 4, lastDay: T.today(), dstreak: 2, dbest: 2, lastDaily: T.today() },
 };
 (async () => {
   const br = await chromium.launch({ headless: true, ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox', '--disable-dev-shm-usage'] } : {}) });
@@ -69,7 +71,7 @@ const NOW = Date.now(), SEED = {
       assert(await p.locator('#doors h2').textContent() === '책의 공방' && await p.locator('#doors a.main').isVisible(), '문 패널');
       assert.equal(await p.locator('#doors a.daily').getAttribute('href'), '/book-atelier/duel.html?daily', name + ' 문 패널의 오늘의 판');
       assert.match(await p.locator('#doors a.daily').textContent(), /끝냈다/, name + ' 끝낸 오늘의 판은 표');
-      assert.match(await p.locator('#status').textContent(), /오늘 2판 · 1승/, name + ' 문 패널에 오늘 줄');
+      assert.match(await p.locator('#status').textContent(), /오늘 2판 · 1승 · 오늘의 판 ✓ · 통산 12판 7승 · 3연승 · 오늘의 판 연속 2일/, name + ' 문 패널에 오늘 줄·통산·연승·연속 일수');
       const d = await p.locator('#doors').boundingBox(), s2 = await p.locator('#stage').boundingBox();
       if (vp.width > vp.height) assert(d.x >= s2.x + s2.width - 1, name + ' 가로 — 문 패널은 지도 오른쪽'); else assert(d.y >= s2.y + s2.height - 1, name + ' 세로 — 문 패널은 지도 아래');
       for (const b of await p.locator('#doors a, #doors button').all()) { const r = await b.boundingBox(); assert(r.height >= 36, '누르는 자리'); }
