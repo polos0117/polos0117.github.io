@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>내 즐겨찾기</title>
+<meta name="description" content="공방 넷의 도감에서 하트로 담은 그림을 한곳에서 — 새것부터, 공방마다 거르고 크게 본다.">
+<meta name="theme-color" content="#0f0e12">
+<link rel="icon" href="icon-192.png">
+<link rel="manifest" href="app.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&display=swap">
+<!--
+  내 즐겨찾기 — 공방 넷(건담·책·포켓몬·신화)의 도감 상세에서 하트로 담은 그림을 모아 본다.
+  담는 쪽은 각 공방의 lib/favorites.js, 읽는 쪽은 여기 favorites.js(원본 — 다섯 곳이 같은 파일). 열쇠 atelier_favorites_v1, 약속은 README 「즐겨찾기」절.
+  새것부터 2:3 썸네일. 공방 칩으로 거른다(주소 ?a=book). 누르면 크게 보기 — ← → 키·밀기·Esc, 「그 공방에서 보기」(칸의 link), 빼기.
+  감상 모드는 6초마다 천천히 겹쳐 넘어가고, 손을 대면 멈춘다. 움직임 줄이기면 잠긴다. 저장이 막힌 브라우저면 그렇다고 말한다.
+  색과 이름은 공방 지도(index.html)의 ROOMS 와 같다 — 지도에서 바꾸면 아래 ROOM 도 같이(tests/favorites-screen.cjs 가 견준다).
+-->
+<style>
+:root {
+  --bg: #0b0a0e; --card: #18161d; --line: #ffffff1a; --text: #f1ece2; --muted: #a8a09a; --gold: #d9b45a;
+  --serif: 'Noto Serif KR', 'Apple Myungjo', 'Nanum Myeongjo', Georgia, serif;
+  --sans: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 15px/1.55 var(--sans); overflow-x: hidden; min-height: 100vh; min-height: 100dvh;
+  background-image: radial-gradient(90% 50% at 50% -10%, #1b1726 0%, transparent 70%); background-repeat: no-repeat; }
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+/* ── 머리 — 공방 지도와 같은 결 ── */
+.head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: calc(16px + env(safe-area-inset-top)) 16px 8px; max-width: 1280px; margin: 0 auto; }
+.head h1 { margin: 0; font: 900 clamp(24px, 3.6vw, 36px)/1.1 var(--serif); letter-spacing: -.02em;
+  background: linear-gradient(180deg, #fff 30%, var(--gold) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.head h1 small { display: block; margin-bottom: 6px; -webkit-text-fill-color: var(--gold); color: var(--gold); font: 700 11px/1 var(--serif); letter-spacing: .4em; }
+.home { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid #ffffff33; border-radius: 99px; background: #000b;
+  color: var(--text); text-decoration: none; font: 600 13px/1 var(--sans); white-space: nowrap; transition: border-color .15s, color .15s; }
+.home:hover, .home:focus-visible { border-color: var(--gold); color: var(--gold); }
+
+.wrap { max-width: 1280px; margin: 0 auto; padding: 0 16px calc(40px + env(safe-area-inset-bottom)); }
+.lede { margin: 2px 0 14px; color: var(--muted); font-size: 13px; word-break: keep-all; }
+.lede b { color: var(--text); font-weight: 700; }
+
+/* ── 거르기 칩 — 공방마다 지도의 그 색 ── */
+.tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 16px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; flex: 1 1 auto; min-width: 0; }
+.chip { --c: var(--gold); display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 1px solid #ffffff2b; border-radius: 99px;
+  background: #ffffff08; cursor: pointer; font: 600 13px/1 var(--sans); white-space: nowrap; transition: border-color .15s, background .15s, color .15s; }
+.chip::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px color-mix(in srgb, var(--c) 60%, transparent); }
+.chip[data-a="all"]::before { background: conic-gradient(#7fb3ff 0 25%, #e39b6b 0 50%, #f4c542 0 75%, #d9b45a 0); box-shadow: none; }
+.chip b { font: 700 11px/1 ui-monospace, Menlo, monospace; color: var(--muted); }
+.chip:hover { border-color: color-mix(in srgb, var(--c) 70%, transparent); }
+.chip[aria-pressed="true"] { border-color: var(--c); background: color-mix(in srgb, var(--c) 16%, #000); color: #fff; }
+.chip[aria-pressed="true"] b { color: color-mix(in srgb, var(--c) 70%, #fff); }
+/* 휴대폰 — 칩은 한 줄로 옆으로 민다(세 줄로 쌓이면 그림이 화면 밖으로 밀린다) */
+@media (max-width: 600px) {
+  .chips { flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px; padding: 2px 16px; scrollbar-width: none; overscroll-behavior-x: contain; }
+  .chips::-webkit-scrollbar { display: none; }
+}
+.play { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border: 1px solid #ffb76388; border-radius: 99px; background: #2a1d10b3;
+  color: #ffd9a8; cursor: pointer; font: 600 13px/1 var(--sans); white-space: nowrap; }
+.play:hover, .play:focus-visible { border-color: #ffd9a8; }
+.play:disabled { opacity: .45; cursor: default; }
+.play svg { width: 14px; height: 14px; fill: currentColor; }
+
+/* ── 그림 칸 — 2:3, 새것부터 ── */
+.grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px 12px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+@media (max-width: 480px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 10px; } }
+@media (min-width: 1000px) { .grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 18px 14px; } }
+.tile { --c: var(--gold); display: block; width: 100%; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; border-radius: 12px; }
+.tile .face { position: relative; display: block; aspect-ratio: 2 / 3; overflow: hidden; border-radius: 12px; background: #15131a;
+  box-shadow: inset 0 0 0 1px #ffffff12, 0 10px 26px #0008; }
+.tile .face::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 0%, transparent); transition: box-shadow .2s; }
+.tile img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 15%; transition: transform .35s cubic-bezier(.2, .8, .2, 1); }
+.tile:hover img, .tile:focus-visible img { transform: scale(1.04); }
+.tile:hover .face::after, .tile:focus-visible .face::after { box-shadow: inset 0 0 0 2px var(--c); }
+.tile:focus-visible { outline: none; }
+.tile:focus-visible .face { outline: 2px solid var(--c); outline-offset: 3px; }
+.tile .ph { position: absolute; inset: 0; display: grid; place-items: center; padding: 10px; color: var(--muted); font-size: 12px; text-align: center; }
+.tile .cap { display: block; padding: 8px 2px 0; min-width: 0; }
+.tile .cap b { display: block; font: 700 14px/1.35 var(--serif); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile .cap i { display: flex; align-items: center; gap: 6px; margin-top: 2px; color: var(--muted); font: 500 11.5px/1.4 var(--sans); font-style: normal; min-width: 0; }
+.tile .cap i::before { content: ''; flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
+.tile .cap i span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── 빈 자리 · 저장 막힘 ── */
+.empty { max-width: 640px; margin: 28px auto 0; padding: 28px 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); text-align: center; }
+.empty .heart { display: block; margin: 0 auto 10px; width: 40px; height: 40px; fill: none; stroke: var(--gold); stroke-width: 1.6; }
+.empty h2 { margin: 0 0 6px; font: 900 22px/1.3 var(--serif); }
+.empty p { margin: 0 auto 18px; color: #d8d2c8; font-size: 14px; max-width: 30em; word-break: keep-all; }
+.doors { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.doors a { --c: var(--gold); display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border: 1px solid color-mix(in srgb, var(--c) 55%, transparent);
+  border-radius: 99px; background: #000b; text-decoration: none; font: 600 14px/1 var(--sans); transition: border-color .15s, color .15s; }
+.doors a::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.doors a:hover, .doors a:focus-visible { border-color: var(--c); color: var(--c); }
+
+/* ── 크게 보기 — 화면 가득. 그림 두 겹을 겹쳐 바꾼다(감상 모드는 천천히) ── */
+.viewer { position: fixed; inset: 0; z-index: 50; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: #070609; color: var(--text); }
+.viewer[hidden] { display: none; }
+.v-bar { display: flex; align-items: center; gap: 8px; padding: calc(8px + env(safe-area-inset-top)) 12px 8px; }
+.v-room { --c: var(--gold); display: inline-flex; align-items: center; gap: 8px; min-width: 0; font: 700 13px/1.2 var(--serif); color: color-mix(in srgb, var(--c) 75%, #fff); }
+.v-room::before { content: ''; flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 10px var(--c); }
+.v-room span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v-count { margin-left: auto; color: var(--muted); font: 600 12px/1 ui-monospace, Menlo, monospace; white-space: nowrap; }
+.v-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 44px; min-height: 44px; padding: 0 12px; border: 1px solid #ffffff2b; border-radius: 99px;
+  background: #000b; cursor: pointer; font: 600 13px/1 var(--sans); white-space: nowrap; text-decoration: none; color: var(--text); transition: border-color .15s, color .15s; }
+.v-btn:hover, .v-btn:focus-visible { border-color: var(--gold); color: var(--gold); }
+.v-btn:disabled { opacity: .4; cursor: default; }
+.v-btn svg { width: 14px; height: 14px; fill: currentColor; }
+.v-btn.on { border-color: #ffd9a8; background: #2a1d10e6; color: #ffd9a8; }
+.v-stage { position: relative; min-height: 0; overflow: hidden; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.v-stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 4px 12px; opacity: 0; transition: opacity .35s ease; pointer-events: none; }
+.v-stage img.on { opacity: 1; }
+.viewer.slow .v-stage img { transition-duration: 1.6s; }
+.v-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 64px; border: 0; border-radius: 12px; background: #0009; color: #fff; font: 400 34px/1 var(--serif);
+  cursor: pointer; opacity: .75; transition: opacity .15s, background .15s; }
+.v-nav:hover, .v-nav:focus-visible { opacity: 1; background: #000c; }
+.v-nav:disabled { opacity: 0; pointer-events: none; }
+.v-prev { left: 8px; } .v-next { right: 8px; }
+.v-paused { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); padding: 5px 12px; border-radius: 99px; background: #000c; color: #ffd9a8; font: 600 12px/1.3 var(--sans); pointer-events: none; }
+.v-paused[hidden] { display: none; }
+.v-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; padding: 8px 14px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: #0b0a0ee6; }
+.v-text { min-width: 0; flex: 1 1 200px; }
+.v-text h2 { margin: 0; font: 900 clamp(18px, 2.4vw, 24px)/1.25 var(--serif); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v-text p { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.v-actions .main { --c: var(--gold); background: var(--c); border-color: var(--c); color: #111; font-weight: 800; }
+.v-actions .main:hover, .v-actions .main:focus-visible { color: #111; filter: brightness(1.08); outline-color: #fff; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .viewer { grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr) minmax(220px, 300px); }
+  .v-bar { grid-column: 2; grid-row: 1; align-self: start; flex-wrap: wrap; padding-top: calc(10px + env(safe-area-inset-top)); }
+  .v-stage { grid-column: 1; grid-row: 1; }
+  .v-foot { grid-column: 2; grid-row: 1; align-self: end; border-top: 0; background: none; flex-direction: column; align-items: stretch; }
+  .v-text { flex: 0 0 auto; }
+  .v-actions { flex-direction: column; }
+}
+
+.toast { position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 60; max-width: calc(100vw - 32px);
+  padding: 9px 16px; border-radius: 99px; background: #f1ece2; color: #111; font: 700 13px/1.3 var(--sans); text-align: center; box-shadow: 0 10px 30px #000a; }
+.toast:empty { display: none; }
+footer { text-align: center; color: #6f6973; font-size: 12px; padding: 0 16px calc(24px + env(safe-area-inset-bottom)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tile img, .v-stage img, .chip, .home { transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="head">
+  <h1><small>ATELIER</small>내 즐겨찾기</h1>
+  <a class="home" href="./">← 공방 지도</a>
+</header>
+
+<main class="wrap" id="main">
+  <p class="lede" id="lede"></p>
+  <div class="tools" id="tools" hidden>
+    <div class="chips" id="chips" role="group" aria-label="공방으로 거르기"></div>
+    <button type="button" class="play" id="play"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg>감상 모드</button>
+  </div>
+  <ul class="grid" id="grid" aria-label="담은 그림"></ul>
+  <div id="note"></div>
+</main>
+<footer>즐겨찾기는 이 브라우저에만 남는다 · 다른 기기와는 나뉘지 않는다</footer>
+
+<div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-labelledby="v-title" hidden>
+  <div class="v-bar">
+    <span class="v-room" id="v-room"><span></span></span>
+    <span class="v-count" id="v-count" aria-live="polite"></span>
+    <button type="button" class="v-btn" id="v-play" aria-pressed="false"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg><span>감상 모드</span></button>
+    <button type="button" class="v-btn" id="v-close" aria-label="닫기">✕</button>
+  </div>
+  <div class="v-stage" id="v-stage">
+    <img id="v-a" alt="" decoding="async"><img id="v-b" alt="" decoding="async">
+    <button type="button" class="v-nav v-prev" id="v-prev" aria-label="이전 그림">‹</button>
+    <button type="button" class="v-nav v-next" id="v-next" aria-label="다음 그림">›</button>
+    <span class="v-paused" id="v-paused" hidden>감상 모드를 멈췄어요</span>
+  </div>
+  <div class="v-foot">
+    <div class="v-text"><h2 id="v-title"></h2><p id="v-sub"></p></div>
+    <div class="v-actions">
+      <a class="v-btn main" id="v-link" href="./">그 공방에서 보기</a>
+      <button type="button" class="v-btn" id="v-remove">즐겨찾기에서 빼기</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="favorites.js"></script>
+<script>
+/* 공방 — 색·이름은 지도(index.html)의 ROOMS 와 같다. 즐겨찾기의 a(공방 열쇠)는 pkm 이고 지도의 방 열쇠는 pokemon 이다 */
+const ROOM = {
+  gundam: { room: 'gundam', name: '건담 격납고', c: '#7fb3ff', dex: '/atelier/dex.html' },
+  book: { room: 'book', name: '책의 서재', c: '#e39b6b', dex: '/book-atelier/dex.html' },
+  pkm: { room: 'pokemon', name: '포켓몬 연구소', c: '#f4c542', dex: '/pkm-atelier/dex.html' },
+  myth: { room: 'myth', name: '신화 무기 대장간', c: '#d9b45a', dex: '/myth-atelier/dex.html' },
+};
+const ORDER = ['gundam', 'book', 'pkm', 'myth'];
+const SLIDE_MS = 6000;
+const F = window.AtelierFavorites;
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const roomOf = a => ROOM[a] || { room: a, name: a, c: '#d9b45a', dex: '/' };
+const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+const grid = $('#grid'), chips = $('#chips'), tools = $('#tools'), lede = $('#lede'), note = $('#note'), viewer = $('#viewer');
+const okStore = !!F && F.available();
+
+/* 거르기 — 주소 ?a=book 에 남는다(기록은 안 쌓는다) */
+let filter = new URLSearchParams(location.search).get('a') || 'all';
+if (filter !== 'all' && !ROOM[filter]) filter = 'all';
+let all = [], shown = [];
+function read() { all = okStore ? F.list() : []; }
+function setFilter(a) {
+  filter = a;
+  const u = new URL(location.href);
+  if (a === 'all') u.searchParams.delete('a'); else u.searchParams.set('a', a);
+  try { history.replaceState(history.state, '', u.pathname + u.search + u.hash); } catch (e) {}
+  paint();
+}
+
+function paint() {
+  read();
+  if (filter !== 'all' && !all.some(e => e.a === filter)) filter = all.length ? 'all' : filter;
+  shown = filter === 'all' ? all : all.filter(e => e.a === filter);
+  const counts = {}; for (const e of all) counts[e.a] = (counts[e.a] || 0) + 1;
+  if (!okStore) {
+    tools.hidden = true; grid.innerHTML = '';
+    lede.textContent = '';
+    note.innerHTML = `<section class="empty" id="blocked"><svg class="heart" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z"/></svg>
+      <h2>이 브라우저는 저장을 막아 두었어요</h2>
+      <p>즐겨찾기는 이 브라우저의 저장 공간(localStorage)에 남는데, 지금은 쓸 수도 읽을 수도 없어요. 사생활 보호 창이거나 사이트 데이터가 막혀 있을 때 그래요 — 보통 창에서 열거나 이 사이트의 저장을 허락하면 공방 도감에서 담은 그림이 여기 모여요.</p>
+      <nav class="doors" aria-label="공방 도감">${doorsHTML()}</nav></section>`;
+    return;
+  }
+  if (!all.length) {
+    tools.hidden = true; grid.innerHTML = '';
+    lede.textContent = '';
+    note.innerHTML = `<section class="empty" id="empty"><svg class="heart" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z"/></svg>
+      <h2>아직 담은 그림이 없어요</h2>
+      <p>공방 도감에서 마음에 드는 그림을 열고 ♡ 즐겨찾기를 누르면 여기 모여요. 한 장씩, 새것부터.</p>
+      <nav class="doors" aria-label="공방 도감">${doorsHTML()}</nav></section>`;
+    return;
+  }
+  note.innerHTML = '';
+  tools.hidden = false;
+  const rooms = ORDER.filter(a => counts[a]).concat(Object.keys(counts).filter(a => ORDER.indexOf(a) < 0));
+  lede.innerHTML = `공방 ${rooms.length}곳에서 담은 그림 <b>${all.length}장</b> — 새것부터`;
+  chips.innerHTML = [['all', '전체', all.length]].concat(rooms.map(a => [a, roomOf(a).name, counts[a]]))
+    .map(([a, label, n]) => `<button type="button" class="chip" data-a="${esc(a)}" aria-pressed="${filter === a}" style="--c:${a === 'all' ? 'var(--gold)' : roomOf(a).c}">${esc(label)} <b>${n}</b></button>`).join('');
+  grid.innerHTML = shown.map((e, i) => { const r = roomOf(e.a);
+    return `<li><button type="button" class="tile" data-i="${i}" data-a="${esc(e.a)}" data-file="${esc(e.file)}" style="--c:${r.c}" aria-label="${esc(e.title)}${e.sub ? ' · ' + esc(e.sub) : ''} · ${esc(r.name)} — 크게 보기">
+      <span class="face"><img src="${esc(e.thumb || e.full)}" data-full="${esc(e.full)}" alt="" loading="lazy" decoding="async" width="341" height="512"></span>
+      <span class="cap"><b>${esc(e.title)}</b><i><span>${esc([e.sub, r.name].filter(Boolean).join(' · '))}</span></i></span></button></li>`; }).join('');
+}
+function doorsHTML() { return ORDER.map(a => `<a href="${ROOM[a].dex}" style="--c:${ROOM[a].c}">${esc(ROOM[a].name)} 도감</a>`).join(''); }
+/* 썸네일이 없으면 원본, 그것도 없으면 이름만 */
+grid.addEventListener('error', ev => { const img = ev.target; if (!(img instanceof HTMLImageElement)) return;
+  if (img.dataset.full && img.src !== img.dataset.full && !img.dataset.tried) { img.dataset.tried = '1'; img.src = img.dataset.full; return; }
+  img.replaceWith(Object.assign(document.createElement('span'), { className: 'ph', textContent: '그림을 불러오지 못했어요' })); }, true);
+chips.addEventListener('click', ev => { const b = ev.target.closest('.chip'); if (b) setFilter(b.dataset.a); });
+grid.addEventListener('click', ev => { const b = ev.target.closest('.tile'); if (b) openViewer(+b.dataset.i, b); });
+
+/* ── 크게 보기 ── */
+let at = -1, back = null, layer = 0, playing = false, timer = 0, pushed = false;
+const imgs = [$('#v-a'), $('#v-b')];
+function show(i, slow) {
+  if (!shown.length) return closeViewer();
+  at = (i + shown.length) % shown.length;
+  const e = shown[at], r = roomOf(e.a), next = imgs[1 - layer], cur = imgs[layer];
+  viewer.classList.toggle('slow', !!slow && !reduced.matches);
+  next.onerror = () => { if (e.thumb && next.src !== e.thumb) next.src = e.thumb; };
+  next.src = e.full || e.thumb; next.alt = e.title + (e.sub ? ' · ' + e.sub : '');
+  next.dataset.file = e.file;
+  next.classList.add('on'); cur.classList.remove('on'); cur.alt = '';
+  layer = 1 - layer;
+  $('#v-room').style.setProperty('--c', r.c); $('#v-room span').textContent = r.name;
+  $('#v-count').textContent = (at + 1) + ' / ' + shown.length;
+  $('#v-title').textContent = e.title; $('#v-sub').textContent = e.sub || '';
+  $('#v-link').href = e.link || r.dex; $('#v-link').style.setProperty('--c', r.c);
+  $('#v-prev').disabled = $('#v-next').disabled = shown.length < 2;
+  /* 다음 그림을 미리 받아 둔다 — 감상 모드가 빈 칸으로 넘어가지 않게 */
+  const n = shown[(at + 1) % shown.length]; if (n && n.full) { const pre = new Image(); pre.src = n.full; }
+}
+function openViewer(i, from) {
+  back = from || document.activeElement;
+  viewer.hidden = false; document.body.style.overflow = 'hidden';
+  show(i, false);
+  if (!pushed) { try { history.pushState({ favView: 1 }, '', location.href); pushed = true; } catch (e) {} }
+  $('#v-close').focus();
+}
+function closeViewer(fromPop) {
+  if (viewer.hidden) return;
+  stopPlay(false);
+  viewer.hidden = true; document.body.style.overflow = '';
+  for (const im of imgs) { im.classList.remove('on'); im.removeAttribute('src'); }
+  if (pushed && !fromPop) { pushed = false; try { history.back(); } catch (e) {} } else pushed = false;
+  const t = back && back.isConnected ? back : grid.querySelector(`.tile[data-i="${Math.min(at, shown.length - 1)}"]`) || $('#play');
+  if (t && t.focus) t.focus();
+}
+addEventListener('popstate', () => { if (!viewer.hidden) closeViewer(true); });
+function step(d) { show(at + d, false); }
+$('#v-prev').addEventListener('click', () => { pause(); step(-1); });
+$('#v-next').addEventListener('click', () => { pause(); step(1); });
+$('#v-close').addEventListener('click', () => closeViewer());
+$('#v-remove').addEventListener('click', () => {
+  pause();
+  const e = shown[at]; if (!e) return;
+  F.remove(e.a, e.file);
+  toast('즐겨찾기에서 뺐어요 · ' + e.title);
+  /* onChange 가 다시 그린 뒤 같은 자리(다음 그림)를 띄운다 */
+});
+/* ← → · Esc · Tab 은 안에서만 */
+document.addEventListener('keydown', ev => {
+  if (viewer.hidden || ev.altKey || ev.ctrlKey || ev.metaKey) return;
+  if (ev.key === 'Escape') { ev.preventDefault(); closeViewer(); return; }
+  if (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft') { ev.preventDefault(); pause(); step(ev.key === 'ArrowRight' ? 1 : -1); return; }
+  if (ev.key === 'Tab') {
+    const f = [...viewer.querySelectorAll('button:not(:disabled), a[href]')].filter(x => x.offsetParent !== null);
+    if (!f.length) return;
+    if (!viewer.contains(document.activeElement)) { ev.preventDefault(); f[0].focus(); return; }
+    const first = f[0], last = f[f.length - 1];
+    if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+    else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+  }
+});
+/* 밀어 넘기기 — 가로로 40px 넘게, 세로보다 확실히 */
+let touch = null;
+$('#v-stage').addEventListener('pointerdown', ev => { if (ev.target.closest('button')) return; touch = { x: ev.clientX, y: ev.clientY }; });
+$('#v-stage').addEventListener('pointerup', ev => { if (!touch) return; const dx = ev.clientX - touch.x, dy = ev.clientY - touch.y; touch = null;
+  if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) { pause(); step(dx < 0 ? 1 : -1); } });
+$('#v-stage').addEventListener('pointercancel', () => { touch = null; });
+
+/* ── 감상 모드 — 6초마다 천천히 겹쳐 넘긴다. 넘기기·밀기·키를 누르면 멈춘다. 움직임 줄이기면 잠긴다 ── */
+function lockPlay() {
+  const off = reduced.matches || !shown.length;
+  for (const b of [$('#play'), $('#v-play')]) { b.disabled = off; b.title = reduced.matches ? '기기의 동작 줄이기 설정을 따라 감상 모드를 껐어요' : '6초마다 다음 그림으로 천천히 넘어가요'; }
+  if (off && playing) stopPlay(false);
+}
+function startPlay() {
+  if (reduced.matches || !shown.length) return;
+  playing = true; $('#v-paused').hidden = true;
+  $('#v-play').classList.add('on'); $('#v-play').setAttribute('aria-pressed', 'true'); $('#v-play span').textContent = '감상 중';
+  clearInterval(timer); timer = setInterval(() => show(at + 1, true), SLIDE_MS);
+}
+function stopPlay(say) {
+  clearInterval(timer); timer = 0;
+  if (playing && say) $('#v-paused').hidden = false;
+  playing = false;
+  $('#v-play').classList.remove('on'); $('#v-play').setAttribute('aria-pressed', 'false'); $('#v-play span').textContent = '감상 모드';
+}
+function pause() { if (playing) stopPlay(true); }
+$('#v-play').addEventListener('click', () => { if (playing) stopPlay(false); else startPlay(); });
+$('#play').addEventListener('click', ev => { openViewer(0, ev.currentTarget); startPlay(); });
+(reduced.addEventListener ? reduced.addEventListener.bind(reduced, 'change') : reduced.addListener.bind(reduced))(lockPlay);
+
+let toastT = 0;
+function toast(s) { const t = $('#toast'); t.textContent = s; clearTimeout(toastT); toastT = setTimeout(() => { t.textContent = ''; }, 2200); }
+
+/* 다른 탭(공방 도감)에서 담거나 빼면 다시 그린다. 보던 그림이 빠졌으면 같은 자리의 다음 것으로 */
+if (F) F.onChange(() => {
+  const cur = !viewer.hidden && shown[at];
+  paint(); lockPlay();
+  if (viewer.hidden) return;
+  if (!shown.length) return closeViewer();
+  const k = cur ? shown.findIndex(e => e.a === cur.a && e.file === cur.file) : -1;
+  show(k >= 0 ? k : Math.min(at, shown.length - 1), false);
+});
+paint(); lockPlay();
+</script>
+</body>
+</html>
