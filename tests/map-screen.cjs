@@ -42,6 +42,13 @@ const NOW = Date.now(), SEED = {
       assert.equal(await p.locator('.pin').count(), 5, '이름표 다섯'); assert.equal(await p.locator('.card').count(), 5, '카드 다섯');
       for (const k of ROOMS) assert((await p.locator(`.pin[data-key="${k}"] b`).textContent()).length > 2, k + ' 이름');
       await noOverflow();
+      /* 제목 「공방 모음」 은 한 줄 — 좁은 폰에서 안내 글에 밀려 글자가 밑줄로 떨어지지 않는다(344 폭도) */
+      for (const w of mobile && vp.width < vp.height ? [344, 360, vp.width] : [vp.width]) {
+        if (w !== vp.width) await p.setViewportSize({ width: w, height: vp.height });
+        const t = await p.evaluate(() => { const h = document.querySelector('.head h1'), r = document.createRange(); r.selectNodeContents(h.lastChild); return r.getClientRects().length; });
+        assert.equal(t, 1, name + ' ' + w + ' 제목 한 줄');
+      }
+      if (mobile && vp.width < vp.height) await p.setViewportSize(vp);
       /* 오늘 불 — 판을 둔 방(서재·대장간)만 빛·줄, 새 소식 점은 격납고에만(HEAD 는 비동기라 기다린다) */
       assert.deepEqual(await p.locator('.room.lit').evaluateAll(es => es.map(e => e.dataset.key)), ['book', 'myth'], name + ' 오늘 판을 둔 방에 불');
       assert.deepEqual(await p.locator('#glows .glow').evaluateAll(es => es.filter(e => e.style.display !== 'none').map(e => e.dataset.key)), ['book', 'myth'], name + ' 빛은 그 방에만');

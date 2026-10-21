@@ -42,10 +42,10 @@ a { color: inherit; }
 
 /* ── 머리 — 작게. 지도가 주인공 ── */
 .head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: calc(14px + env(safe-area-inset-top)) 16px 6px; max-width: 1280px; margin: 0 auto; }
-.head h1 { margin: 0; font: 900 clamp(22px, 3.4vw, 34px)/1.1 var(--serif); letter-spacing: -.02em;
+.head h1 { flex: none; white-space: nowrap; margin: 0; font: 900 clamp(22px, 3.4vw, 34px)/1.1 var(--serif); letter-spacing: -.02em;   /* 제목은 줄지도 꺾이지도 않는다 — 좁은 폰에서 안내 글에 밀려 「음」 이 밑줄로 떨어졌다 */
   background: linear-gradient(180deg, #fff 30%, var(--gold) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .head h1 small { display: block; margin-top: 4px; -webkit-text-fill-color: var(--gold); color: var(--gold); font: 700 11px/1 var(--serif); letter-spacing: .4em; }
-.head p { margin: 0; color: var(--muted); font-size: 12px; text-align: right; }
+.head p { flex: 1 1 auto; min-width: 0; margin: 0; color: var(--muted); font-size: 12px; text-align: right; word-break: keep-all; }
 .head p a { color: var(--gold); text-decoration: none; }
 
 /* ── 지도 ── */
