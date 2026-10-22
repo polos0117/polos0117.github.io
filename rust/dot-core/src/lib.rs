@@ -648,8 +648,18 @@ pub fn sheet(src: &Img, still: &Img, o: &SheetOpts) -> Result<Out, String> {
         return Err(format!("프레임 {} 개를 찾았다(기대 {}, 칸 배치 {grid}{}) — 생성 그림의 칸 수·배치가 지시와 같은지 본다(칸끼리 겹쳐 그렸거나 칸 수가 다르면 다시 생성)",
             boxes.len(), o.frames, if bgc.is_some() { ", 한 색 바탕을 지웠다" } else { "" }));
     }
-    let pal = still_palette(still);
+    let mut pal = still_palette(still);
     if pal.is_empty() { return Err("정지 도트가 비었다".into()); }
+    /* 정리한 정지 도트가 아니라 생성 원본을 넣었으면 색이 수십만 개라 셈이 끝나지 않는다 — 64색이 넘으면 그 그림에서 24색을 묶어 쓴다 */
+    let quantized = pal.len() > 64;
+    if quantized {
+        let opaque: Vec<[f64; 3]> = (0..still.w * still.h).filter(|&i| still.px[i * 4 + 3] >= 160)
+            .map(|i| [still.px[i * 4] as f64, still.px[i * 4 + 1] as f64, still.px[i * 4 + 2] as f64]).collect();
+        let step = (opaque.len() / 20000).max(1);
+        let samp: Vec<[f64; 3]> = opaque.iter().step_by(step).copied().collect();
+        let (p, _) = palette(&samp, 24);
+        pal = p; pal.sort(); pal.dedup();
+    }
     let rows_pitch = o.rows.map(|r| {
         let mut hs: Vec<f64> = boxes.iter().map(|&(x0, y0, x1, y1)| {
             let rows: Vec<usize> = (y0..y1).filter(|&y| (x0..x1).any(|x| src.alpha(x, y) >= 160)).collect();
@@ -727,7 +737,8 @@ pub fn sheet(src: &Img, still: &Img, o: &SheetOpts) -> Result<Out, String> {
     let mut cols: Vec<[u8; 3]> = (0..out.w * out.h).filter(|&i| out.px[i * 4 + 3] > 0).map(|i| [out.px[i * 4], out.px[i * 4 + 1], out.px[i * 4 + 2]]).collect();
     cols.sort(); cols.dedup();
     let keyed_json = bgc.map_or(String::new(), |c| format!(", \"background_keyed\": {}", hex(&c)))
-        + &fitted.map_or(String::new(), |p| format!(", \"fitted_pitch\": {}", round2(p)));
+        + &fitted.map_or(String::new(), |p| format!(", \"fitted_pitch\": {}", round2(p)))
+        + if quantized { ", \"palette_quantized\": true" } else { "" };
     let json = format!("{{\"cell\": [{ww}, {hh}], \"frames\": {}, \"foot_y\": {}, \"colours\": {}{keyed_json}, \"frame\": [{}]}}",
         fr.len(), hh - 2, cols.len(), info.join(", "));
     Ok(Out { img: out, json })

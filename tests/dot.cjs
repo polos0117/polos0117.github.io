@@ -93,7 +93,13 @@ function sourceHash() {
     const r = W.sheet(raw, st, { frames: 4, grid: [2, 2], rows: 0, fixedPitch: 6, speck: 6, cell: [96, 128] });
     assert.equal(r.info.frames, 4); assert.equal(r.info.background_keyed, '#00ff00');
     assert.throws(() => W.sheet(raw, st, { frames: 4, grid: null, rows: 0, fixedPitch: 6, speck: 6, cell: [96, 128] }), /프레임 2 개를 찾았다\(기대 4, 칸 배치 없음, 한 색 바탕을 지웠다\)/);
-    W.free(raw); W.free(st); W.free(r.id);
+    /* 정지 도트 칸에 원본(색 수십만)을 넣어도 — 24색으로 묶어 금방 끝난다 */
+    const t0 = Date.now(), q = W.sheet(raw, raw, { frames: 4, grid: [2, 2], rows: 0, fixedPitch: 6, speck: 6, cell: [96, 128] });
+    assert.equal(q.info.palette_quantized, undefined, '두 색 그림은 묶지 않는다');
+    const noisy = new Uint8Array(w * hh * 4); for (let i = 0; i < w * hh; i++) noisy.set([i % 251, (i * 7) % 253, (i * 13) % 255, 255], i * 4);
+    const big = W.put(noisy, w, hh), q2 = W.sheet(raw, big, { frames: 4, grid: [2, 2], rows: 0, fixedPitch: 6, speck: 6, cell: [96, 128] });
+    assert.equal(q2.info.palette_quantized, true); assert(Date.now() - t0 < 20000, '원본을 정지 도트로 넣어도 끝난다 ' + (Date.now() - t0) + 'ms');
+    W.free(raw); W.free(st); W.free(r.id); W.free(q.id); W.free(big); W.free(q2.id);
     n++;
   }
 
