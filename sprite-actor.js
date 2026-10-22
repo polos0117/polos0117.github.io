@@ -1,4 +1,4 @@
-/* 도트 재생기 v2 (2026-10-22) — 도트 인물을 작은 공간에서 움직인다(대기·걷기·고르기 반응). 한 명(create) · 여러 명의 바닥(floor) · 뛰쳐나오기(popOut).
+/* 도트 재생기 v2 (2026-10-22) — 도트 인물을 작은 공간에서 움직인다(대기·걷기·고르기 반응). 한 명(create · 카드로 mount) · 여러 명의 바닥(floor) · 뛰쳐나오기(popOut).
    원본은 polos0117.github.io/sprite-actor.js(모양은 sprite-actor.css) — 다섯 공방 저장소의 lib/ 에 글자 하나 다르지 않게 복사해 둔다
    (고치면 여섯 곳을 같이 — 각 저장소의 tests/sprite-actor-copy.cjs 가 옆에 받아 둔 원본과 견준다).
    약속(sprites.json 꼴 · API)은 polos0117.github.io/README.md 「도트 재생기」절. 인물의 그림은 도트 공방(dot.html)에서 만든다.
@@ -244,6 +244,17 @@
   function forCard(key, url) {
     return load(url).then(function (d) { var def = actorFor(d, key); return def ? { def: def, base: baseOf(d, def) } : null; }, function () { return null; });
   }
+  /* 카드 하나의 도트를 host 에 세운다 — 도감 상세의 작은 무대. → Promise<인물 | null>. 인물이 없거나 그림을 못 받으면 null(부르는 쪽이 자리를 숨긴다).
+     opts: url(자료, 기본 data/sprites.json), label, points([0.3, 0.7]), floor(10), seed, scale, idleMs, onSelect(기본: 반응) */
+  function mount(host, key, opts) {
+    opts = opts || {};
+    return forCard(key, opts.url).then(function (r) {
+      if (!r || !host || !host.isConnected) return null;
+      var a = create(host, r.def, { base: r.base, label: opts.label, points: opts.points || [0.3, 0.7], floor: opts.floor == null ? 10 : opts.floor,
+        seed: opts.seed || 5, scale: opts.scale, idleMs: opts.idleMs, onSelect: opts.onSelect });
+      return a.ready.then(function (x) { if (x.failed) { a.destroy(); return null; } return a; });
+    });
+  }
   function today() { var d = new Date(); return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); }
 
   /* 여러 인물을 한 바닥에 — 공방 메인(격납고·연구소·대장간·군막·서재). 인물마다 바닥의 제 몫(폭을 나눈 칸) 안에서 걷는다.
@@ -343,5 +354,5 @@
     return P;
   }
 
-  root.AtelierSprite = { load: load, create: create, floor: floor, popOut: popOut, actorFor: actorFor, forCard: forCard, cardKey: cardKey };
+  root.AtelierSprite = { load: load, create: create, floor: floor, popOut: popOut, mount: mount, actorFor: actorFor, forCard: forCard, cardKey: cardKey };
 })(typeof window !== 'undefined' ? window : this);

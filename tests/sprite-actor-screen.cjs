@@ -40,6 +40,8 @@ const server = http.createServer((q, s) => {
   let n = 0;
   try {
     const ctx = await br.newContext({ viewport: { width: 390, height: 844 } }), page = await ctx.newPage(), errors = [];
+    /* 자료의 base(https://polos0117.github.io/…)는 옆 저장소로 */
+    await ctx.route('https://polos0117.github.io/**', r => { const f = path.join(SIB, decodeURIComponent(new URL(r.request().url()).pathname)); return fs.existsSync(f) ? r.fulfill({ status: 200, contentType: MIME[path.extname(f)], body: fs.readFileSync(f) }) : r.fulfill({ status: 404 }); });
     page.on('pageerror', e => errors.push(String(e)));
     await page.goto(BASE + '/t.html'); await page.evaluate(() => window.go);
 
@@ -47,6 +49,10 @@ const server = http.createServer((q, s) => {
     assert.deepEqual(await page.evaluate(() => [!!AtelierSprite.actorFor(data, 'alice'), AtelierSprite.actorFor(data, 'nope'), AtelierSprite.cardKey('x', { book: 'b' }), AtelierSprite.cardKey('x', { card: 'c' }), AtelierSprite.cardKey('x', {})]), [true, null, 'b', 'c', 'x']);
     assert.equal(await page.evaluate(() => AtelierSprite.forCard('chunhyang', '/book-atelier/data/sprites.json').then(r => r && r.base)), 'https://polos0117.github.io/book-atelier-img/sprites/');
     assert.equal(await page.evaluate(() => AtelierSprite.forCard('alice', '/nope.json')), null, '자료가 없으면 null');
+    const mounted = await page.evaluate(() => { const box = document.createElement('div'); box.style.cssText = 'position:relative;height:150px'; document.body.appendChild(box);
+      return Promise.all([AtelierSprite.mount(box, 'sunzi', { url: '/book-atelier/data/sprites.json', label: '손자' }), AtelierSprite.mount(box, 'nope', { url: '/book-atelier/data/sprites.json' })])
+        .then(([a, b]) => { const r = [!!a && a.debug().ready, b, box.querySelectorAll('.sprite-actor').length, a && a.el.getAttribute('aria-label')]; a && a.destroy(); box.remove(); return r; }); });
+    assert.deepEqual(mounted, [true, null, 1, '손자'], 'mount — 카드 하나의 작은 무대, 없으면 null');
     n++;
 
     /* floor — 좁으면 둘, 제 몫 안에서 */
