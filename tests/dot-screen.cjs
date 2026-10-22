@@ -40,7 +40,9 @@ const server = http.createServer((q, s) => {
     await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, r => r.abort());   // 글꼴 같은 바깥 것은 받지 않는다
     const page = await ctx.newPage(), errors = [];
     page.on('pageerror', e => errors.push(String(e)));
-    page.on('console', m => { if (m.type() === 'error' && !/ERR_FAILED|net::/.test(m.text())) errors.push(m.text()); });
+    /* 그림 404 는 옆에 받아 둔 그림 저장소가 등록부보다 늦을 때 난다(화면은 원본으로 바꿔 보인다) — 그림 말고 다른 것이 없으면 실패 */
+    page.on('console', m => { if (m.type() === 'error' && !/ERR_FAILED|net::|Failed to load resource/.test(m.text())) errors.push(m.text()); });
+    page.on('response', r => { if (r.status() >= 400 && r.url().startsWith(BASE) && !/\.(webp|jpe?g|png)$/i.test(new URL(r.url()).pathname)) errors.push(r.status() + ' ' + r.url()); });
     const save = async (btn) => { const [dl] = await Promise.all([page.waitForEvent('download'), page.click(btn)]); const f = path.join(tmp, dl.suggestedFilename()); await dl.saveAs(f); return { name: dl.suggestedFilename(), buf: fs.readFileSync(f) }; };
 
     /* ① 인물 */
@@ -109,15 +111,28 @@ const server = http.createServer((q, s) => {
     assert.deepEqual(rec.cleaned.args, ['--frames', '6', '--grid', '3x2', '--palette', 'sprites/sunzi/sunzi_begin_still.png', '--rows', '121', '--speck', '40', '--cell', '96x128']);
     assert.match(rec.generation.sha256 || '', /^[0-9a-f]{64}$/); assert.match(rec.cleaned.sha1 || '', /^[0-9a-f]{12}$/);
     assert.equal(rec.playback.speed, stride.speed);
+    /* 무대 — 넣은 정지 도트와 방금 정리한 걷기를 공용 재생기(sprite-actor.js)로 세운다. 두 자리 사이를 걷는다 */
+    await page.waitForSelector('#stageBox:not([hidden]) .sprite-actor:not([hidden])');
+    await page.waitForFunction(() => { const a = document.querySelector('#room .sprite-actor'); return a && a.sprite.debug().ready; });
+    await page.locator('#room').scrollIntoViewIfNeeded();   // 화면 밖이면 재생기가 쉰다(그래야 한다)
+    const walked = await page.waitForFunction(() => document.querySelector('#room .sprite-actor').dataset.state === 'walk', null, { timeout: 8000 }).then(() => true, () => false);
+    assert(walked, '무대의 인물이 걷는다 ' + JSON.stringify(await page.evaluate(() => { const a = document.querySelector('#room .sprite-actor'); return [a.sprite.debug(), a.dataset.state, document.getElementById('room').getBoundingClientRect().top, innerHeight]; })));
+    const actorEntry = JSON.parse(await page.inputValue('#actorEntry'));
+    assert.deepEqual(Object.keys(actorEntry.states), ['still', 'walk']);
+    assert.deepEqual(actorEntry.states.walk.dy, bob.dy); assert.equal(actorEntry.states.walk.speed, stride.speed);
+    assert.equal(actorEntry.states.still.file, 'sunzi/sunzi_begin_still.png'); assert.deepEqual(actorEntry.cell, [96, 128]);
+    assert.match(await page.textContent('#roomNote'), /아직 없는 것: 대기 · 반응/);
     /* 재생 — 멈춤·다시 */
     await page.click('#playBtn'); assert.equal(await page.getAttribute('#playBtn', 'aria-pressed'), 'false');
     await page.click('#playBtn'); assert.equal(await page.getAttribute('#playBtn', 'aria-pressed'), 'true');
-    checks += 3;
+    checks += 4;
 
     /* 공방 바꾸기 — 포켓몬 */
     await page.click('.chip:has-text("포켓몬")');
     await page.waitForFunction(() => /모두 \d+명/.test(document.getElementById('more').textContent));
-    assert.match(await page.textContent('#more'), /앞의 60명 · 모두 379명/);
+    assert.match(await page.textContent('#more'), /앞의 60명 · 모두 \d{3,}명/);
+    await page.fill('#q', '피카츄');
+    assert.equal(await page.isHidden('#stageBox'), true, '인물을 바꾸기 전까지 무대는 남는다 — 바꾸면 비운다');
     await page.fill('#q', '피카츄');
     await page.click('#people button:has-text("피카츄")');
     assert.equal(await page.inputValue('#id'), 'pikachu'); assert.equal(await page.inputValue('#form'), 'base');

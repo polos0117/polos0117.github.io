@@ -245,6 +245,13 @@
     return e;
   }
 
+  /* sprites.json 의 인물 칸 하나 — 가진 상태만. walk: {speed, dy} */
+  function actor(o) {
+    var states = {};
+    (o.states || []).forEach(function (s) { states[s] = spriteState({ state: s, id: o.id, form: o.form, walk: s === 'walk' ? o.walk : null }); });
+    return { id: o.id, form: o.form || 'base', cell: CELL.slice(), foot: FOOT.slice(), scale: 1, flip: o.flip !== false, facing: 'right', states: states };
+  }
+
   /* ── 다섯 공방의 그림 목록 — 같은 출처(polos0117.github.io)라 각 공방의 자료를 그대로 읽는다 ── */
   var ATELIERS = [
     { key: 'book', name: '책', data: '/book-atelier/data/img.json', names: '/book-atelier/data/book-design.json', bases: ['/book-atelier-img/img/'], subject: 'woman' },
@@ -301,7 +308,7 @@
   }
 
   var api = { API: API, CELL: CELL, FOOT: FOOT, STATES: STATES, CLEAN: CLEAN, SUBJECTS: SUBJECTS, ATTACH: ATTACH, STATE_NAME: STATE_NAME, ATELIERS: ATELIERS,
-    load: load, wrap: wrap, args: args, slug: slug, names: names, prompt: prompt, request: request, record: record, spriteState: spriteState, filesOf: filesOf, cards: cards };
+    load: load, wrap: wrap, args: args, slug: slug, names: names, prompt: prompt, request: request, record: record, spriteState: spriteState, actor: actor, filesOf: filesOf, cards: cards };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.AtelierDot = api;
 })(typeof window !== 'undefined' ? window : this);

@@ -80,3 +80,23 @@ API(`window.AtelierFavorites`): `has(a, file)` · `toggle(칸)` → 담겼으면
 정리 셈은 `rust/dot-core` 한 곳이다 — book-atelier 의 파이썬 도구(`tools/sprite-grid.py` · `sprite-sheet.py` · `sprite-bob.py`)를 옮긴 것이라 같은 원본·같은 인자면 **화소 하나 다르지 않다**(book 기록 12장으로 검사한다). 세션은 명령줄 `dot` 로 같은 일을 한다(`rust/README.md`).
 검사: `node tests/dot.cjs` — wasm 이 소스와 같다 · book 기록 12장 다시 정리 · 걷기 dy·빠르기 · 지시문·이름·기록 · 다섯 공방 그림 목록.
 `CHROMIUM_PATH=<chrome> NODE_PATH=<playwright 가 있는 node_modules> node tests/dot-screen.cjs` — 화면에서 고르기·요청문·상태 넷, 앨리스 정지·손자 걷기를 화면에서 정리해 그림 저장소 정리본과 같다, 받기 넷, 공방 다섯, 새로 고침, 네 크기(344×882 · 390×844 · 844×390 · 1280×900). 옆에 `../book-atelier-img` 가 있어야 한다.
+
+## 도트 재생기 — 다섯 공방이 같이 쓰는 도트 인물
+
+도구는 `sprite-actor.js`(모양은 `sprite-actor.css`)이고, **같은 파일을 다섯 저장소(atelier · pkm-atelier · myth-atelier · book-atelier · sam-atelier)의 `lib/sprite-actor.js`·`lib/sprite-actor.css` 에 글자 하나 다르지 않게 복사해 둔다**(여기 것이 원본, 맨 위 줄에 판). 고치면 여섯 곳을 같이 고친다 — 각 저장소의 `tests/sprite-actor-copy.cjs` 가 옆에 받아 둔 이 파일과 견주고, 여기 `tests/dot.cjs` 도 옆의 다섯 복사본을 본다. 화면 말은 없다.
+지금 부르는 곳: book 의 서재 바닥 · 서가 상세 도트 줄 · 서고 복도 · 도트 진열실, 그리고 도트 공방(`dot.html`)의 무대 미리보기. 나머지 공방은 도트 인물이 생기면 부른다.
+
+인물 자료 `data/sprites.json`(공방마다 하나 — 도트 공방의 「인물 칸 복사」가 이 꼴로 준다):
+
+| 칸 | 값 |
+|---|---|
+| `base` | 그림 주소 앞(예: `https://polos0117.github.io/book-atelier-img/sprites/`) — 그림은 그 공방의 그림 저장소 `sprites/`(`img/` 밖) |
+| `actors.<열쇠>` | 인물 하나: `cell`([96, 128]) · `foot`(발 기준선 [48, 126]) · `scale`(1) · `flip`(좌우 뒤집어 걸어도 되나) · `facing`('right') · `states` · 그 밖의 칸(책 `book`·`form` 처럼)은 공방이 쓴다 |
+| `states.still` | `{file, frames: 1}` — 정지 도트 |
+| `states.idle` · `react` | `{file, frames: 4, order, ms}` — 칸 차례와 칸마다 시간(ms). 반응이 끝나면 대기로 |
+| `states.walk` | `{file, frames: 6, order, ms, speed, dy}` — speed 는 도트 화소/초(접지 칸 발 폭 ÷ 반 주기 — 발이 미끄러지지 않게), dy 는 칸마다 위아래(+ 는 아래) |
+
+API(`window.AtelierSprite`): `load(url = 'data/sprites.json')` → 자료(한 번만 받는다) · `create(host, def, opts)` → 인물. `host` 는 `position: relative` 인 공간, `def` 는 `actors.<열쇠>` 하나.
+`opts`: `base`(그림 주소 앞) · `label`(누르는 이름 — 공방의 낱말 표에서) · `points`([왼쪽, 오른쪽] 공간 폭의 비율) · `start` · `idleMs`([최소, 최대] 걷기 전 서 있는 시간) · `seed` · `scale`(도트 한 칸의 CSS 배율) · `floor`(공간 바닥에서 발까지 px) · `fit`(공간 높이에 들게 배율을 낮춘다) · `wander`(false 면 저절로 걷지 않는다) · `onSelect(인물)` · `onError()` · `onState(이름)`.
+인물: `ready`(Promise) · `select()` · `pause(까닭)`/`resume(까닭)` · `walkTo(0|1)` · `march(ms)`(제자리 걸음) · `play(상태)` · `destroy()` · `running` · `failed` · `debug()`.
+지키는 것: 도트 한 칸 = 실제 화소의 정수배 · 루프 안에서 배치를 읽지 않는다 · 움직임 끔(`AtelierMotion`, 없으면 동작 줄이기)이면 첫 칸에 멈춰 선다 · 숨은 탭·화면 밖이면 쉰다 · 그림을 못 받으면 인물만 숨는다 · 대기 시트가 없으면 정지 도트로 서 있다가 걷는다.

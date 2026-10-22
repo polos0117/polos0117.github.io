@@ -115,6 +115,25 @@ function sourceHash() {
   assert.equal(rec.cleaned.file, 'sprites/x/x_base_idle.png'); assert.deepEqual(rec.playback.order, [0, 1, 2, 3]); assert.deepEqual(rec.cleaned.cell, [96, 128]);
   n += 2;
 
+  /* ── 인물 칸 전체 ── */
+  const act = D.actor({ id: 'x', form: 'base', states: ['still', 'walk'], walk: { speed: 60, dy: [0, 1, -1, 0, 1, -1] } });
+  assert.deepEqual(Object.keys(act.states), ['still', 'walk']); assert.deepEqual(act.cell, [96, 128]); assert.deepEqual(act.foot, [48, 126]);
+  assert.equal(act.states.walk.speed, 60); assert.equal(act.flip, true);
+  n++;
+
+  /* ── 도트 재생기 복사본 — 옆에 받아 둔 다섯 공방 저장소의 lib/sprite-actor.{js,css} 가 여기 원본과 같다 ── */
+  const copies = [];
+  for (const repo of ['atelier', 'pkm-atelier', 'myth-atelier', 'book-atelier', 'sam-atelier']) {
+    for (const f of ['sprite-actor.js', 'sprite-actor.css']) {
+      const p = path.join(ROOT, '..', repo, 'lib', f);
+      if (!fs.existsSync(path.join(ROOT, '..', repo))) continue;
+      assert(fs.existsSync(p), repo + '/lib/' + f + ' 가 없다');
+      assert.equal(fs.readFileSync(p, 'utf8'), fs.readFileSync(path.join(ROOT, f), 'utf8'), repo + '/lib/' + f + ' 가 원본과 다르다');
+    }
+    if (fs.existsSync(path.join(ROOT, '..', repo))) copies.push(repo);
+  }
+  n++;
+
   /* ── 공방 그림 목록 — 옆에 저장소가 있으면 실제 자료로 ── */
   const near = (dir, f) => { const p = path.join(ROOT, '..', dir, f); return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null; };
   const seen = [];
@@ -136,5 +155,5 @@ function sourceHash() {
   }
   n++;
 
-  console.log('PASS 도트 공방: ' + n + '가지 · wasm 이 소스와 같다 · book 기록 ' + same + '장을 다시 정리해 화소 하나 다르지 않다(걷기 dy·빠르기까지) · 지시문·요청문·이름·기록 · 그림 목록 ' + seen.join(' · '));
+  console.log('PASS 도트 공방: ' + n + '가지 · wasm 이 소스와 같다 · book 기록 ' + same + '장을 다시 정리해 화소 하나 다르지 않다(걷기 dy·빠르기까지) · 지시문·요청문·이름·기록·인물 칸 · 재생기 복사본 ' + copies.length + '곳 = 원본 · 그림 목록 ' + seen.join(' · '));
 })().catch(e => { console.error(e); process.exit(1); });

@@ -15,6 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&display=swap">
+<link rel="stylesheet" href="sprite-actor.css?v=1">
 <!--
   도트 공방 — 다섯 공방(책·포켓몬·신화 무기·건담·삼국지)이 같이 쓰는 도트 인물 만들기. README 「도트 공방」.
   ① 인물: 공방을 고르면 그 공방의 그림 등록부(/<공방>/data/img.json — 같은 출처라 그대로 읽는다)에서 인물 목록, 고르면 그 인물의 그림들.
@@ -22,6 +23,7 @@
   ② 지시문: 상태(정지·대기·걷기·반응)마다 GPT 이미지 생성에 그대로 줄 요청문과 첨부 차례. 정지 도트 6배·다리 자세 안내 그림을 여기서 받는다.
   ③ 정리: 받은 원본 PNG 를 dot/dot.wasm(rust/dot-core — book-atelier 파이썬 도구와 같은 셈, 화소 하나 다르지 않다)으로 정리해
      미리 보고 재생하고, 정리본 PNG · 기록 JSON · sprites.json 칸을 받는다. 그림은 이 브라우저 밖으로 나가지 않는다 — 올리기는 세션이 한다.
+     무대: 이번에 정리한(또는 넣은) 상태들을 모아 공용 재생기(sprite-actor.js — 다섯 공방이 같은 파일)로 공방에서처럼 세운다. 인물 칸 전체도 받는다.
   고른 값은 이 기기에만 남는다(atelier_dot_v1). 주소 ?a=book&c=alice&s=walk 로 바로 연다.
 -->
 <style>
@@ -139,6 +141,9 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: bloc
 .zoom { display: flex; gap: 6px; }
 .zoom button { min-height: 36px; min-width: 44px; border: 1px solid #ffffff2e; border-radius: 8px; background: #ffffff08; cursor: pointer; }
 .zoom button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+/* 무대 — 공용 재생기가 인물을 세운다. 바닥은 아래 30px */
+.sprite-room { position: relative; height: 300px; border-radius: 8px; overflow: hidden; background: linear-gradient(180deg, #1d1a24 0, #26212c calc(100% - 30px), #4a3a2a calc(100% - 30px), #3a2d20 100%); }
+.note2 { margin: 8px 0; color: var(--muted); font-size: 12.5px; word-break: keep-all; }
 footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px calc(24px + env(safe-area-inset-bottom)); }
 @media (max-width: 480px) { .step { padding: 14px 12px; } }
 </style>
@@ -217,11 +222,18 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
       </div>
       <textarea id="entry" rows="6" readonly aria-label="sprites.json 칸" style="font:12.5px/1.45 var(--mono)"></textarea>
     </div>
+    <div class="box" id="stageBox" style="margin-top:14px" hidden><h3>무대 — 이번에 정리한 상태를 모아 공방에서처럼 (누르면 반응)</h3>
+      <div class="sprite-room" id="room"></div>
+      <p class="note2" id="roomNote"></p>
+      <textarea id="actorEntry" rows="6" readonly aria-label="sprites.json 인물 칸" style="font:12.5px/1.45 var(--mono)"></textarea>
+      <div class="row" style="margin-top:8px"><button class="btn" type="button" id="cpActor">인물 칸 복사</button></div>
+    </div>
   </section>
 </main>
 <footer>polos0117 · 도트 공방 · 정리 셈은 rust/dot-core (book-atelier 파이썬 도구와 같은 화소)</footer>
 
-<script src="dot/dot.js?v=1"></script>
+<script src="dot/dot.js?v=2"></script>
+<script src="sprite-actor.js?v=1"></script>
 <script>
 (function () {
   'use strict';
@@ -238,6 +250,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   };
   if (!STATE_TAB[S.state]) S.state = 'still';
   var docs = {}, list = [], W = null, raw = null, still = null, made = null, play = null;
+  var session = {}, actor = null;   // 무대 — 이번에 정리한 상태마다 {url(그림), walk}
 
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify({ atelier: S.atelier, card: S.card, state: S.state, per: S.per })); } catch (e) { /* 저장이 막혀도 화면은 돈다 */ }
@@ -268,7 +281,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
       var b = document.createElement('button');
       b.type = 'button'; b.className = 'chip'; b.textContent = a.name; b.style.setProperty('--c', COLORS[a.key]);
       b.setAttribute('aria-pressed', String(a.key === S.atelier));
-      b.onclick = function () { if (S.atelier === a.key) return; S.atelier = a.key; S.card = ''; $('q').value = ''; save(); chips(); loadAtelier(); };
+      b.onclick = function () { if (S.atelier === a.key) return; clearStage(); S.atelier = a.key; S.card = ''; $('q').value = ''; save(); chips(); loadAtelier(); };
       $('ateliers').appendChild(b);
     });
   }
@@ -303,6 +316,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     $('more').textContent = hit.length > MAX ? '앞의 ' + MAX + '명 · 모두 ' + hit.length + '명 — 이름으로 좁힌다' : hit.length ? '모두 ' + hit.length + '명' : '맞는 인물이 없다';
   }
   function pick(key, quiet) {
+    if (key !== S.card) clearStage();
     S.card = key; save();
     Array.prototype.forEach.call($('people').querySelectorAll('button'), function (b, i) { b.setAttribute('aria-pressed', String(b.lastChild.textContent === (cur() || {}).name)); });
     var c = cur(); if (!c) return;
@@ -433,7 +447,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
       r.name = file.name;
       var sz = W.size(r.id);
       if (which === 'raw') { if (raw) W.free(raw.id); raw = r; }
-      else { if (still && still.own) W.free(still.id); still = r; prompt(); }
+      else { if (still && still.own) W.free(still.id); still = r; prompt(); keepSheet('still', r.bytes, null); }
       nameEl.textContent = file.name + ' · ' + sz[0] + '×' + sz[1] + (r.png ? '' : ' · PNG 가 아니라 브라우저가 풀었다');
       ready();
     }).catch(function (e) { nameEl.textContent = '못 읽었다 — ' + e.message; });
@@ -470,6 +484,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
         made = { id: out.id, info: out.info, state: s, walk: walk, png: W.png(out.id) };
         if (s === 'still') { if (still && still.own) W.free(still.id); still = { id: W.decode(made.png), own: true, name: '방금 정리한 정지 도트' }; $('stillName').textContent = '방금 정리한 정지 도트를 쓴다'; prompt(); }
         show();
+        keepSheet(s, made.png, walk);
         status($('runStatus'), '정리했다 — 아래에서 보고 받는다', 'good');
       } catch (e) { status($('runStatus'), e.message, 'bad'); }
     }, 20);
@@ -557,6 +572,37 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
       rec.generation.received_as = raw.name;
       download(new TextEncoder().encode(JSON.stringify(rec, null, 1) + '\n'), n.record.split('/').pop(), 'application/json');
     });
+  };
+
+  /* ── 무대 — 공용 재생기(sprite-actor.js)로 이번에 정리한 상태들을 모아 세운다 ── */
+  function keepSheet(state, bytes, walk) {
+    if (session[state]) URL.revokeObjectURL(session[state].url);
+    session[state] = { url: URL.createObjectURL(new Blob([bytes], { type: 'image/png' })), walk: walk };
+    stage();
+  }
+  function clearStage() {
+    Object.keys(session).forEach(function (k) { URL.revokeObjectURL(session[k].url); });
+    session = {}; if (actor) { actor.destroy(); actor = null; } $('stageBox').hidden = true;
+  }
+  function stage() {
+    if (!window.AtelierSprite || (!session.still && !session.idle)) { $('stageBox').hidden = true; return; }
+    var m = me(), have = ['still', 'idle', 'walk', 'react'].filter(function (k) { return session[k]; });
+    var def = D.actor({ id: m.id || 'name', form: m.form, states: have, walk: session.walk && session.walk.walk, flip: true });
+    var view = JSON.parse(JSON.stringify(def));
+    have.forEach(function (k) { view.states[k].file = session[k].url; });
+    if (actor) actor.destroy();
+    $('stageBox').hidden = false;
+    actor = window.AtelierSprite.create($('room'), view, { base: '', label: (cur() || {}).name || m.id, floor: 30, scale: 2, fit: true, idleMs: [1500, 3000], seed: 5,
+      onError: function () { $('roomNote').textContent = '그림을 못 세웠다'; } });
+    var miss = ['still', 'idle', 'walk', 'react'].filter(function (k) { return !session[k]; }).map(function (k) { return STATE_TAB[k]; });
+    $('roomNote').textContent = '세운 상태: ' + have.map(function (k) { return STATE_TAB[k]; }).join(' · ') + (miss.length ? ' — 아직 없는 것: ' + miss.join(' · ') : ' — 넷 다 있다') +
+      '. 공방 화면과 같은 재생기라 여기서 보는 대로 움직인다.';
+    $('actorEntry').value = JSON.stringify(def, null, 1);
+  }
+  $('cpActor').onclick = function () {
+    var t = $('actorEntry').value;
+    (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { $('roomNote').textContent = '인물 칸을 복사했다'; },
+      function () { $('actorEntry').select(); $('roomNote').textContent = '복사가 막혔다 — 글을 골라 두었다'; });
   };
 
   chips(); tabs(); prompt(); options(); loadAtelier();
