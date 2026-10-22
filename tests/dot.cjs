@@ -82,6 +82,21 @@ function sourceHash() {
     n += 3;
   } else console.log('(../book-atelier-img 가 옆에 없어 다시 정리 시험은 건너뜀)');
 
+  /* ── 한 색 바탕(#00FF00)에 위아래 칸이 이어진 2x2 시트 — 바탕을 지우고 칸 배치로 잘라 네 칸 ── */
+  {
+    const w = 400, hh = 600, px = new Uint8Array(w * hh * 4);
+    for (let i = 0; i < w * hh; i++) px.set([0, 255, 0, 255], i * 4);
+    const paint = (x0, y0, x1, y1) => { for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) px.set([120, 60, 40, 255], (y * w + x) * 4); };
+    for (const [cx, cy] of [[100, 150], [300, 150], [100, 450], [300, 450]]) paint(cx - 40, cy - 120, cx + 40, cy + 120);
+    paint(95, 270, 105, 330);
+    const raw = W.put(px, w, hh), st = W.put(new Uint8Array([120, 60, 40, 255, 0, 0, 0, 0]), 2, 1);
+    const r = W.sheet(raw, st, { frames: 4, grid: [2, 2], rows: 0, fixedPitch: 6, speck: 6, cell: [96, 128] });
+    assert.equal(r.info.frames, 4); assert.equal(r.info.background_keyed, '#00ff00');
+    assert.throws(() => W.sheet(raw, st, { frames: 4, grid: null, rows: 0, fixedPitch: 6, speck: 6, cell: [96, 128] }), /프레임 2 개를 찾았다\(기대 4, 칸 배치 없음, 한 색 바탕을 지웠다\)/);
+    W.free(raw); W.free(st); W.free(r.id);
+    n++;
+  }
+
   /* ── 틀린 입력은 던진다(그림은 그대로) ── */
   assert.throws(() => W.decode(new Uint8Array([1, 2, 3])), /PNG/);
   const blank = W.put(new Uint8Array(64 * 64 * 4), 64, 64);

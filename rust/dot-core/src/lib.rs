@@ -409,6 +409,9 @@ pub struct StillOpts { pub colors: usize, pub rows: Option<usize>, pub outline: 
 pub struct Out { pub img: Img, pub json: String }
 
 pub fn still(src: &Img, o: &StillOpts) -> Result<Out, String> {
+    let mut keyed = src.clone();
+    let bgc = key_background(&mut keyed);
+    let src = &keyed;
     let nc = o.colors;
     let (pal, mut idx, mut m, w, h, meta);
     if let Some(rows) = o.rows {
@@ -481,6 +484,7 @@ pub fn still(src: &Img, o: &StillOpts) -> Result<Out, String> {
         }
     }
     used.sort(); used.dedup();
+    let meta = match bgc { Some(c) => format!("{meta}, \"background_keyed\": {}", hex(&c)), None => meta };
     let json = format!("{{{meta}, \"sprite\": [{w}, {h}], \"cell\": [96, 128], \"cell_offset\": [{x0}, {y0}], \"foot_y\": 126, \"colours\": {}, \"palette\": [{}]}}",
         used.len(), used.iter().map(hex).collect::<Vec<_>>().join(", "));
     Ok(Out { img: cell, json })
@@ -513,29 +517,47 @@ fn runs(v: &[bool], minlen: usize) -> Vec<(usize, usize)> {
     out
 }
 
-/// 프레임 상자들 (x0, y0, x1, y1)
-pub fn frame_boxes(a: &Img, grid_c: Option<usize>) -> Vec<(usize, usize, usize, usize)> {
+/// 기대 경계(k·n/칸 수) 둘레 ±36%/칸 수 안에서 가장 빈 줄로 자른다 — 파이썬 도구의 세로 자르기 그대로(가로 자르기도 같은 식)
+fn cut_at(count: &[f64], n: usize, parts: usize) -> Vec<usize> {
+    let n0 = n as f64;
+    let mut cuts = Vec::new();
+    for k in 1..parts {
+        let b = k as f64 * n0 / parts as f64;
+        let r = n0 * 0.12 / parts as f64 * 3.0;
+        let (lo, hi) = (((b - r) as usize).min(n), ((b + r) as usize).min(n));
+        cuts.push(if hi > lo { lo + argmin(&count[lo..hi]) } else { b as usize });
+    }
+    let mut edges = vec![0]; edges.extend(cuts); edges.push(n);
+    edges
+}
+
+/// 프레임 상자들 (x0, y0, x1, y1). grid(가로 칸 수, 세로 칸 수)를 주면 빈 줄로 못 나눈 곳을 기대 경계 가까이 가장 빈 줄에서 자른다
+/// (위아래 칸이 머리카락·자락으로 이어졌거나, 옆 칸에 닿았을 때). 빈 줄로 다 나뉘면 파이썬 도구와 같은 상자다
+pub fn frame_boxes(a: &Img, grid: Option<(usize, usize)>) -> Vec<(usize, usize, usize, usize)> {
     let (w, h) = (a.w, a.h);
     let solid: Vec<bool> = (0..w * h).map(|i| a.px[i * 4 + 3] >= 160).collect();
     let rowany: Vec<bool> = (0..h).map(|y| (0..w).any(|x| solid[y * w + x])).collect();
+    let mut bands = runs(&rowany, 60);
+    if let Some((_, r)) = grid {
+        if r > 1 && bands.len() < r {
+            /* 위아래가 붙었다 — 줄마다 불투명 화소 수로 가장 빈 가로줄에서 자르고, 칸마다 실제 그림 위아래로 줄인다 */
+            let row: Vec<f64> = (0..h).map(|y| (0..w).filter(|&x| solid[y * w + x]).count() as f64).collect();
+            bands = Vec::new();
+            for p in cut_at(&row, h, r).windows(2) {
+                let ys: Vec<usize> = (p[0]..p[1]).filter(|&y| rowany[y]).collect();
+                if !ys.is_empty() && ys[ys.len() - 1] + 1 - ys[0] >= 60 { bands.push((ys[0], ys[ys.len() - 1] + 1)); }
+            }
+        }
+    }
     let mut boxes = Vec::new();
-    for (y0, y1) in runs(&rowany, 60) {
+    for (y0, y1) in bands {
         let colany: Vec<bool> = (0..w).map(|x| (y0..y1).any(|y| solid[y * w + x])).collect();
         let mut segs = runs(&colany, 60);
-        if let Some(c) = grid_c {
+        if let Some((c, _)) = grid {
             if segs.len() < c {
                 let col: Vec<f64> = (0..w).map(|x| (y0..y1).filter(|&y| solid[y * w + x]).count() as f64).collect();
-                let w0 = w as f64;
-                let mut cuts = Vec::new();
-                for k in 1..c {
-                    let b = k as f64 * w0 / c as f64;
-                    let r = w0 * 0.12 / c as f64 * 3.0;
-                    let (lo, hi) = ((b - r) as usize, (b + r) as usize);
-                    cuts.push(lo + argmin(&col[lo..hi]));
-                }
-                let mut edges = vec![0]; edges.extend(cuts); edges.push(w);
                 segs = Vec::new();
-                for p in edges.windows(2) {
+                for p in cut_at(&col, w, c).windows(2) {
                     let xs: Vec<usize> = (p[0]..p[1]).filter(|&x| colany[x]).collect();
                     if !xs.is_empty() { segs.push((xs[0], xs[xs.len() - 1] + 1)); }
                 }
@@ -544,6 +566,39 @@ pub fn frame_boxes(a: &Img, grid_c: Option<usize>) -> Vec<(usize, usize, usize, 
         for (x0, x1) in segs { boxes.push((x0, y0, x1, y1)); }
     }
     boxes
+}
+
+/// 배경이 투명하지 않으면(생성기가 #00FF00 같은 한 색 바탕으로 그렸을 때) 가장자리에서 이어진 바탕색을 투명으로.
+/// 네 귀퉁이가 모두 불투명하고 가장자리 화소의 60% 넘게 한 색(채널마다 ±48)일 때만 — 투명 바탕 그림은 그대로(파이썬 도구와 같은 화소).
+/// 바탕에서 이어진 곳만 지우므로 인물 안의 같은 색은 남는다. 지웠으면 그 바탕색을 돌려준다
+pub fn key_background(a: &mut Img) -> Option<[u8; 3]> {
+    let (w, h) = (a.w, a.h);
+    if w < 3 || h < 3 { return None; }
+    if [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)].iter().any(|&(x, y)| a.alpha(x, y) < 160) { return None; }
+    let mut edge = Vec::new();
+    for x in 0..w { edge.push((x, 0)); edge.push((x, h - 1)); }
+    for y in 1..h - 1 { edge.push((0, y)); edge.push((w - 1, y)); }
+    let mut bg = [0u8; 3];
+    for c in 0..3 {
+        let mut v: Vec<f64> = edge.iter().map(|&(x, y)| a.at(x, y)[c] as f64).collect();
+        bg[c] = rnd(median(&mut v)) as u8;
+    }
+    let near = |p: &[u8]| p[3] >= 160 && (0..3).all(|c| (p[c] as i32 - bg[c] as i32).abs() <= 48);
+    let hits = edge.iter().filter(|&&(x, y)| near(a.at(x, y))).count();
+    if (hits as f64) < edge.len() as f64 * 0.6 { return None; }
+    let mut seen = vec![false; w * h];
+    let mut stack: Vec<(usize, usize)> = edge.into_iter().filter(|&(x, y)| near(a.at(x, y))).collect();
+    for &(x, y) in &stack { seen[y * w + x] = true; }
+    while let Some((x, y)) = stack.pop() {
+        a.px[(y * w + x) * 4 + 3] = 0;
+        let nb = [(x.wrapping_sub(1), y), (x + 1, y), (x, y.wrapping_sub(1)), (x, y + 1)];
+        for &(nx, ny) in &nb {
+            if nx >= w || ny >= h || seen[ny * w + nx] { continue; }
+            seen[ny * w + nx] = true;
+            if near(a.at(nx, ny)) { stack.push((nx, ny)); }
+        }
+    }
+    Some(bg)
 }
 
 /// 가장 큰 덩어리(8방향 이웃)와 speck 칸 이상인 덩어리만 남긴다 → (남길 칸, 지운 칸 수)
@@ -584,9 +639,14 @@ pub fn still_palette(still: &Img) -> Vec<[u8; 3]> {
 }
 
 pub fn sheet(src: &Img, still: &Img, o: &SheetOpts) -> Result<Out, String> {
-    let boxes = frame_boxes(src, o.grid.map(|g| g.0));
+    let mut keyed = src.clone();
+    let bgc = key_background(&mut keyed);
+    let src = &keyed;
+    let boxes = frame_boxes(src, o.grid);
     if boxes.len() != o.frames {
-        return Err(format!("프레임 {} 개를 찾았다(기대 {}) — 칸 배치(grid)를 주거나 생성 그림을 본다", boxes.len(), o.frames));
+        let grid = o.grid.map_or("없음".to_string(), |g| format!("{}x{}", g.0, g.1));
+        return Err(format!("프레임 {} 개를 찾았다(기대 {}, 칸 배치 {grid}{}) — 생성 그림의 칸 수·배치가 지시와 같은지 본다(칸끼리 겹쳐 그렸거나 칸 수가 다르면 다시 생성)",
+            boxes.len(), o.frames, if bgc.is_some() { ", 한 색 바탕을 지웠다" } else { "" }));
     }
     let pal = still_palette(still);
     if pal.is_empty() { return Err("정지 도트가 비었다".into()); }
@@ -648,7 +708,8 @@ pub fn sheet(src: &Img, still: &Img, o: &SheetOpts) -> Result<Out, String> {
     }
     let mut cols: Vec<[u8; 3]> = (0..out.w * out.h).filter(|&i| out.px[i * 4 + 3] > 0).map(|i| [out.px[i * 4], out.px[i * 4 + 1], out.px[i * 4 + 2]]).collect();
     cols.sort(); cols.dedup();
-    let json = format!("{{\"cell\": [{ww}, {hh}], \"frames\": {}, \"foot_y\": {}, \"colours\": {}, \"frame\": [{}]}}",
+    let keyed_json = bgc.map_or(String::new(), |c| format!(", \"background_keyed\": {}", hex(&c)));
+    let json = format!("{{\"cell\": [{ww}, {hh}], \"frames\": {}, \"foot_y\": {}, \"colours\": {}{keyed_json}, \"frame\": [{}]}}",
         fr.len(), hh - 2, cols.len(), info.join(", "));
     Ok(Out { img: out, json })
 }
@@ -708,6 +769,26 @@ mod tests {
         assert_eq!(round2(23.135), 23.14);   // 23.135 의 이진 값이 조금 크다
         assert_eq!(round2(2.675), 2.67);     // 이진 값이 조금 작다
         assert_eq!(round2(5.5), 5.5);
+    }
+    /// 2x2 시트 — 위아래 칸이 가는 띠로 이어지고 한 색(#00FF00) 바탕이어도 네 칸을 찾는다
+    #[test]
+    fn grid_touching_rows_on_green() {
+        let (w, h) = (400usize, 600usize);
+        let mut a = Img::new(w, h);
+        for i in 0..w * h { a.px[i * 4..i * 4 + 4].copy_from_slice(&[0, 255, 0, 255]); }
+        let mut paint = |x0: usize, y0: usize, x1: usize, y1: usize| { for y in y0..y1 { for x in x0..x1 { a.px[(y * w + x) * 4..(y * w + x) * 4 + 4].copy_from_slice(&[120, 60, 40, 255]); } } };
+        for &(cx, cy) in &[(100, 150), (300, 150), (100, 450), (300, 450)] { paint(cx - 40, cy - 120, cx + 40, cy + 120); }
+        paint(95, 270, 105, 330);   // 왼쪽 위·아래 칸을 잇는 머리카락
+        let bg = key_background(&mut a);
+        assert_eq!(bg, Some([0, 255, 0]));
+        assert_eq!(frame_boxes(&a, None).len(), 2, "빈 줄로만 나누면 둘");
+        let b = frame_boxes(&a, Some((2, 2)));
+        assert_eq!(b.len(), 4, "{b:?}");
+    }
+    #[test]
+    fn transparent_left_alone() {
+        let mut a = Img::new(10, 10);
+        assert_eq!(key_background(&mut a), None);
     }
     #[test]
     fn runs_and_mode() {
