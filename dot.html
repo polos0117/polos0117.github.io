@@ -471,7 +471,15 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     status($('runStatus'), '정리하는 중…');
     setTimeout(function () {
       try {
-        var s = S.state, out, walk = null;
+        var s = S.state, out, walk = null, swapped = false;
+        /* 두 칸을 바꿔 넣었으면 — 생성 시트는 정지 도트(정리본 96×128 · 6배 576×768)보다 늘 크다. 작은 쪽이 원본 칸에 있으면 바꿔 쓴다 */
+        if (s !== 'still' && still && raw) {
+          var a = W.size(raw.id), b = W.size(still.id);
+          if (a[0] * a[1] < b[0] * b[1]) {
+            var t = raw; raw = still; still = t; swapped = true;
+            var rn = $('rawName').textContent; $('rawName').textContent = $('stillName').textContent; $('stillName').textContent = rn;
+          }
+        }
         if (s === 'still') out = W.still(raw.id, { colors: opt('colors'), rows: opt('rows'), outline: opt('outline') });
         else {
           var gc = opt('gridC'), gr = opt('gridR');
@@ -487,7 +495,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
         if (s === 'still') { if (still && still.own) W.free(still.id); still = { id: W.decode(made.png), own: true, name: '방금 정리한 정지 도트' }; $('stillName').textContent = '방금 정리한 정지 도트를 쓴다'; prompt(); }
         show();
         keepSheet(s, made.png, walk);
-        status($('runStatus'), '정리했다 — 아래에서 보고 받는다', 'good');
+        status($('runStatus'), swapped ? '두 칸이 바뀌어 있어 바꿔 넣고 정리했다 — 아래에서 보고 받는다' : '정리했다 — 아래에서 보고 받는다', 'good');
       } catch (e) { status($('runStatus'), e.message, 'bad'); }
     }, 20);
   };

@@ -102,6 +102,20 @@ const server = http.createServer((q, s) => {
     got = await save('#dlPng');
     assert.equal(got.name, 'sunzi_begin_walk.png');
     samePixels(got.buf, 'sprites/sunzi/sunzi_begin_walk.png', '손자 걷기');
+    /* 두 칸을 바꿔 넣어도 — 크기로 알아보고 바꿔 정리한다(같은 화소) */
+    {
+      const q = await ctx.newPage();
+      await q.goto(BASE + '/dot.html?a=book&c=sunzi&s=walk'); await q.waitForSelector('#who:not([hidden])');
+      await q.setInputFiles('#raw', path.join(IMG, 'sprites/sunzi/sunzi_begin_still.png'));
+      await q.setInputFiles('#stillFile', path.join(IMG, 'sprites/sunzi/raw/sunzi_begin_walk_gen1.png'));
+      await q.waitForFunction(() => !document.getElementById('run').disabled);
+      await q.click('#run'); await q.waitForSelector('#result:not([hidden])');
+      assert.match(await q.textContent('#runStatus'), /바꿔 넣고 정리했다/);
+      const [dl] = await Promise.all([q.waitForEvent('download'), q.click('#dlPng')]);
+      const f = path.join(tmp, 'swapped.png'); await dl.saveAs(f);
+      samePixels(fs.readFileSync(f), 'sprites/sunzi/sunzi_begin_walk.png', '바꿔 넣은 손자 걷기');
+      await q.close();
+    }
     const sheetId = W.decode(got.buf), stride = W.stride(sheetId, 96, 200), bob = W.bob(sheetId, 96, 1);
     const entry = JSON.parse(await page.inputValue('#entry'));
     assert.deepEqual(entry, { file: 'sunzi/sunzi_begin_walk.png', frames: 6, order: [0, 1, 2, 3, 4, 5], ms: [200, 200, 200, 200, 200, 200], speed: stride.speed, dy: bob.dy });
