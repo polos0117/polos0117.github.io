@@ -289,7 +289,7 @@
   /* 뛰쳐나오기 — from(펼친 책·연 캡슐 같은 요소)에서 인물이 튀어나와 화면 바닥에 내려앉고, 화면을 가로질러 걸어 다닌다.
      def — 인물 하나. opts: base, label, onSelect(actor), within(붙일 곳 — 없으면 from 이 든 열린 dialog, 그도 없으면 body), scale(기본 3), floor(px),
      duration(뛰는 시간 ms, 기본 700), idleMs, seed.
-     돌려주는 것 { actor, layer, ready, close(back) → Promise } — close(true) 면 from 으로 뛰어 들어가고, 아니면 바로 사라진다.
+     돌려주는 것 { actor, layer, ready, close(back, ms) → Promise } — close(true) 면 from 으로 뛰어 들어가고(ms — 그 시간에, 기본 duration), 아니면 바로 사라진다.
      움직임 끔이면 뛰지 않고 내려앉은 자리에 선다(걷지도 않는다 — create 가 지킨다). 한 번에 하나 — 새로 부르면 앞의 것은 닫는다. */
   var popped = null;
   function center(el) { var r = el && el.isConnected && el.getBoundingClientRect ? el.getBoundingClientRect() : null; return r && r.width + r.height > 0 ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null; }
@@ -306,15 +306,16 @@
       scale: opts.scale || 3, floor: fl, idleMs: opts.idleMs || [700, 1800], onSelect: opts.onSelect });
     var P = { actor: actor, layer: layer, closed: false };
     /* stage 를 옮겨 뛴다 — 인물 하나뿐이라 stage 가 곧 인물. 기준점은 인물의 발 */
-    function hop(frames, done) {
+    function hop(frames, done, ms) {
       var sr = stage.getBoundingClientRect(), d = actor.debug();
       stage.style.transformOrigin = d.x + 'px ' + (sr.height - fl) + 'px';
-      var an = stage.animate(frames, { duration: dur, easing: 'cubic-bezier(.33,.75,.4,1)', fill: 'forwards' });
+      var an = stage.animate(frames, { duration: ms || dur, easing: 'cubic-bezier(.33,.75,.4,1)', fill: 'forwards' });
       return new Promise(function (ok) { an.onfinish = an.oncancel = function () { ok(); if (done) done(an); }; });
     }
     function offset(p) { var sr = stage.getBoundingClientRect(), d = actor.debug(); return { x: p.x - (sr.left + d.x), y: p.y - (sr.bottom - fl) }; }
     P.ready = actor.ready.then(function () {
-      if (P.closed || actor.failed || !c || !motionOn() || !stage.animate) return P;
+      if (actor.failed) { P.close(); return P; }   // 그림을 못 받았으면 판째 치운다
+      if (P.closed || !c || !motionOn() || !stage.animate) return P;
       var o = offset(c), up = Math.min(o.y, 0) - 72;
       actor.pause('pop');
       return hop([
@@ -324,7 +325,7 @@
         { transform: 'translate(0,0) scale(1)', opacity: 1 }
       ], function (an) { an.cancel(); stage.style.transform = ''; }).then(function () { if (!P.closed) actor.resume('pop'); return P; });
     });
-    P.close = function (back) {
+    P.close = function (back, ms) {
       if (P.closed) return Promise.resolve();
       P.closed = true; if (popped === P) popped = null;
       var c2 = center(from) || c;
@@ -336,7 +337,7 @@
         { transform: 'translate(0,0) scale(1)', opacity: 1 },
         { offset: 0.45, transform: 'translate(' + o.x * 0.5 + 'px,' + (Math.min(o.y, 0) - 60) + 'px) scale(1.04)' },
         { transform: 'translate(' + o.x + 'px,' + o.y + 'px) scale(.3)', opacity: 0 }
-      ]).then(gone);
+      ], null, ms).then(gone);
     };
     popped = P;
     return P;
