@@ -1,4 +1,4 @@
-/* 도트 재생기 v1 (2026-10-22) — 도트 인물 하나를 작은 공간에서 움직인다(대기·걷기·고르기 반응).
+/* 도트 재생기 v2 (2026-10-22) — 도트 인물을 작은 공간에서 움직인다(대기·걷기·고르기 반응). 한 명(create) · 여러 명의 바닥(floor) · 뛰쳐나오기(popOut).
    원본은 polos0117.github.io/sprite-actor.js(모양은 sprite-actor.css) — 다섯 공방 저장소의 lib/ 에 글자 하나 다르지 않게 복사해 둔다
    (고치면 여섯 곳을 같이 — 각 저장소의 tests/sprite-actor-copy.cjs 가 옆에 받아 둔 원본과 견준다).
    약속(sprites.json 꼴 · API)은 polos0117.github.io/README.md 「도트 재생기」절. 인물의 그림은 도트 공방(dot.html)에서 만든다.
@@ -224,5 +224,123 @@
     return A.api;
   }
 
-  root.AtelierSprite = { load: load, create: create };
+  /* ── 공방마다 같은 자리 — 카드 열쇠로 인물 찾기 · 공방 메인의 바닥 · 뛰쳐나오기 ── */
+
+  /* 인물의 카드 열쇠 — card(그 공방 그림 등록부의 열쇠), 책은 book, 없으면 actors 의 열쇠 */
+  function cardKey(k, def) { return (def && (def.card || def.book)) || k; }
+  function baseOf(data, def) { return (def && def.base) || (data && data.base) || ''; }
+  function keysOf(data) {
+    var A = (data && data.actors) || {};
+    return Object.keys(A).filter(function (k) { return A[k] && A[k].states && A[k].cell; });
+  }
+  /* sprites.json 에서 카드 열쇠로 인물 하나(없으면 null) */
+  function actorFor(data, key) {
+    if (!key) return null;
+    var ks = keysOf(data);
+    for (var i = 0; i < ks.length; i++) if (cardKey(ks[i], data.actors[ks[i]]) === key) return data.actors[ks[i]];
+    return null;
+  }
+  /* 카드 하나의 인물 — Promise<{def, base} | null>. 자료를 못 받아도 null(화면은 그대로) */
+  function forCard(key, url) {
+    return load(url).then(function (d) { var def = actorFor(d, key); return def ? { def: def, base: baseOf(d, def) } : null; }, function () { return null; });
+  }
+  function today() { var d = new Date(); return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); }
+
+  /* 여러 인물을 한 바닥에 — 공방 메인(격납고·연구소·대장간·군막·서재). 인물마다 바닥의 제 몫(폭을 나눈 칸) 안에서 걷는다.
+     data — sprites.json. opts: keys(이 카드들만), count(몇 명 — 수 또는 폭 → 수, 기본 좁으면 2·넓으면 3), seed(차례 — 기본 오늘 날짜라 날마다 돈다),
+     labelOf(카드 열쇠, def) → 누르는 이름, onSelect(카드 열쇠, actor), scale, floor, fit, idleMs.
+     돌려주는 것 { list() → [{key, actor}], ready() → Promise, pause(까닭), resume(까닭), destroy() }. 인물이 없으면 빈 바닥(아무것도 안 붙인다) */
+  function floor(host, data, opts) {
+    opts = opts || {};
+    var all = keysOf(data).filter(function (k) { return !opts.keys || opts.keys.indexOf(cardKey(k, data.actors[k])) >= 0; }).sort();
+    var list = [], count = -1, reasons = {}, dead = false, ro = null;
+    function want() {
+      var w = host.clientWidth || 0, n = typeof opts.count === 'function' ? opts.count(w) : opts.count || (w < 560 ? 2 : 3);
+      return Math.max(0, Math.min(n, all.length));
+    }
+    function build() {
+      list.forEach(function (x) { x.actor.destroy(); }); list = [];
+      count = want();
+      var s = (opts.seed == null ? today() : opts.seed) % Math.max(1, all.length);
+      for (var i = 0; i < count; i++) {
+        var k = all[(s + i) % all.length], def = data.actors[k], ck = cardKey(k, def), lo = i / count, w = 1 / count;
+        var a = create(host, def, {
+          base: baseOf(data, def), label: opts.labelOf ? opts.labelOf(ck, def) : ck,
+          points: [lo + w * 0.18, lo + w * 0.82], start: i % 2, seed: (s + i + 1) * 7919,
+          scale: opts.scale, floor: opts.floor, fit: opts.fit, idleMs: opts.idleMs,
+          onSelect: opts.onSelect ? (function (key) { return function (actor) { opts.onSelect(key, actor); }; })(ck) : null
+        });
+        a.el.dataset.who = ck;
+        for (var r in reasons) a.pause(r);
+        list.push({ key: ck, actor: a });
+      }
+    }
+    build();
+    if (root.ResizeObserver) { ro = new ResizeObserver(function () { if (!dead && want() !== count) build(); }); ro.observe(host); }
+    return {
+      list: function () { return list.slice(); },
+      ready: function () { return Promise.all(list.map(function (x) { return x.actor.ready; })); },
+      pause: function (r) { r = r || 'manual'; reasons[r] = 1; list.forEach(function (x) { x.actor.pause(r); }); },
+      resume: function (r) { r = r || 'manual'; delete reasons[r]; list.forEach(function (x) { x.actor.resume(r); }); },
+      destroy: function () { dead = true; if (ro) ro.disconnect(); list.forEach(function (x) { x.actor.destroy(); }); list = []; }
+    };
+  }
+
+  /* 뛰쳐나오기 — from(펼친 책·연 캡슐 같은 요소)에서 인물이 튀어나와 화면 바닥에 내려앉고, 화면을 가로질러 걸어 다닌다.
+     def — 인물 하나. opts: base, label, onSelect(actor), within(붙일 곳 — 없으면 from 이 든 열린 dialog, 그도 없으면 body), scale(기본 3), floor(px),
+     duration(뛰는 시간 ms, 기본 700), idleMs, seed.
+     돌려주는 것 { actor, layer, ready, close(back) → Promise } — close(true) 면 from 으로 뛰어 들어가고, 아니면 바로 사라진다.
+     움직임 끔이면 뛰지 않고 내려앉은 자리에 선다(걷지도 않는다 — create 가 지킨다). 한 번에 하나 — 새로 부르면 앞의 것은 닫는다. */
+  var popped = null;
+  function center(el) { var r = el && el.isConnected && el.getBoundingClientRect ? el.getBoundingClientRect() : null; return r && r.width + r.height > 0 ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null; }
+  function popOut(from, def, opts) {
+    opts = opts || {};
+    if (popped) popped.close();
+    var within = opts.within || (from && from.closest && from.closest('dialog[open]')) || doc.body;
+    var layer = doc.createElement('div'), stage = doc.createElement('div');
+    layer.className = 'sprite-popout'; stage.className = 'sprite-popout-stage';
+    layer.appendChild(stage); within.appendChild(layer);
+    var c = center(from), vw = root.innerWidth || doc.documentElement.clientWidth || 360, dur = opts.duration || 700, fl = opts.floor == null ? 10 : opts.floor;
+    var fx = c ? Math.min(0.88, Math.max(0.12, c.x / vw)) : 0.5, to = fx < 0.5 ? Math.min(0.88, fx + 0.5) : Math.max(0.12, fx - 0.5);
+    var actor = create(stage, def, { base: opts.base || '', label: opts.label, points: [fx, to], start: 0, seed: opts.seed || 11,
+      scale: opts.scale || 3, floor: fl, idleMs: opts.idleMs || [700, 1800], onSelect: opts.onSelect });
+    var P = { actor: actor, layer: layer, closed: false };
+    /* stage 를 옮겨 뛴다 — 인물 하나뿐이라 stage 가 곧 인물. 기준점은 인물의 발 */
+    function hop(frames, done) {
+      var sr = stage.getBoundingClientRect(), d = actor.debug();
+      stage.style.transformOrigin = d.x + 'px ' + (sr.height - fl) + 'px';
+      var an = stage.animate(frames, { duration: dur, easing: 'cubic-bezier(.33,.75,.4,1)', fill: 'forwards' });
+      return new Promise(function (ok) { an.onfinish = an.oncancel = function () { ok(); if (done) done(an); }; });
+    }
+    function offset(p) { var sr = stage.getBoundingClientRect(), d = actor.debug(); return { x: p.x - (sr.left + d.x), y: p.y - (sr.bottom - fl) }; }
+    P.ready = actor.ready.then(function () {
+      if (P.closed || actor.failed || !c || !motionOn() || !stage.animate) return P;
+      var o = offset(c), up = Math.min(o.y, 0) - 72;
+      actor.pause('pop');
+      return hop([
+        { transform: 'translate(' + o.x + 'px,' + o.y + 'px) scale(.3)', opacity: 0 },
+        { offset: 0.12, opacity: 1 },
+        { offset: 0.55, transform: 'translate(' + o.x * 0.35 + 'px,' + up + 'px) scale(1.06)' },
+        { transform: 'translate(0,0) scale(1)', opacity: 1 }
+      ], function (an) { an.cancel(); stage.style.transform = ''; }).then(function () { if (!P.closed) actor.resume('pop'); return P; });
+    });
+    P.close = function (back) {
+      if (P.closed) return Promise.resolve();
+      P.closed = true; if (popped === P) popped = null;
+      var c2 = center(from) || c;
+      function gone() { actor.destroy(); if (layer.parentNode) layer.parentNode.removeChild(layer); }
+      if (!back || !c2 || !motionOn() || !stage.animate || !actor.debug().ready) { gone(); return Promise.resolve(); }
+      actor.pause('pop');
+      var o = offset(c2);
+      return hop([
+        { transform: 'translate(0,0) scale(1)', opacity: 1 },
+        { offset: 0.45, transform: 'translate(' + o.x * 0.5 + 'px,' + (Math.min(o.y, 0) - 60) + 'px) scale(1.04)' },
+        { transform: 'translate(' + o.x + 'px,' + o.y + 'px) scale(.3)', opacity: 0 }
+      ]).then(gone);
+    };
+    popped = P;
+    return P;
+  }
+
+  root.AtelierSprite = { load: load, create: create, floor: floor, popOut: popOut, actorFor: actorFor, forCard: forCard, cardKey: cardKey };
 })(typeof window !== 'undefined' ? window : this);

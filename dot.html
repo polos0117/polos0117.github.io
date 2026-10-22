@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&display=swap">
-<link rel="stylesheet" href="sprite-actor.css?v=1">
+<link rel="stylesheet" href="sprite-actor.css?v=2">
 <!--
   도트 공방 — 다섯 공방(책·포켓몬·신화 무기·건담·삼국지)이 같이 쓰는 도트 인물 만들기. README 「도트 공방」.
   ① 인물: 공방을 고르면 그 공방의 그림 등록부(/<공방>/data/img.json — 같은 출처라 그대로 읽는다)에서 인물 목록, 고르면 그 인물의 그림들.
@@ -232,8 +232,8 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
 </main>
 <footer>polos0117 · 도트 공방 · 정리 셈은 rust/dot-core (book-atelier 파이썬 도구와 같은 화소)</footer>
 
-<script src="dot/dot.js?v=2"></script>
-<script src="sprite-actor.js?v=1"></script>
+<script src="dot/dot.js?v=3"></script>
+<script src="sprite-actor.js?v=2"></script>
 <script>
 (function () {
   'use strict';
@@ -587,7 +587,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   function stage() {
     if (!window.AtelierSprite || (!session.still && !session.idle)) { $('stageBox').hidden = true; return; }
     var m = me(), have = ['still', 'idle', 'walk', 'react'].filter(function (k) { return session[k]; });
-    var def = D.actor({ id: m.id || 'name', form: m.form, states: have, walk: session.walk && session.walk.walk, flip: true });
+    var def = D.actor({ card: S.card, id: m.id || 'name', form: m.form, states: have, walk: session.walk && session.walk.walk, flip: true });
     var view = JSON.parse(JSON.stringify(def));
     have.forEach(function (k) { view.states[k].file = session[k].url; });
     if (actor) actor.destroy();

@@ -1,4 +1,4 @@
-/* 도트 재생기 v1 (2026-10-22) — sprite-actor.js 의 모양. 원본은 polos0117.github.io/sprite-actor.css — 다섯 공방 저장소의 lib/ 에 글자 하나 다르지 않게.
+/* 도트 재생기 v2 (2026-10-22) — sprite-actor.js 의 모양. 원본은 polos0117.github.io/sprite-actor.css — 다섯 공방 저장소의 lib/ 에 글자 하나 다르지 않게.
    크기·자리는 스크립트가 실제 화소에 맞춰 넣는다 — 여기서는 모양만. --sprite-px: 도트 한 칸의 CSS 크기(스크립트가 단다) */
 /* 화면들의 단추 꼴(.prompt-page button 같은 것)을 이기도록 button.sprite-actor 와 :where 없는 두 겹 — 인물 뒤에 판이 비치면 안 된다 */
 button.sprite-actor.sprite-actor {position:absolute;left:0;min-height:0;min-width:0;margin:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none;color:inherit;font:inherit;cursor:pointer;
@@ -11,3 +11,7 @@ button.sprite-actor[hidden] {display:none}
 .sprite-actor-shadow {position:absolute;left:50%;bottom:calc(var(--sprite-px, 2px) * -.5);width:calc(var(--sprite-px, 2px) * 40);height:calc(var(--sprite-px, 2px) * 5);
   border-radius:50%;background:rgba(0,0,0,.22);transform:translateX(-50%);pointer-events:none}
 .sprite-actor:hover .sprite-actor-shadow {background:rgba(0,0,0,.3)}
+/* 뛰쳐나오기(popOut) — 화면 아래에 깔리는 투명한 판. 판은 누름을 지나 보내고 인물만 받는다 */
+.sprite-popout {position:fixed;left:0;right:0;bottom:0;height:min(60vh,480px);pointer-events:none;z-index:2147483000;overflow:visible}
+.sprite-popout-stage {position:absolute;left:0;right:0;top:0;bottom:env(safe-area-inset-bottom,0px);will-change:transform}
+.sprite-popout button.sprite-actor.sprite-actor {pointer-events:auto;z-index:1}

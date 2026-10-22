@@ -120,7 +120,7 @@ const server = http.createServer((q, s) => {
     const actorEntry = JSON.parse(await page.inputValue('#actorEntry'));
     assert.deepEqual(Object.keys(actorEntry.states), ['still', 'walk']);
     assert.deepEqual(actorEntry.states.walk.dy, bob.dy); assert.equal(actorEntry.states.walk.speed, stride.speed);
-    assert.equal(actorEntry.states.still.file, 'sunzi/sunzi_begin_still.png'); assert.deepEqual(actorEntry.cell, [96, 128]);
+    assert.equal(actorEntry.states.still.file, 'sunzi/sunzi_begin_still.png'); assert.deepEqual(actorEntry.cell, [96, 128]); assert.equal(actorEntry.card, 'sunzi', '카드 열쇠');
     assert.match(await page.textContent('#roomNote'), /아직 없는 것: 대기 · 반응/);
     /* 재생 — 멈춤·다시 */
     await page.click('#playBtn'); assert.equal(await page.getAttribute('#playBtn', 'aria-pressed'), 'false');

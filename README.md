@@ -99,4 +99,10 @@ API(`window.AtelierFavorites`): `has(a, file)` · `toggle(칸)` → 담겼으면
 API(`window.AtelierSprite`): `load(url = 'data/sprites.json')` → 자료(한 번만 받는다) · `create(host, def, opts)` → 인물. `host` 는 `position: relative` 인 공간, `def` 는 `actors.<열쇠>` 하나.
 `opts`: `base`(그림 주소 앞) · `label`(누르는 이름 — 공방의 낱말 표에서) · `points`([왼쪽, 오른쪽] 공간 폭의 비율) · `start` · `idleMs`([최소, 최대] 걷기 전 서 있는 시간) · `seed` · `scale`(도트 한 칸의 CSS 배율) · `floor`(공간 바닥에서 발까지 px) · `fit`(공간 높이에 들게 배율을 낮춘다) · `wander`(false 면 저절로 걷지 않는다) · `onSelect(인물)` · `onError()` · `onState(이름)`.
 인물: `ready`(Promise) · `select()` · `pause(까닭)`/`resume(까닭)` · `walkTo(0|1)` · `march(ms)`(제자리 걸음) · `play(상태)` · `destroy()` · `running` · `failed` · `debug()`.
+공방마다 같은 자리(v2):
+- `actorFor(자료, 카드 열쇠)` → 인물 하나 또는 null. 카드 열쇠는 인물 칸의 `card`(그 공방 그림 등록부의 열쇠 — 도트 공방의 「인물 칸 복사」가 넣는다), 책은 `book`, 없으면 `actors` 의 열쇠. `forCard(카드 열쇠, url)` → Promise<{def, base} | null>(자료를 못 받아도 null). 인물 칸에 `base` 가 있으면 그것이 자료의 `base` 보다 먼저.
+- `floor(host, 자료, opts)` — 공방 메인의 바닥에 여러 명. 좁으면 둘·넓으면 셋(`count`), 인물마다 폭을 나눈 제 몫 안에서 걷는다, 차례는 날마다 돈다(`seed`, 기본 오늘), `keys` 로 거르기, `labelOf(열쇠)`·`onSelect(열쇠, 인물)`. → `{list, ready, pause, resume, destroy}`, 폭이 바뀌어 사람 수가 달라지면 다시 세운다.
+- `popOut(from, def, opts)` — 뛰쳐나오기: `from`(펼친 책·연 캡슐)에서 튀어나와 화면 바닥(`.sprite-popout`, 아래에 깔리는 투명한 판 — 누름은 인물만 받는다)에 내려앉고 화면을 가로질러 걷는다. `from` 이 열린 dialog 안이면 그 dialog 에 붙는다(맨 위 층). → `{actor, layer, ready, close(back)}` — `close(true)` 는 되돌아 뛰어 들어간다. 한 번에 하나, 움직임 끔이면 뛰지 않고 선다.
+검사: `CHROMIUM_PATH=<chrome> NODE_PATH=<playwright 가 있는 node_modules> node tests/sprite-actor-screen.cjs` — 옆의 book 세 인물로 카드 열쇠·바닥·뛰쳐나오기.
+
 지키는 것: 도트 한 칸 = 실제 화소의 정수배 · 루프 안에서 배치를 읽지 않는다 · 움직임 끔(`AtelierMotion`, 없으면 동작 줄이기)이면 첫 칸에 멈춰 선다 · 숨은 탭·화면 밖이면 쉰다 · 그림을 못 받으면 인물만 숨는다 · 대기 시트가 없으면 정지 도트로 서 있다가 걷는다.

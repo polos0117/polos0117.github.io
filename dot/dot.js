@@ -249,7 +249,10 @@
   function actor(o) {
     var states = {};
     (o.states || []).forEach(function (s) { states[s] = spriteState({ state: s, id: o.id, form: o.form, walk: s === 'walk' ? o.walk : null }); });
-    return { id: o.id, form: o.form || 'base', cell: CELL.slice(), foot: FOOT.slice(), scale: 1, flip: o.flip !== false, facing: 'right', states: states };
+    /* card — 그 공방 그림 등록부의 열쇠(공용 재생기의 actorFor 가 이것으로 찾는다 — 도감 상세·캡슐·책 펼치기) */
+    var e = { id: o.id, form: o.form || 'base', cell: CELL.slice(), foot: FOOT.slice(), scale: 1, flip: o.flip !== false, facing: 'right', states: states };
+    if (o.card) e = Object.assign({ card: o.card }, e);
+    return e;
   }
 
   /* ── 다섯 공방의 그림 목록 — 같은 출처(polos0117.github.io)라 각 공방의 자료를 그대로 읽는다 ── */
