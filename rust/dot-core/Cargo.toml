@@ -1,0 +1,12 @@
+[package]
+name = "dot-core"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[features]
+# PNG 풀기·싸기(dot-wasm · dot-cli). 셈 자체는 바깥 의존 없음
+png = ["dep:png"]
+
+[dependencies]
+png = { version = "0.18", optional = true }

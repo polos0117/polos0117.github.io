@@ -1,0 +1,12 @@
+[package]
+name = "dot-wasm"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+build = "build.rs"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+dot-core = { path = "../dot-core", features = ["png"] }

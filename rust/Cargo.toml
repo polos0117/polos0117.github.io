@@ -1,0 +1,20 @@
+# 도트 공방 — 생성기가 그린 도트 그림을 정리한다. dot-core(셈) · dot-wasm(dot.html 이 쓴다) · dot-cli(세션이 명령줄로). rust/README.md
+[workspace]
+resolver = "2"
+members = ["dot-core", "dot-wasm", "dot-cli"]
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+publish = false
+
+[profile.release]
+codegen-units = 1
+lto = true
+panic = "abort"
+
+# dot-wasm 크기 우선 판: cargo build -p dot-wasm --target wasm32-unknown-unknown --profile wasm
+[profile.wasm]
+inherits = "release"
+opt-level = "z"
+strip = true

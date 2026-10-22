@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>도트 공방</title>
+<meta name="description" content="다섯 공방의 인물을 도트로 — 인물을 고르고, GPT 에 줄 지시문을 받고, 받은 그림을 이 브라우저에서 정리한다.">
+<meta name="theme-color" content="#0f0e12">
+<link rel="icon" href="icon-192.png">
+<link rel="manifest" href="app.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&display=swap">
+<!--
+  도트 공방 — 다섯 공방(책·포켓몬·신화 무기·건담·삼국지)이 같이 쓰는 도트 인물 만들기. README 「도트 공방」.
+  ① 인물: 공방을 고르면 그 공방의 그림 등록부(/<공방>/data/img.json — 같은 출처라 그대로 읽는다)에서 인물 목록, 고르면 그 인물의 그림들.
+     정본·의상 그림을 짚고, 영문 이름·폼·생김새 한 줄을 적는다.
+  ② 지시문: 상태(정지·대기·걷기·반응)마다 GPT 이미지 생성에 그대로 줄 요청문과 첨부 차례. 정지 도트 6배·다리 자세 안내 그림을 여기서 받는다.
+  ③ 정리: 받은 원본 PNG 를 dot/dot.wasm(rust/dot-core — book-atelier 파이썬 도구와 같은 셈, 화소 하나 다르지 않다)으로 정리해
+     미리 보고 재생하고, 정리본 PNG · 기록 JSON · sprites.json 칸을 받는다. 그림은 이 브라우저 밖으로 나가지 않는다 — 올리기는 세션이 한다.
+  고른 값은 이 기기에만 남는다(atelier_dot_v1). 주소 ?a=book&c=alice&s=walk 로 바로 연다.
+-->
+<style>
+:root {
+  --bg: #0b0a0e; --card: #18161d; --card2: #201d26; --line: #ffffff1a; --text: #f1ece2; --muted: #a8a09a; --gold: #d9b45a; --bad: #ff8f80; --good: #9fd6a4;
+  --serif: 'Noto Serif KR', 'Apple Myungjo', 'Nanum Myeongjo', Georgia, serif;
+  --sans: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  --mono: ui-monospace, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 15px/1.55 var(--sans); overflow-x: hidden; min-height: 100vh; min-height: 100dvh;
+  background-image: radial-gradient(90% 50% at 50% -10%, #1b1726 0%, transparent 70%); background-repeat: no-repeat; }
+a { color: var(--gold); }
+button, input, select, textarea { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: calc(16px + env(safe-area-inset-top)) 16px 8px; max-width: 1100px; margin: 0 auto; }
+.head h1 { margin: 0; font: 900 clamp(24px, 3.6vw, 36px)/1.1 var(--serif); letter-spacing: -.02em;
+  background: linear-gradient(180deg, #fff 30%, var(--gold) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.head h1 small { display: block; margin-bottom: 6px; -webkit-text-fill-color: var(--gold); color: var(--gold); font: 700 11px/1 var(--serif); letter-spacing: .4em; }
+.home { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid #ffffff33; border-radius: 99px; background: #000b;
+  color: var(--text); text-decoration: none; font: 600 13px/1 var(--sans); white-space: nowrap; }
+.home:hover, .home:focus-visible { border-color: var(--gold); color: var(--gold); }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px calc(40px + env(safe-area-inset-bottom)); }
+.lede { margin: 2px 0 16px; color: var(--muted); font-size: 13px; word-break: keep-all; }
+.lede b { color: var(--text); }
+
+.step { margin: 0 0 18px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.step > h2 { display: flex; align-items: baseline; gap: 10px; margin: 0 0 4px; font: 800 18px/1.3 var(--serif); }
+.step > h2 b { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--gold); color: #1a1408; font: 800 13px/1 var(--sans); }
+.step > p.note { margin: 0 0 12px; color: var(--muted); font-size: 13px; word-break: keep-all; }
+
+/* 공방 칩 — 지도의 그 색 */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.chip { --c: var(--gold); display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 1px solid #ffffff2b; border-radius: 99px;
+  background: #ffffff08; cursor: pointer; font: 600 13px/1 var(--sans); white-space: nowrap; }
+.chip::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.chip[aria-pressed="true"] { border-color: var(--c); background: color-mix(in srgb, var(--c) 16%, #000); color: #fff; }
+@media (max-width: 600px) {
+  .chips.scroll { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px 12px; padding: 2px 16px; scrollbar-width: none; }
+  .chips.scroll::-webkit-scrollbar { display: none; }
+}
+
+.find { display: flex; gap: 8px; margin: 0 0 10px; }
+.find input { flex: 1 1 auto; min-width: 0; }
+input[type="text"], input[type="search"], input[type="number"], select, textarea {
+  min-height: 44px; padding: 8px 12px; border: 1px solid #ffffff2e; border-radius: 10px; background: #0f0e13; }
+textarea { width: 100%; resize: vertical; line-height: 1.45; }
+.people { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); max-height: 330px; overflow-y: auto; overscroll-behavior: contain; }
+.people button { display: grid; gap: 4px; width: 100%; padding: 4px; border: 1px solid transparent; border-radius: 10px; background: #ffffff06; cursor: pointer; text-align: center; }
+.people button[aria-pressed="true"] { border-color: var(--gold); background: #d9b45a1f; }
+.people img, .people .ph { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 7px; background: #0003; display: block; }
+.people span { font-size: 12px; line-height: 1.25; word-break: keep-all; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; min-height: 2.5em; }
+.more { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
+
+.who { display: grid; gap: 14px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.refs { list-style: none; margin: 0; padding: 0; display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+.refs li { flex: none; width: 112px; display: grid; gap: 4px; }
+.refs img { width: 112px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 8px; border: 2px solid transparent; background: #0003; }
+.refs li.canon img { border-color: var(--gold); }
+.refs li.outfit img { border-color: #8fb7ff; }
+.refs small { color: var(--muted); font-size: 11px; line-height: 1.25; word-break: break-all; }
+.refs .pick { display: flex; gap: 4px; }
+.refs .pick button { flex: 1; min-height: 36px; padding: 0 4px; border: 1px solid #ffffff2e; border-radius: 8px; background: #ffffff08; cursor: pointer; font-size: 12px; }
+.refs .pick button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+.refs .pick button.o[aria-pressed="true"] { border-color: #8fb7ff; color: #8fb7ff; }
+.fields { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.fields label, .opt label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.fields label > *, .opt label > * { color: var(--text); font-size: 14px; }
+.wide { grid-column: 1 / -1; }
+.checks { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.check { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 14px; cursor: pointer; }
+.check input { width: 20px; height: 20px; accent-color: var(--gold); }
+
+.tabs { display: flex; gap: 6px; margin: 0 0 12px; flex-wrap: wrap; }
+.tab { min-height: 44px; padding: 0 16px; border: 1px solid #ffffff2b; border-radius: 10px; background: #ffffff06; cursor: pointer; font-weight: 700; }
+.tab[aria-selected="true"] { border-color: var(--gold); background: #d9b45a22; color: #fff; }
+.attach { margin: 0 0 12px; padding-left: 22px; }
+.attach li { margin: 4px 0; word-break: keep-all; }
+.attach li small { color: var(--muted); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 16px; border: 1px solid #ffffff33; border-radius: 10px;
+  background: #ffffff0a; cursor: pointer; font-weight: 700; text-decoration: none; color: var(--text); font-size: 14px; }
+.btn:hover { border-color: var(--gold); }
+.btn.main { background: var(--gold); border-color: var(--gold); color: #1a1408; }
+.btn:disabled { opacity: .45; cursor: default; }
+#req { min-height: 260px; font: 12.5px/1.5 var(--mono); }
+.status { min-height: 1.4em; margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+.status.bad { color: var(--bad); }
+.status.good { color: var(--good); }
+
+.files { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin: 0 0 10px; }
+.drop { display: grid; gap: 6px; padding: 12px; border: 1px dashed #ffffff40; border-radius: 12px; background: #ffffff05; }
+.drop.over { border-color: var(--gold); background: #d9b45a14; }
+.drop b { font-size: 14px; }
+.drop small { color: var(--muted); font-size: 12px; word-break: break-all; }
+.drop input[type="file"] { min-height: 44px; font-size: 13px; max-width: 100%; }
+details.opt { margin: 0 0 12px; }
+details.opt summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--muted); font-size: 13px; }
+details.opt .fields { margin-top: 6px; }
+
+.result { display: grid; gap: 14px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.stage { display: grid; gap: 12px; grid-template-columns: minmax(0, auto) minmax(0, 1fr); align-items: start; }
+@media (max-width: 640px) { .stage { grid-template-columns: minmax(0, 1fr); } }
+.box { padding: 10px; border-radius: 12px; background: #0d0c11; border: 1px solid var(--line); overflow-x: auto; }
+.box h3 { margin: 0 0 8px; font: 700 13px/1.3 var(--sans); color: var(--muted); }
+.checker { background-color: #2a2730; background-image: linear-gradient(45deg, #36323d 25%, transparent 25%, transparent 75%, #36323d 75%), linear-gradient(45deg, #36323d 25%, transparent 25%, transparent 75%, #36323d 75%);
+  background-size: 16px 16px; background-position: 0 0, 8px 8px; border-radius: 8px; }
+canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+.floor { background: linear-gradient(180deg, #2b2620 0 78%, #4a3a2a 78% 100%); border-radius: 8px; }
+.facts { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; font-size: 13px; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; font-family: var(--mono); font-size: 12.5px; word-break: break-all; }
+.zoom { display: flex; gap: 6px; }
+.zoom button { min-height: 36px; min-width: 44px; border: 1px solid #ffffff2e; border-radius: 8px; background: #ffffff08; cursor: pointer; }
+.zoom button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px calc(24px + env(safe-area-inset-bottom)); }
+@media (max-width: 480px) { .step { padding: 14px 12px; } }
+</style>
+</head>
+<body>
+<header class="head">
+  <h1><small>SPRITE</small>도트 공방</h1>
+  <a class="home" href="./">공방 모음</a>
+</header>
+<main class="wrap">
+  <p class="lede">다섯 공방의 인물을 도트로. <b>① 인물을 고르고 ② GPT 에 줄 지시문을 받고 ③ 받은 그림을 여기서 정리한다.</b>
+    정리는 이 브라우저 안에서만 하고 어디에도 올리지 않는다 — 저장소에 올리기는 세션이 검토한 뒤에 한다.</p>
+
+  <section class="step" id="s1" aria-labelledby="s1h">
+    <h2 id="s1h"><b>1</b>인물</h2>
+    <p class="note">공방을 고르면 그 공방 도감에 등록된 인물이 뜬다. 인물을 누르면 그 인물의 그림이 아래에 — 정본(얼굴·머리·색)과 의상을 짚는다.</p>
+    <div class="chips scroll" id="ateliers" role="group" aria-label="공방"></div>
+    <div class="find"><input type="search" id="q" placeholder="이름으로 찾기" aria-label="인물 이름으로 찾기" autocomplete="off"></div>
+    <ul class="people" id="people" aria-label="인물"></ul>
+    <p class="more" id="more"></p>
+    <div class="who" id="who" hidden>
+      <ul class="refs" id="refs" aria-label="그 인물의 그림"></ul>
+      <div class="fields">
+        <label>영문 이름 (파일 이름)<input type="text" id="id" placeholder="alice" autocomplete="off" spellcheck="false"></label>
+        <label>폼<input type="text" id="form" placeholder="begin" autocomplete="off" spellcheck="false"></label>
+        <label>그릴 대상<select id="subject">
+          <option value="woman">젊은 여성</option><option value="man">젊은 남성</option><option value="person">인물(성별 말 안 함)</option>
+          <option value="mech">로봇·기체</option><option value="creature">생물</option></select></label>
+        <label class="wide">생김새 한 줄 (영어 — 정본을 보고, 작게 줄여도 알아볼 특징만. 좌우가 다른 장식은 image-left / image-right 로)
+          <textarea id="identity" rows="3" placeholder="Short dark-brown bob with the bow on the image-left side of the head, cream dress with navy trim and white apron, navy shoes."></textarea></label>
+      </div>
+      <div class="checks">
+        <label class="check"><input type="checkbox" id="sample"> 같은 공방의 다 만든 도트를 본보기로 붙인다(정지)</label>
+        <label class="check"><input type="checkbox" id="skirt"> 긴 치마·도포가 다리를 가린다(걷기)</label>
+      </div>
+    </div>
+  </section>
+
+  <section class="step" id="s2" aria-labelledby="s2h">
+    <h2 id="s2h"><b>2</b>지시문</h2>
+    <p class="note">상태마다 한 장씩 따로 생성한다. 정지 도트가 마음에 든 뒤에 동작(대기·걷기·반응)으로 간다 — 동작 시트는 정지 도트 6배를 첫 첨부로 붙인다.</p>
+    <div class="tabs" role="tablist" aria-label="상태" id="tabs"></div>
+    <ol class="attach" id="attach"></ol>
+    <div class="row" style="margin-bottom:10px">
+      <a class="btn" id="guide" href="dot/walk_leg_guide.png" download="walk_leg_guide.png" hidden>다리 자세 안내 받기</a>
+      <button class="btn" type="button" id="x6" hidden>정지 도트 6배 받기</button>
+    </div>
+    <textarea id="req" readonly aria-label="GPT 에 보낼 요청문"></textarea>
+    <div class="row" style="margin-top:8px"><button class="btn main" type="button" id="copy">요청문 복사</button></div>
+    <p class="status" id="s2status" role="status"></p>
+  </section>
+
+  <section class="step" id="s3" aria-labelledby="s3h">
+    <h2 id="s3h"><b>3</b>정리</h2>
+    <p class="note">GPT 가 준 원본 PNG 를 그대로 넣는다(자르거나 줄이지 않는다). 동작 시트는 확정한 정지 도트(정리본)도 같이 — 색을 거기서 뽑아 맞춘다.</p>
+    <div class="files">
+      <div class="drop" id="dropRaw"><b>생성 원본</b><input type="file" id="raw" accept="image/png,image/*"><small id="rawName">아직 없다</small></div>
+      <div class="drop" id="dropStill"><b>정지 도트 (동작 시트만)</b><input type="file" id="stillFile" accept="image/png"><small id="stillName">아직 없다 — 여기서 정지를 정리하면 그것을 쓴다</small></div>
+    </div>
+    <details class="opt" id="opts"><summary>정리 값 (기본값은 book 서재 세 인물이 쓴 값)</summary>
+      <div class="fields" id="optFields"></div>
+    </details>
+    <div class="row"><button class="btn main" type="button" id="run" disabled>정리하기</button><span class="status" id="runStatus" role="status"></span></div>
+    <div class="result" id="result" hidden>
+      <div class="stage">
+        <div class="box"><h3>재생</h3><div class="floor"><canvas id="anim" width="96" height="128" aria-label="재생 미리보기"></canvas></div>
+          <div class="row" style="margin-top:8px"><button class="btn" type="button" id="playBtn" aria-pressed="true">멈춤</button><label class="check"><input type="checkbox" id="flip"> 뒤집기</label></div></div>
+        <div class="box"><h3>정리본 <span class="zoom" id="zoom" role="group" aria-label="배율"></span></h3><div class="checker" style="display:inline-block"><canvas id="sheet" aria-label="정리한 시트"></canvas></div></div>
+      </div>
+      <dl class="facts" id="facts"></dl>
+      <div class="row">
+        <button class="btn main" type="button" id="dlPng">정리본 PNG</button>
+        <button class="btn" type="button" id="dlRec">기록 JSON</button>
+        <button class="btn" type="button" id="cpEntry">sprites.json 칸 복사</button>
+        <button class="btn" type="button" id="dlX6" hidden>6배 확대 PNG</button>
+      </div>
+      <textarea id="entry" rows="6" readonly aria-label="sprites.json 칸" style="font:12.5px/1.45 var(--mono)"></textarea>
+    </div>
+  </section>
+</main>
+<footer>polos0117 · 도트 공방 · 정리 셈은 rust/dot-core (book-atelier 파이썬 도구와 같은 화소)</footer>
+
+<script src="dot/dot.js?v=1"></script>
+<script>
+(function () {
+  'use strict';
+  var D = window.AtelierDot, $ = function (id) { return document.getElementById(id); };
+  var COLORS = { gundam: '#7fb3ff', book: '#e39b6b', samguk: '#c9a227', pkm: '#f4c542', myth: '#d9b45a' };
+  var STATE_TAB = { still: '정지', idle: '대기', walk: '걷기', react: '반응' };
+  var KEY = 'atelier_dot_v1';
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { saved = {}; }
+  var q = new URLSearchParams(location.search);
+  var S = {
+    atelier: q.get('a') || saved.atelier || 'book', card: q.get('c') || saved.card || '', state: q.get('s') || saved.state || 'still',
+    per: saved.per || {}   // 인물마다 적은 값 { '<공방>/<카드>': {id, form, subject, identity, canon, outfit, skirt, sample} }
+  };
+  if (!STATE_TAB[S.state]) S.state = 'still';
+  var docs = {}, list = [], W = null, raw = null, still = null, made = null, play = null;
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify({ atelier: S.atelier, card: S.card, state: S.state, per: S.per })); } catch (e) { /* 저장이 막혀도 화면은 돈다 */ }
+    /* 주소도 지금 고른 것으로 — 새로 고침·공유가 같은 자리를 연다 */
+    var u = new URL(location.href); u.searchParams.set('a', S.atelier); u.searchParams.set('s', S.state);
+    if (S.card) u.searchParams.set('c', S.card); else u.searchParams.delete('c');
+    try { history.replaceState(null, '', u.pathname + '?' + u.searchParams.toString()); } catch (e) { /* 파일로 열면 막힌다 */ }
+  }
+  function A() { return D.ATELIERS.filter(function (x) { return x.key === S.atelier; })[0]; }
+  function cur() { return list.filter(function (c) { return c.key === S.card; })[0] || null; }
+  function me() {
+    var k = S.atelier + '/' + S.card;
+    if (!S.per[k]) {
+      var c = cur(), files = c ? c.files : [];
+      /* 정본 처음 고르기 — 폼 초상(open·casual·action 이 아닌 것) 가운데 첫째(책은 발단), 없으면 첫 그림 */
+      var plain = files.filter(function (f) { return !/casual|action|open|overdrive|awaken|cursed/.test(f.file); });
+      S.per[k] = { id: c ? c.id : '', form: S.atelier === 'book' ? 'begin' : 'base', subject: A().subject, identity: '',
+        canon: (plain[0] || files[0] || {}).file || '', outfit: '', skirt: false, sample: false };
+    }
+    return S.per[k];
+  }
+  function status(el, msg, kind) { el.textContent = msg || ''; el.className = 'status' + (kind ? ' ' + kind : ''); }
+
+  /* ── ① 인물 ── */
+  function chips() {
+    $('ateliers').innerHTML = '';
+    D.ATELIERS.forEach(function (a) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'chip'; b.textContent = a.name; b.style.setProperty('--c', COLORS[a.key]);
+      b.setAttribute('aria-pressed', String(a.key === S.atelier));
+      b.onclick = function () { if (S.atelier === a.key) return; S.atelier = a.key; S.card = ''; $('q').value = ''; save(); chips(); loadAtelier(); };
+      $('ateliers').appendChild(b);
+    });
+  }
+  function fetchJSON(u) { return fetch(u).then(function (r) { if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); }); }
+  function loadAtelier() {
+    var a = A();
+    $('people').innerHTML = ''; $('more').textContent = '불러오는 중…'; $('who').hidden = true;
+    var k = a.key;
+    (docs[k] ? Promise.resolve(docs[k]) : Promise.all([fetchJSON(a.data), a.names ? fetchJSON(a.names).catch(function () { return null; }) : null])
+      .then(function (r) { return (docs[k] = r); }))
+      .then(function (r) {
+        if (S.atelier !== k) return;
+        list = D.cards(a, r[0], r[1]);
+        people(); if (cur()) pick(S.card, true);
+      }).catch(function (e) { $('more').textContent = '이 공방의 그림 등록부를 못 읽었다 — ' + e.message; });
+  }
+  function people() {
+    var t = $('q').value.trim().toLowerCase(), ul = $('people');
+    var hit = list.filter(function (c) { return !t || c.name.toLowerCase().indexOf(t) >= 0 || c.key.toLowerCase().indexOf(t) >= 0 || (c.id && c.id.indexOf(t) >= 0); });
+    var MAX = 60;
+    ul.innerHTML = '';
+    hit.slice(0, MAX).forEach(function (c) {
+      var li = document.createElement('li'), b = document.createElement('button'), f = c.files[0];
+      b.type = 'button'; b.setAttribute('aria-pressed', String(c.key === S.card));
+      var im = document.createElement('img'); im.loading = 'lazy'; im.alt = ''; im.src = f.thumb || f.url;
+      im.onerror = function () { if (f.thumb && im.src.indexOf('/thumb/') >= 0) im.src = f.url; };
+      var sp = document.createElement('span'); sp.textContent = c.name;
+      b.appendChild(im); b.appendChild(sp);
+      b.onclick = function () { pick(c.key); };
+      li.appendChild(b); ul.appendChild(li);
+    });
+    $('more').textContent = hit.length > MAX ? '앞의 ' + MAX + '명 · 모두 ' + hit.length + '명 — 이름으로 좁힌다' : hit.length ? '모두 ' + hit.length + '명' : '맞는 인물이 없다';
+  }
+  function pick(key, quiet) {
+    S.card = key; save();
+    Array.prototype.forEach.call($('people').querySelectorAll('button'), function (b, i) { b.setAttribute('aria-pressed', String(b.lastChild.textContent === (cur() || {}).name)); });
+    var c = cur(); if (!c) return;
+    var m = me();
+    $('who').hidden = false;
+    $('id').value = m.id; $('form').value = m.form; $('subject').value = m.subject; $('identity').value = m.identity;
+    $('skirt').checked = !!m.skirt; $('sample').checked = !!m.sample;
+    refs(); prompt();
+    if (!quiet) $('who').scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  }
+  function refs() {
+    var c = cur(), m = me(), ul = $('refs');
+    ul.innerHTML = '';
+    c.files.forEach(function (f) {
+      var li = document.createElement('li');
+      li.className = (f.file === m.canon ? 'canon' : '') + (f.file === m.outfit ? ' outfit' : '');
+      var im = document.createElement('img'); im.loading = 'lazy'; im.alt = f.at; im.src = f.thumb || f.url;
+      im.onerror = function () { if (f.thumb && im.src.indexOf('/thumb/') >= 0) im.src = f.url; };
+      var sm = document.createElement('small'); sm.textContent = f.at || f.file;
+      var pk = document.createElement('div'); pk.className = 'pick';
+      [['정본', 'canon', ''], ['의상', 'outfit', 'o']].forEach(function (p) {
+        var b = document.createElement('button'); b.type = 'button'; b.textContent = p[0]; b.className = p[2];
+        b.setAttribute('aria-pressed', String(m[p[1]] === f.file));
+        b.setAttribute('aria-label', f.file + ' 을 ' + p[0] + '으로');
+        b.onclick = function () { m[p[1]] = m[p[1]] === f.file ? '' : f.file; if (p[1] === 'canon' && !m.canon) m.canon = f.file; save(); refs(); prompt(); };
+        pk.appendChild(b);
+      });
+      li.appendChild(im); li.appendChild(sm); li.appendChild(pk); ul.appendChild(li);
+    });
+  }
+  ['id', 'form', 'subject', 'identity'].forEach(function (k) {
+    $(k).addEventListener('input', function () {
+      var m = me(); m[k] = k === 'id' ? D.slug($(k).value) || '' : $(k).value;
+      save(); prompt();
+    });
+  });
+  $('id').addEventListener('change', function () { $('id').value = me().id; });
+  ['skirt', 'sample'].forEach(function (k) { $(k).addEventListener('change', function () { me()[k] = $(k).checked; save(); prompt(); }); });
+  $('q').addEventListener('input', people);
+
+  /* ── ② 지시문 ── */
+  function tabs() {
+    $('tabs').innerHTML = '';
+    Object.keys(STATE_TAB).forEach(function (s) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'tab'; b.setAttribute('role', 'tab'); b.textContent = STATE_TAB[s];
+      b.setAttribute('aria-selected', String(s === S.state)); b.dataset.s = s;
+      b.onclick = function () { S.state = s; save(); tabs(); prompt(); options(); };
+      $('tabs').appendChild(b);
+    });
+  }
+  function fileURL(file) { var c = cur(); var f = c && c.files.filter(function (x) { return x.file === file; })[0]; return f ? new URL(f.url, location.href).href : ''; }
+  function prompt() {
+    var c = cur();
+    if (!c) { $('req').value = '먼저 ① 에서 인물을 고른다.'; $('attach').innerHTML = ''; $('copy').disabled = true; return; }
+    var m = me(), s = S.state, id = m.id || 'name';
+    var o = { state: s, subject: m.subject, identity: m.identity, outfit: !!m.outfit && s === 'still', sample: !!m.sample && s === 'still', skirt: !!m.skirt,
+      id: id, form: m.form || 'base', name: c.name, atelierName: A().name };
+    var n = D.names(id, o.form, s);
+    o.files = { canonical: fileURL(m.canon), outfit: fileURL(m.outfit), still_x6: n.x6, leg_guide: 'walk_leg_guide.png', sample_x6: '본보기 정지 도트 6배(예: alice_begin_still_x6.png)' };
+    $('req').value = D.request(o);
+    var p = D.prompt(o);
+    $('attach').innerHTML = '';
+    p.attach.forEach(function (a) {
+      var li = document.createElement('li'); li.textContent = D.ATTACH[a];
+      var url = a === 'canonical' ? o.files.canonical : a === 'outfit' ? o.files.outfit : '';
+      if (url) { li.appendChild(document.createTextNode(' — ')); var l = document.createElement('a'); l.href = url; l.target = '_blank'; l.rel = 'noopener'; l.textContent = '열기'; li.appendChild(l); }
+      else if (a === 'canonical') { var sm = document.createElement('small'); sm.textContent = ' — ① 에서 정본을 짚는다'; li.appendChild(sm); }
+      $('attach').appendChild(li);
+    });
+    $('guide').hidden = s !== 'walk';
+    $('x6').hidden = s === 'still';
+    $('x6').disabled = !still;
+    $('x6').title = still ? '' : '③ 에 정지 도트를 넣으면 받을 수 있다';
+    $('copy').disabled = false;
+    if (!m.id) status($('s2status'), '영문 이름을 적으면 파일 이름에 들어간다', '');
+    else status($('s2status'), '');
+  }
+  $('copy').onclick = function () {
+    var t = $('req').value;
+    (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { status($('s2status'), '복사했다', 'good'); },
+      function () { $('req').select(); status($('s2status'), '복사가 막혔다 — 글을 골라 두었으니 직접 복사한다', 'bad'); });
+  };
+
+  /* ── ③ 정리 ── */
+  var OPT = {
+    still: [['colors', '색 수', 24], ['rows', '줄 수 (0 = 격자 찾기)', 121], ['outline', '바깥 윤곽 한 칸', true]],
+    sheet: [['rows', '줄 수 (정지 도트 키, 0 = 간격 찾기)', 121], ['fixedPitch', '고정 간격 px (줄 수 0 일 때)', 0], ['speck', '떨어진 쪼가리 지우기(칸 수 미만)', 40], ['cellW', '칸 폭', 96], ['cellH', '칸 높이', 128], ['gridC', '칸 배치 가로', 0], ['gridR', '칸 배치 세로', 0]]
+  };
+  function options() {
+    var kind = S.state === 'still' ? 'still' : 'sheet', box = $('optFields'), st = D.STATES[S.state];
+    box.innerHTML = '';
+    OPT[kind].forEach(function (o) {
+      var l = document.createElement('label'), v = o[2];
+      if (o[0] === 'gridC') v = st.grid ? st.grid[0] : 0;
+      if (o[0] === 'gridR') v = st.grid ? st.grid[1] : 0;
+      l.appendChild(document.createTextNode(o[1]));
+      var i = document.createElement('input');
+      if (typeof v === 'boolean') { i.type = 'checkbox'; i.checked = v; l.className = 'check'; }
+      else { i.type = 'number'; i.value = v; i.min = 0; i.step = o[0] === 'fixedPitch' ? '0.1' : '1'; i.inputMode = 'decimal'; }
+      i.id = 'opt-' + o[0]; l.appendChild(i); box.appendChild(l);
+    });
+    $('dropStill').hidden = kind === 'still';
+    ready();
+  }
+  function opt(k) { var i = $('opt-' + k); return !i ? null : i.type === 'checkbox' ? i.checked : +i.value; }
+  function ready() { $('run').disabled = !W || !raw || (S.state !== 'still' && !still); }
+
+  function decodeFile(file) {
+    return file.arrayBuffer().then(function (buf) {
+      var b = new Uint8Array(buf);
+      var isPng = b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47;
+      if (isPng) return { id: W.decode(b), bytes: b, png: true };
+      /* PNG 가 아니면 브라우저가 푼다 — 반투명 가장자리가 PNG 를 직접 푼 것과 조금 다를 수 있다 */
+      return createImageBitmap(file).then(function (bm) {
+        var c = document.createElement('canvas'); c.width = bm.width; c.height = bm.height;
+        var x = c.getContext('2d'); x.drawImage(bm, 0, 0);
+        var d = x.getImageData(0, 0, bm.width, bm.height);
+        return { id: W.put(new Uint8Array(d.data.buffer), bm.width, bm.height), bytes: b, png: false };
+      });
+    });
+  }
+  function take(which, file) {
+    if (!file || !W) return;
+    var nameEl = which === 'raw' ? $('rawName') : $('stillName');
+    nameEl.textContent = '읽는 중…';
+    decodeFile(file).then(function (r) {
+      r.name = file.name;
+      var sz = W.size(r.id);
+      if (which === 'raw') { if (raw) W.free(raw.id); raw = r; }
+      else { if (still && still.own) W.free(still.id); still = r; prompt(); }
+      nameEl.textContent = file.name + ' · ' + sz[0] + '×' + sz[1] + (r.png ? '' : ' · PNG 가 아니라 브라우저가 풀었다');
+      ready();
+    }).catch(function (e) { nameEl.textContent = '못 읽었다 — ' + e.message; });
+  }
+  $('raw').onchange = function () { take('raw', this.files[0]); };
+  $('stillFile').onchange = function () { take('still', this.files[0]); };
+  [['dropRaw', 'raw'], ['dropStill', 'still']].forEach(function (p) {
+    var el = $(p[0]);
+    el.addEventListener('dragover', function (e) { e.preventDefault(); el.classList.add('over'); });
+    el.addEventListener('dragleave', function () { el.classList.remove('over'); });
+    el.addEventListener('drop', function (e) { e.preventDefault(); el.classList.remove('over'); take(p[1], e.dataTransfer.files[0]); });
+  });
+
+  function hex(buf, n) { return Array.prototype.map.call(new Uint8Array(buf), function (x) { return ('0' + x.toString(16)).slice(-2); }).join('').slice(0, n); }
+  function digest(alg, bytes) { return crypto && crypto.subtle ? crypto.subtle.digest(alg, bytes).catch(function () { return null; }) : Promise.resolve(null); }
+
+  $('run').onclick = function () {
+    if ($('run').disabled) return;
+    status($('runStatus'), '정리하는 중…');
+    setTimeout(function () {
+      try {
+        var s = S.state, out, walk = null;
+        if (s === 'still') out = W.still(raw.id, { colors: opt('colors'), rows: opt('rows'), outline: opt('outline') });
+        else {
+          var gc = opt('gridC'), gr = opt('gridR');
+          out = W.sheet(raw.id, still.id, { frames: D.STATES[s].frames, grid: gc && gr ? [gc, gr] : null, rows: opt('rows'), fixedPitch: opt('fixedPitch'),
+            speck: opt('speck'), cell: [opt('cellW'), opt('cellH')] });
+        }
+        if (s === 'walk') {
+          var b = W.bob(out.id, opt('cellW'), 1), t = W.stride(out.id, opt('cellW'), D.STATES.walk.ms[0]);
+          walk = { speed: t.speed, dy: b.dy, stride: t.stride };
+        }
+        if (made) W.free(made.id);
+        made = { id: out.id, info: out.info, state: s, walk: walk, png: W.png(out.id) };
+        if (s === 'still') { if (still && still.own) W.free(still.id); still = { id: W.decode(made.png), own: true, name: '방금 정리한 정지 도트' }; $('stillName').textContent = '방금 정리한 정지 도트를 쓴다'; prompt(); }
+        show();
+        status($('runStatus'), '정리했다 — 아래에서 보고 받는다', 'good');
+      } catch (e) { status($('runStatus'), e.message, 'bad'); }
+    }, 20);
+  };
+
+  var zoom = 2;
+  function show() {
+    var r = W.rgba(made.id), cv = $('sheet');
+    cv.width = r.w; cv.height = r.h;
+    cv.getContext('2d').putImageData(new ImageData(r.data, r.w, r.h), 0, 0);
+    cv.style.width = r.w * zoom + 'px'; cv.style.height = r.h * zoom + 'px';
+    $('zoom').innerHTML = '';
+    [1, 2, 4].forEach(function (z) {
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = z + '배'; b.setAttribute('aria-pressed', String(z === zoom));
+      b.onclick = function () { zoom = z; show(); }; $('zoom').appendChild(b);
+    });
+    var st = D.STATES[made.state], info = made.info, rows = [];
+    rows.push(['상태', STATE_TAB[made.state] + ' · ' + st.frames + '칸']);
+    if (info.cell) rows.push(['칸', info.cell.join('×') + ' · 발 기준선 ' + (info.foot_y || 126)]);
+    if (info.sprite) rows.push(['인물', info.sprite.join('×') + ' 도트']);
+    if (info.frame) rows.push(['프레임', info.frame.map(function (f) { return f.size.join('×'); }).join(' · ')]);
+    if (info.frame) { var sp = info.frame.map(function (f) { return f.dropped_specks; }); if (sp.some(Boolean)) rows.push(['지운 쪼가리', sp.join(' · ') + ' 칸']); }
+    if (info.pitch) rows.push(['격자 간격', [].concat(info.pitch).join(' · ') + ' px']);
+    rows.push(['색', info.colours + '색']);
+    if (made.walk) rows.push(['걷기', '빠르기 ' + made.walk.speed + ' (보폭 ' + made.walk.stride + ' ÷ 0.6초) · dy ' + made.walk.dy.join(', ')]);
+    $('facts').innerHTML = '';
+    rows.forEach(function (x) { var dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = x[0]; dd.textContent = x[1]; $('facts').appendChild(dt); $('facts').appendChild(dd); });
+    var m = me();
+    $('entry').value = JSON.stringify(D.spriteState({ state: made.state, id: m.id || 'name', form: m.form, walk: made.walk }), null, 1);
+    $('dlX6').hidden = made.state !== 'still';
+    $('result').hidden = false;
+    animate(true);
+  }
+
+  /* 재생 — 칸 차례와 칸마다 시간. 움직임 줄이기면 첫 칸에 멈춰 있다(누르면 돈다) */
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches, running = !reduce;
+  function animate(reset) {
+    clearTimeout(play);
+    var st = D.STATES[made.state], cw = made.info.cell ? made.info.cell[0] : 96, ch = made.info.cell ? made.info.cell[1] : 128;
+    var cv = $('anim'), x = cv.getContext('2d'), src = $('sheet'), k = 0, sc = 3;
+    cv.width = cw; cv.height = ch; cv.style.width = cw * sc + 'px'; cv.style.height = ch * sc + 'px';
+    var order = st.order || [0], ms = st.ms || [1000], dy = made.walk ? made.walk.dy : null;
+    function frame() {
+      var f = order[k % order.length];
+      x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, cw, ch);
+      x.fillStyle = '#0006'; x.beginPath(); x.ellipse(cw / 2, (made.info.foot_y || 126) + 0.5, 14, 2.5, 0, 0, 7); x.fill();
+      if ($('flip').checked) x.setTransform(-1, 0, 0, 1, cw, 0);
+      x.drawImage(src, f * cw, 0, cw, ch, 0, dy ? Math.round(dy[f]) : 0, cw, ch);
+      if (running && order.length > 1) play = setTimeout(function () { k++; frame(); }, ms[k % ms.length]);
+    }
+    $('playBtn').textContent = running ? '멈춤' : '재생'; $('playBtn').setAttribute('aria-pressed', String(running));
+    frame();
+  }
+  $('playBtn').onclick = function () { running = !running; animate(); };
+  $('flip').onchange = function () { animate(); };
+
+  function download(bytes, name, type) {
+    var a = document.createElement('a'), u = URL.createObjectURL(new Blob([bytes], { type: type }));
+    a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(u); }, 4000);
+  }
+  function x6(id) {
+    var r = W.rgba(id), c = document.createElement('canvas'); c.width = r.w * 6; c.height = r.h * 6;
+    var t = document.createElement('canvas'); t.width = r.w; t.height = r.h; t.getContext('2d').putImageData(new ImageData(r.data, r.w, r.h), 0, 0);
+    var x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(t, 0, 0, c.width, c.height);
+    return new Promise(function (ok) { c.toBlob(ok, 'image/png'); });
+  }
+  function names() { var m = me(); return D.names(m.id || 'name', m.form || 'base', made ? made.state : S.state); }
+  $('dlPng').onclick = function () { download(made.png, names().cleaned.split('/').pop(), 'image/png'); };
+  $('dlX6').onclick = function () { x6(made.id).then(function (b) { download(b, names().x6, 'image/png'); }); };
+  $('x6').onclick = function () { if (still) x6(still.id).then(function (b) { download(b, names().x6, 'image/png'); }); };
+  $('cpEntry').onclick = function () {
+    var t = $('entry').value;
+    (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { status($('runStatus'), 'sprites.json 칸을 복사했다', 'good'); },
+      function () { $('entry').select(); status($('runStatus'), '복사가 막혔다 — 글을 골라 두었다', 'bad'); });
+  };
+  $('dlRec').onclick = function () {
+    var m = me(), n = names();
+    Promise.all([digest('SHA-256', raw.bytes), digest('SHA-1', made.png)]).then(function (h) {
+      var sheetArgs = made.state === 'still' ? D.args('still', { colors: opt('colors'), rows: opt('rows'), outline: opt('outline') })
+        : D.args(made.state, { rows: opt('rows'), fixedPitch: opt('fixedPitch'), speck: opt('speck'), cell: [opt('cellW'), opt('cellH')],
+            grid: opt('gridC') && opt('gridR') ? [opt('gridC'), opt('gridR')] : null }, D.names(m.id || 'name', m.form || 'base', 'still').cleaned);
+      var rec = D.record({ state: made.state, id: m.id || 'name', form: m.form, atelier: S.atelier, date: new Date().toISOString().slice(0, 10),
+        rawSha256: h[0] ? hex(h[0]) : null, sha1: h[1] ? hex(h[1], 12) : null, args: sheetArgs, info: made.info, walk: made.walk });
+      rec.generation.received_as = raw.name;
+      download(new TextEncoder().encode(JSON.stringify(rec, null, 1) + '\n'), n.record.split('/').pop(), 'application/json');
+    });
+  };
+
+  chips(); tabs(); prompt(); options(); loadAtelier();
+  D.load('dot/dot.wasm?v=1').then(function (w) { W = w; ready(); }).catch(function (e) { status($('runStatus'), '정리기를 못 불러왔다 — ' + e.message, 'bad'); });
+})();
+</script>
+</body>
+</html>

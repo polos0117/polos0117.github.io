@@ -1,0 +1,12 @@
+[package]
+name = "dot-cli"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "dot"
+path = "src/main.rs"
+
+[dependencies]
+dot-core = { path = "../dot-core", features = ["png"] }

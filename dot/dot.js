@@ -1,0 +1,307 @@
+/* 도트 공방 — dot/dot.wasm 싣개와 화면 없는 셈(상태 차림 · 생성 지시문 · 정리 기록 · sprites.json 칸 · 공방 그림 목록).
+   dot.html 과 tests/dot.cjs 가 같이 쓴다. 브라우저에서는 window.AtelierDot, node 에서는 require.
+   wasm 의 소스는 rust/dot-core · rust/dot-wasm — 셈은 book-atelier 의 파이썬 도트 도구(sprite-grid · sprite-sheet · sprite-bob)를
+   옮긴 것이라 같은 원본·같은 인자면 화소 하나 다르지 않다(rust/README.md). 붙임 생성기 없이 포인터·길이만 손으로 잇는다. */
+(function (root) {
+  'use strict';
+
+  var API = 1;
+  var CELL = [96, 128], FOOT = [48, 126];
+
+  /* 상태 — 칸 수·생성 시트의 칸 배치·재생 차례와 칸마다 시간(book 서재 세 인물이 쓰는 값) */
+  var STATES = {
+    still: { frames: 1 },
+    idle: { frames: 4, grid: [2, 2], order: [0, 1, 2, 3], ms: [700, 220, 140, 220] },
+    walk: { frames: 6, grid: [3, 2], order: [0, 1, 2, 3, 4, 5], ms: [200, 200, 200, 200, 200, 200] },
+    react: { frames: 4, grid: [2, 2], order: [0, 1, 2, 3], ms: [120, 180, 320, 200] }
+  };
+  /* 정리 기본값 — 손자·춘향 때 굳힌 것: 정지는 121줄 고른 격자 + 바깥 윤곽(123줄), 시트는 정지 도트 키(121줄)에 맞춘다 */
+  var CLEAN = {
+    still: { colors: 24, rows: 121, outline: true },
+    sheet: { rows: 121, speck: 40, cell: CELL, lo: 9, hi: 14, fixedPitch: 0 }
+  };
+
+  /* ── wasm ── */
+  function load(src) {
+    var get = typeof src === 'string'
+      ? fetch(src).then(function (r) { if (!r.ok) throw new Error('dot.wasm ' + r.status); return r.arrayBuffer(); })
+      : Promise.resolve(src);
+    return get.then(function (buf) { return WebAssembly.instantiate(buf, {}); }).then(function (m) { return wrap(m.instance.exports); });
+  }
+
+  function wrap(X) {
+    var dec = typeof TextDecoder !== 'undefined' ? new TextDecoder() : null;
+    function mem() { return new Uint8Array(X.memory.buffer); }
+    function text(p, n) { var b = mem().slice(p, p + n); return dec ? dec.decode(b) : Buffer.from(b).toString('utf8'); }
+    function err() { return new Error(text(X.err_ptr(), X.err_len())); }
+    function json() { return JSON.parse(text(X.json_ptr(), X.json_len())); }
+    function withBytes(bytes, f) {
+      var n = bytes.length, p = X.alloc(n);
+      mem().set(bytes, p);
+      try { return f(p, n); } finally { X.dealloc(p, n); }
+    }
+    function id(v) { if (v < 0) throw err(); return v; }
+    function ok(v) { if (v < 0) throw err(); }
+    var D = {
+      api: X.api_version(),
+      hash: text(X.source_hash_ptr(), X.source_hash_len()),
+      /* PNG 바이트 → 그림 번호 */
+      decode: function (bytes) { return withBytes(bytes, function (p, n) { return id(X.decode(p, n)); }); },
+      /* 브라우저가 푼 RGBA → 그림 번호 */
+      put: function (rgba, w, h) { return withBytes(rgba, function (p) { return id(X.put(p, w, h)); }); },
+      free: function (i) { X.free(i); },
+      size: function (i) { return [X.img_w(i), X.img_h(i)]; },
+      rgba: function (i) { var w = X.img_w(i), h = X.img_h(i), p = X.img_ptr(i); return { w: w, h: h, data: new Uint8ClampedArray(mem().slice(p, p + w * h * 4)) }; },
+      png: function (i) { ok(X.encode(i)); var p = X.bytes_ptr(); return mem().slice(p, p + X.bytes_len()); },
+      /* 정지 도트 한 장 → { id, info } */
+      still: function (i, o) {
+        o = Object.assign({}, CLEAN.still, o || {});
+        var r = id(X.still(i, o.colors, o.rows || 0, o.outline ? 1 : 0));
+        return { id: r, info: json() };
+      },
+      /* 동작 시트 → { id, info }. stillId 는 정지 도트(팔레트를 거기서 뽑는다) */
+      sheet: function (i, stillId, o) {
+        o = Object.assign({}, CLEAN.sheet, o || {});
+        var g = o.grid || [0, 0], c = o.cell || [0, 0];
+        var r = id(X.sheet(i, stillId, o.frames, g[0], g[1], o.rows || 0, o.fixedPitch || 0, o.lo, o.hi, o.speck, c[0], c[1]));
+        return { id: r, info: json() };
+      },
+      bob: function (i, cw, amount) { ok(X.bob(i, cw || CELL[0], amount == null ? 1 : amount)); return json(); },
+      stride: function (i, cw, ms) { ok(X.stride(i, cw || CELL[0], ms || 200)); return json(); }
+    };
+    if (D.api !== API) throw new Error('dot.wasm 내보내기 판이 다르다(' + D.api + ' ≠ ' + API + ') — dot.js 와 같이 다시 지어 올릴 것');
+    return D;
+  }
+
+  /* 정리 인자 — 파이썬 도구와 같은 꼴(기록의 args, dot-cli 도 같다) */
+  function args(state, o, paletteFile) {
+    if (state === 'still') {
+      o = Object.assign({}, CLEAN.still, o || {});
+      return [String(o.colors)].concat(o.rows ? ['--rows', String(o.rows)] : []).concat(o.outline ? ['--outline'] : []);
+    }
+    o = Object.assign({}, CLEAN.sheet, { frames: STATES[state].frames, grid: STATES[state].grid }, o || {});
+    var a = ['--frames', String(o.frames)];
+    if (o.grid) a.push('--grid', o.grid.join('x'));
+    a.push('--palette', paletteFile || '<정지 도트>');
+    if (o.rows) a.push('--rows', String(o.rows));
+    else if (o.fixedPitch) a.push('--fixed-pitch', String(o.fixedPitch));
+    if (!o.rows) a.push('--pitch', o.lo + ',' + o.hi);
+    a.push('--speck', String(o.speck));
+    if (o.cell) a.push('--cell', o.cell.join('x'));
+    return a;
+  }
+
+  /* ── 파일 이름 · 자리 (그림 저장소 sprites/ — img/ 밖이라 등록기·썸네일이 읽지 않는다) ── */
+  function slug(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''); }
+  function names(id, form, state, gen, version) {
+    var stem = id + '_' + (form || 'base') + '_' + state;
+    return {
+      raw: 'sprites/' + id + '/raw/' + stem + '_gen' + (gen || 1) + '.png',
+      cleaned: 'sprites/' + id + '/' + stem + (version ? '_' + version : '') + '.png',
+      record: 'records/sprites/' + id + '/' + state + (version ? '_' + version : '') + '.json',
+      x6: id + '_' + (form || 'base') + '_still_x6.png'
+    };
+  }
+
+  /* ── 생성 지시문 (GPT 이미지 생성에 그대로) — book-atelier docs/ATELIER_PIXEL_ART_PLAN.md 11절에서 일반화 ── */
+  var SUBJECTS = {
+    woman: 'young woman', man: 'young man', person: 'character', mech: 'robot mecha', creature: 'creature'
+  };
+  var CLEAN_LINE = 'Hard edges only: no anti-aliasing, no blur, no gradients, no dithering noise.';
+  var NO_EXTRA = 'Transparent background. No grid lines, no cell borders, no numbers, no labels, no text, no ground, no shadow, no motion lines, no extra characters.';
+
+  function stillPrompt(o) {
+    var who = SUBJECTS[o.subject] || o.subject || 'character', L = [];
+    L.push('Pixel art game sprite of the SAME ' + who + ' shown in attached image 1. Copy the face, hair, skin tone, outfit and palette from image 1.');
+    if (o.outfit) L.push('Attached image 2 shows the outfit to draw — take only the clothes from it.');
+    var n = o.outfit ? 3 : 2;
+    if (o.sample) L.push('Attached image ' + n + ' is a finished sprite of a different character from the same game: match its pixel size, outline, shading style and body proportions exactly, but NOT its outfit or colours.');
+    if (o.identity) L.push(o.identity.trim());
+    L.push('Do not draw any background, furniture, props or scenery from the attachments.', '');
+    L.push('Draw with very large chunky pixels (each sprite pixel a crisp 12 x 12 square), about 16 colours,',
+      'about 4 heads tall (not chibi), and about half the decoration of image 1 — keep only the shapes that',
+      'make the character recognisable at small size. One full-body character, standing idle on flat ground,',
+      'three-quarter view turned slightly toward the viewer\'s right, arms relaxed, feet close together.',
+      CLEAN_LINE + ' Dark selective outline,',
+      'simple 2-3 tone shading lit from the upper left. Keep the face readable: two clear eyes, small mouth.',
+      'Transparent background. If transparency is not possible, use one flat solid #00FF00 green with nothing else.',
+      'No ground shadow, no floor, no text, no frame, no border, no second character.',
+      'Portrait canvas 1024 x 1536.');
+    return L.join('\n');
+  }
+
+  function sheetHead(o, title, refNo) {
+    return [
+      title + ' of the EXACT same character as attached image 1 — a finished pixel-art sprite.',
+      'Copy it pixel for pixel in style: same very large chunky pixels, same 16-colour palette, same dark outline,',
+      'same proportions (about 4 heads tall), same face.' + (o.identity ? ' ' + o.identity.trim() : ''),
+      'Keep decoration as simple as image 1 — do not add new details. Image ' + refNo + ' is only a colour and face reference; do not copy its painterly style.'
+    ];
+  }
+  function layout(cols, rows, cw) {
+    return [
+      'Sheet layout: portrait canvas 1024 x 1536, ' + (cols * rows) + ' frames in a ' + cols + ' x ' + rows + ' grid (cell ' + cw + ' x 768), read left to right, top to bottom.',
+      'In every cell the character is the same size (about 125 pixels tall on the sprite\'s own pixel grid, each sprite pixel',
+      'drawn as a crisp 6 x 6 square), centred horizontally, with both feet on the same baseline near the bottom of the cell.',
+      'Every frame faces the same direction as described below. ' + CLEAN_LINE,
+      NO_EXTRA
+    ];
+  }
+
+  var IDLE = [
+    'IDLE animation, 4 frames. Same standing pose as image 1, three-quarter view turned slightly toward the viewer\'s right, arms relaxed.',
+    'Changes between frames are tiny (1-2 sprite pixels): frame 1 = exactly image 1; frame 2 = slight breath in, shoulders and hair 1 pixel up;',
+    'frame 3 = same as frame 2 but eyes closed (blink); frame 4 = back between frame 2 and frame 1.',
+    'Feet never move. The loop 4 -> 1 must be seamless.'
+  ];
+  var REACT = [
+    'REACT animation when selected, 4 frames. Starts and ends in the image 1 pose.',
+    'frame 1 = image 1 pose; frame 2 = turns head and body toward the viewer with a small pleased expression;',
+    'frame 3 = a small greeting that suits the character (a light bow, a curtsy or a small wave), knees slightly bent, body 2-3 pixels lower;',
+    'frame 4 = rising back halfway toward the image 1 pose. Feet stay on the baseline.'
+  ];
+  var LEGS = [
+    'LEGS — follow attached image 2 exactly, cell by cell (dark navy = the NEAR leg, the one closer to the viewer;',
+    'grey = the FAR leg). Do not copy image 2\'s shapes or colours, only where each leg and foot is:',
+    'frame 1 = contact: NEAR leg reaches forward, heel down; FAR leg stretched back, only its toe touching.',
+    'frame 2 = down: weight on the NEAR leg, knee slightly bent, body 1 pixel lower; FAR foot lifting off behind.',
+    'frame 3 = passing: NEAR leg straight under the body; FAR leg swings forward past it with the knee lifted; body 1 pixel higher.',
+    'frame 4 = contact, the MIRROR of frame 1: FAR leg reaches forward, heel down; NEAR leg stretched BACK, only its toe touching.',
+    'frame 5 = down: weight on the FAR leg; NEAR foot lifting off behind; body 1 pixel lower.',
+    'frame 6 = passing: FAR leg straight under the body; NEAR leg swings forward past it with the knee lifted; body 1 pixel higher.',
+    'Frames 1 and 4 must look clearly different: in frame 1 the near leg is in front, in frame 4 the near leg is behind.',
+    'Arms swing opposite to the legs (near arm back when the near leg is forward). Head height changes by at most 1 sprite pixel',
+    'except the rise and fall above. The loop 6 -> 1 must be seamless.'
+  ];
+  var SKIRT = [
+    'LEGS: the legs are hidden by a long skirt or robe — follow attached image 2 only for where the two feet are and how the hem moves:',
+    'frame 1 = NEAR foot forward peeking out in front of the hem, FAR foot behind (only its toe showing at the back of the hem); the hem pushes forward;',
+    'frame 2 = feet close, hem settles, body 1 pixel lower; frame 3 = FAR foot swinging forward under the hem, body 1 pixel higher;',
+    'frame 4 = the MIRROR of frame 1: FAR foot forward in front of the hem, NEAR foot behind; frame 5 = feet close, body 1 pixel lower;',
+    'frame 6 = NEAR foot swinging forward under the hem, body 1 pixel higher. Frames 1 and 4 must clearly show a different foot in front.',
+    'The hem sways opposite to the forward foot. The loop 6 -> 1 must be seamless.'
+  ];
+
+  /* 지시문 + 첨부(차례대로). o: {state, subject, identity, outfit(bool), sample(bool), skirt(bool)} */
+  function prompt(o) {
+    var s = o.state || 'still', attach;
+    if (s === 'still') {
+      attach = ['canonical'].concat(o.outfit ? ['outfit'] : []).concat(o.sample ? ['sample_x6'] : []);
+      return { text: stillPrompt(o), attach: attach };
+    }
+    if (s === 'walk') {
+      var t = sheetHead(o, 'Pixel art WALK CYCLE sprite sheet', 3).concat([''], layout(3, 2, 341), [
+        'Side three-quarter view walking toward the viewer\'s right, walking in place (the character does not travel across the cell).', ''
+      ], o.skirt ? SKIRT : LEGS);
+      return { text: t.join('\n'), attach: ['still_x6', 'leg_guide', 'canonical'] };
+    }
+    var body = s === 'idle' ? IDLE : REACT;
+    return { text: sheetHead(o, 'Pixel art sprite sheet', 2).concat([''], layout(2, 2, 512), [''], body).join('\n'), attach: ['still_x6', 'canonical'] };
+  }
+
+  var ATTACH = {
+    canonical: '그 인물의 정본 그림',
+    outfit: '입힐 옷이 보이는 그림',
+    sample_x6: '같은 공방의 다 만든 정지 도트 6배 — 도트 크기·윤곽·비율 본보기(옷·색은 따르지 않는다)',
+    still_x6: '그 인물의 정지 도트 6배(576×768)',
+    leg_guide: '다리 자세 안내 walk_leg_guide.png (남색 = 가까운 다리, 회색 = 먼 다리, 4칸은 1칸의 거울)'
+  };
+  var STATE_NAME = { still: '정지 도트', idle: '대기 시트(4칸)', walk: '걷기 시트(6칸)', react: '반응 시트(4칸)' };
+
+  /* GPT 세션에 보낼 요청문 — 사람이 그대로 붙여 넣는다 */
+  function request(o) {
+    var p = prompt(o), n = names(o.id, o.form, o.state, o.gen);
+    var files = o.files || {};
+    var L = [(o.atelierName || '') + ' 도트 — ' + (o.name || o.id) + '(' + o.id + ') ' + STATE_NAME[o.state] + ' 한 장.', '', '첨부 ' + p.attach.length + '장 (순서대로):'];
+    p.attach.forEach(function (a, i) { L.push((i + 1) + '. ' + ATTACH[a] + (files[a] ? ' — ' + files[a] : '')); });
+    L.push('', '지킬 것:',
+      '- 한 번만 생성한다. 결과가 마음에 안 들어도 다시 뽑거나 고치지 말고 그대로 보여줘. 크롭·축소·보정 금지.',
+      '- 저장소에 올리지 마. 원본 PNG 만 넘겨줘. 이름은 ' + n.raw.split('/').pop(),
+      '- 기존 이미지 삭제, 강제 push, 이력 재작성 금지.', '', '프롬프트:', '', p.text);
+    return L.join('\n');
+  }
+
+  /* ── 기록 · sprites.json 칸 ── */
+  function record(o) {
+    var st = STATES[o.state], n = names(o.id, o.form, o.state, o.gen, o.version);
+    var r = {
+      date: o.date, author: o.author || 'claude', atelier: o.atelier, id: o.id, form: o.form || 'base', state: o.state,
+      plan: 'polos0117.github.io dot.html — 공용 도트 공방',
+      generation: { file: n.raw, sha256: o.rawSha256 || null, by: 'gpt' },
+      cleaned: Object.assign({ file: n.cleaned, sha1: o.sha1 || null, tool: 'polos0117.github.io dot.html (rust/dot-core — book-atelier 파이썬 도구와 같은 셈)', args: o.args }, o.info || {})
+    };
+    if (o.state !== 'still') r.playback = Object.assign({ order: st.order, ms: st.ms }, o.walk || {});
+    r.flip = { allowed: o.flip !== false };
+    return r;
+  }
+
+  function spriteState(o) {
+    var st = STATES[o.state], n = names(o.id, o.form, o.state, o.gen, o.version);
+    var file = n.cleaned.replace(/^sprites\//, '');
+    if (o.state === 'still') return { file: file, frames: 1 };
+    var e = { file: file, frames: st.frames, order: st.order.slice(), ms: st.ms.slice() };
+    if (o.walk && o.walk.speed != null) e.speed = o.walk.speed;
+    if (o.walk && o.walk.dy) e.dy = o.walk.dy;
+    return e;
+  }
+
+  /* ── 다섯 공방의 그림 목록 — 같은 출처(polos0117.github.io)라 각 공방의 자료를 그대로 읽는다 ── */
+  var ATELIERS = [
+    { key: 'book', name: '책', data: '/book-atelier/data/img.json', names: '/book-atelier/data/book-design.json', bases: ['/book-atelier-img/img/'], subject: 'woman' },
+    { key: 'pkm', name: '포켓몬', data: '/pkm-atelier/data/img.json', names: '/pkm-atelier/data/card.json', bases: ['/pkm-atelier-img/img/', '/pkm-atelier-img-2/img/'], subject: 'woman' },
+    { key: 'myth', name: '신화 무기', data: '/myth-atelier/data/img.json', names: '/myth-atelier/data/card.json', bases: ['/myth-atelier-img/img/'], subject: 'woman' },
+    { key: 'gundam', name: '건담', data: '/atelier/data/img.json', bases: ['/atelier/img/'], subject: 'woman' },
+    { key: 'samguk', name: '삼국지', data: '/sam-atelier/images/manifest.json', bases: ['/sam-atelier/'], subject: 'person', noThumb: true }
+  ];
+
+  /* 자리 표시 — byStyle·byForm 같은 칸 이름과 화풍 이름은 빼고 폼·컷만("begin · f", "casual · f · 2") */
+  function label(path) {
+    var out = [];
+    for (var i = 0; i < path.length; i++) {
+      if (path[i] === 'byStyle') { i++; continue; }
+      if (path[i] === 'byForm') continue;
+      out.push(path[i]);
+    }
+    return out.join(' · ') || '기본';
+  }
+
+  /* 카드 하나 아래의 그림 파일 이름을 모두(자리 표시와 함께) — byStyle·byForm·casual 처럼 겹친 칸을 다 훑는다 */
+  function filesOf(node, path, out) {
+    out = out || [];
+    if (typeof node === 'string') { if (/\.(webp|png|jpe?g)$/i.test(node)) out.push({ file: node, at: label(path) }); return out; }
+    if (Array.isArray(node)) { node.forEach(function (v, i) { filesOf(v, path.concat(String(i + 1)), out); }); return out; }
+    if (node && typeof node === 'object') Object.keys(node).forEach(function (k) { if (k !== 'face') filesOf(node[k], path.concat(k), out); });
+    return out;
+  }
+
+  /* 그림 목록 → [{ key, name, id, files: [{file, at, url, thumb}] }] (이름 차례) */
+  function cards(at, doc, namesDoc) {
+    var A = typeof at === 'string' ? ATELIERS.filter(function (x) { return x.key === at; })[0] : at, out = [];
+    var en = {}, title = {};
+    if (namesDoc && namesDoc.books) namesDoc.books.forEach(function (b) { title[b.key] = b.title; en[b.key] = b.key; });
+    /* 카드 자료의 영어 이름 — pkm 은 cards: {갈래: [카드]}, myth 는 cards: [카드] */
+    var cs = namesDoc && namesDoc.cards, lists = Array.isArray(cs) ? [cs] : cs ? Object.keys(cs).map(function (k) { return cs[k]; }) : [];
+    lists.forEach(function (l) { (Array.isArray(l) ? l : []).forEach(function (c) { if (c && c.name && c.en) en[c.name] = c.en; }); });
+    if (A.key === 'samguk') {
+      (Array.isArray(doc) ? doc : []).forEach(function (e) {
+        var m = /^sam\/(images\/portraits\/(.+)\.(jpe?g|png|webp))$/i.exec(e.path || '');
+        if (m) out.push({ key: m[2], name: m[2], id: '', files: [{ file: m[1], at: '초상', url: A.bases[0] + m[1].split('/').map(encodeURIComponent).join('/'), thumb: null }] });
+      });
+    } else {
+      var img = (doc && doc.img) || {}, where = (doc && doc.where) || {};
+      Object.keys(img).forEach(function (k) {
+        var files = filesOf(img[k], []).map(function (f) {
+          var base = A.bases[where[f.file]] || A.bases[0], e = encodeURIComponent(f.file);
+          return { file: f.file, at: f.at, url: base + e, thumb: A.noThumb ? null : base + 'thumb/' + e };
+        });
+        if (files.length) out.push({ key: k, name: title[k] || k, id: slug(en[k] || (/^[\x00-\x7f]+$/.test(k) ? k : '')), files: files });
+      });
+    }
+    return out.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+  }
+
+  var api = { API: API, CELL: CELL, FOOT: FOOT, STATES: STATES, CLEAN: CLEAN, SUBJECTS: SUBJECTS, ATTACH: ATTACH, STATE_NAME: STATE_NAME, ATELIERS: ATELIERS,
+    load: load, wrap: wrap, args: args, slug: slug, names: names, prompt: prompt, request: request, record: record, spriteState: spriteState, filesOf: filesOf, cards: cards };
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  else root.AtelierDot = api;
+})(typeof window !== 'undefined' ? window : this);
