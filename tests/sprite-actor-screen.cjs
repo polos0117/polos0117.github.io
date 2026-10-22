@@ -1,6 +1,7 @@
 /* 도트 재생기 v2(sprite-actor.js) — 다섯 공방이 같이 쓰는 자리: 카드 열쇠로 찾기(actorFor · forCard) · 여러 인물의 바닥(floor) · 뛰쳐나오기(popOut).
    인물은 book 서재 세 인물(옆의 ../book-atelier/data/sprites.json · ../book-atelier-img/sprites) — 실제 Pages 처럼 같은 출처의 /<저장소>/ 로 내준다.
    - floor: 좁으면 둘·넓으면 셋, 인물마다 제 몫 안에서 걷는다, 날마다 차례가 돈다(seed), keys 로 거르기, 누르면 onSelect(카드 열쇠), pause/resume, 폭이 바뀌면 다시 세운다
+   - grow: 화소 배율 2.625(폴드)에서 도트가 1.14배 — mount(기본)·floor({grow:true})가 공간을 늘려 머리가 안 잘린다 · grow:false 면 그대로 · 치우면 되돌린다
    - popOut: 요소에서 튀어나와 바닥에 내려앉고(뛰는 동안 쉰다) 화면을 가로질러 걷는다 · 누르면 onSelect · close(true) 는 되돌아 뛰어 들어가고 판을 치운다 ·
      열린 dialog 안의 요소면 그 dialog 에 붙는다(맨 위 층) · 새로 부르면 앞의 것은 닫힌다 · 움직임 줄이기면 뛰지 않고 선다
    Run: CHROMIUM_PATH=<chrome> NODE_PATH=<playwright 가 있는 node_modules> node tests/sprite-actor-screen.cjs   (SPRITE_PORT, 기본 8773) */
@@ -112,6 +113,32 @@ const server = http.createServer((q, s) => {
     assert.deepEqual(errors, []);
     await ctx.close();
 
+    /* grow — 화소 배율이 정수가 아니면(폴드 2.625 → 3화소 = 1.14배) 도트가 커진다. 무대·바닥이 그만큼 늘어 머리가 안 잘린다 */
+    const c3 = await br.newContext({ viewport: { width: 344, height: 882 }, deviceScaleFactor: 2.625 }), p3 = await c3.newPage();
+    await c3.route('https://polos0117.github.io/**', r => { const f = path.join(SIB, decodeURIComponent(new URL(r.request().url()).pathname)); return fs.existsSync(f) ? r.fulfill({ status: 200, contentType: MIME[path.extname(f)], body: fs.readFileSync(f) }) : r.fulfill({ status: 404 }); });
+    await p3.goto(BASE + '/t.html'); await p3.evaluate(() => window.go);
+    const grown = await p3.evaluate(() => {
+      const box = document.createElement('div'); box.style.cssText = 'position:relative;height:150px;overflow:hidden'; document.body.appendChild(box);
+      const off = document.createElement('div'); off.style.cssText = 'position:relative;height:150px;overflow:hidden'; document.body.appendChild(off);
+      const fits = (host, a) => { const u = a.debug().unit, b = a.el.getBoundingClientRect(), h = host.getBoundingClientRect(); return b.top - 2 * u >= h.top - 0.5 && b.bottom <= h.bottom + 0.5; };
+      const floorFits = () => F.list().every(x => fits(document.getElementById('floor'), x.actor));
+      return Promise.all([AtelierSprite.mount(box, 'alice', { url: '/book-atelier/data/sprites.json' }), AtelierSprite.mount(off, 'alice', { url: '/book-atelier/data/sprites.json', grow: false })]).then(([a, b]) => {
+        const r = { unit: a.debug().unit, mount: fits(box, a), off: fits(off, b), offMin: off.style.minHeight, floorPlain: floorFits() };
+        a.destroy(); r.after = box.style.minHeight; b.destroy(); box.remove(); off.remove();
+        F.destroy(); document.getElementById('floor').style.height = '150px';
+        window.F = AtelierSprite.floor(document.getElementById('floor'), data, { seed: 0, floor: 14, grow: true });
+        return F.ready().then(() => { r.floorGrow = floorFits(); r.floorMin = document.getElementById('floor').style.minHeight; return r; });
+      });
+    });
+    assert.ok(Math.abs(grown.unit - 3 / 2.625) < 1e-9, '폴드에서 도트 한 칸 = 3화소 ' + grown.unit);
+    assert.equal(grown.mount, true, 'mount 는 기본으로 무대를 늘린다');
+    assert.equal(grown.after, '', '인물을 치우면 늘린 높이도 치운다');
+    assert.equal(grown.off, false, 'grow:false 면 그대로(이 배율에서는 머리가 잘린다)');
+    assert.equal(grown.offMin, '');
+    assert.equal(grown.floorGrow, true, 'floor({grow:true}) 도 늘린다 — ' + grown.floorMin);
+    await c3.close();
+    n++;
+
     /* 움직임 줄이기 — 뛰지 않고 선다 */
     const c2 = await br.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' }), p2 = await c2.newPage();
     await p2.goto(BASE + '/t.html'); await p2.evaluate(() => window.go);
@@ -119,6 +146,6 @@ const server = http.createServer((q, s) => {
     assert.deepEqual(still, [0, false, 'idle'], '움직임 줄이기 — 뛰지 않고 대기 첫 칸');
     await c2.close();
     n++;
-    console.log('PASS 도트 재생기 v2: ' + n + '가지 · 카드 열쇠로 찾기 · 바닥(좁으면 둘·넓으면 셋·제 몫·날마다 차례·거르기·누르기·쉬기·다시 세우기·빈 바닥) · 뛰쳐나오기(뛰고 내려앉아 걷기·누르기·되돌아 들어가기·dialog 안·하나만·움직임 줄이기)');
+    console.log('PASS 도트 재생기 v2: ' + n + '가지 · 카드 열쇠로 찾기 · 바닥(좁으면 둘·넓으면 셋·제 몫·날마다 차례·거르기·누르기·쉬기·다시 세우기·빈 바닥) · 뛰쳐나오기(뛰고 내려앉아 걷기·누르기·되돌아 들어가기·dialog 안·하나만·움직임 줄이기) · grow(폴드 배율에서 무대·바닥이 도트만큼 는다)');
   } finally { await br.close(); server.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

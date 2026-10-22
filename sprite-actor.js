@@ -44,8 +44,20 @@
      base(그림 주소 앞), label(누르는 이름), points([왼쪽, 오른쪽] 공간 폭의 비율 0~1), start(처음 자리 0 또는 1),
      idleMs([최소, 최대] 걷기 전 서 있는 시간), seed, scale(도트 한 칸의 CSS 배율, 기본 def.scale), floor(공간 바닥에서 발까지 CSS px),
      fit(참이면 공간 높이에 들어가게 배율을 낮춘다 — 그래도 실제 화소 정수배),
+     grow(참이면 공간의 min-height 를 늘려 머리(걷기 오르내림 2칸 더)까지 들어가게 — 화소 배율이 정수가 아니면(폴드 2.625 → 3화소 = 1.14배,
+       노트북 150% → 2화소 = 1.33배) 도트가 scale 보다 커진다. 같은 공간의 여럿은 가장 큰 쪽. 배율이 바뀌면 다시 잰다),
      wander(false 면 저절로 걷지 않는다 — 부르는 쪽이 march·walkTo 로만),
      onSelect(actor), onError(), onState(name) */
+  /* grow — 공간마다 인물별로 들어갈 높이를 모아 가장 큰 것을 min-height 로(px 가 null 이면 그 인물을 뺀다) */
+  var needs = typeof WeakMap === 'function' && typeof Map === 'function' ? new WeakMap() : null;
+  function grow(host, who, px) {
+    if (!needs) return;
+    var m = needs.get(host); if (!m) { m = new Map(); needs.set(host, m); }
+    if (px == null) m.delete(who); else m.set(who, px);
+    var h = 0; m.forEach(function (v) { if (v > h) h = v; });
+    host.style.minHeight = h ? Math.ceil(h) + 'px' : '';
+  }
+
   function create(host, def, opts) {
     opts = opts || {};
     var S = def.states, cell = def.cell, foot = def.foot || [cell[0] / 2, cell[1] - 2];
@@ -81,6 +93,7 @@
       el.style.width = cell[0] * A.unit + 'px'; el.style.height = cell[1] * A.unit + 'px';
       body.style.width = cell[0] * A.unit + 'px'; body.style.height = cell[1] * A.unit + 'px';
       el.style.bottom = (opts.floor || 0) - (cell[1] - foot[1]) * A.unit + 'px';
+      if (opts.grow) grow(host, A, (opts.floor || 0) + (foot[1] + 2) * A.unit + 4);   // 발 위 칸 + 오르내림 2칸 + 틈
       A.width = host.clientWidth;
       A.x = pointX(A.at); paint(true);
     }
@@ -188,6 +201,7 @@
       doc.removeEventListener('visibilitychange', onVisible); root.removeEventListener('resize', onDpr);
       if (unsub) unsub(); if (ro) ro.disconnect(); if (io) io.disconnect();
       if (el.parentNode) el.parentNode.removeChild(el);
+      if (opts.grow) grow(host, A, null);
     }
 
     var base = opts.base || '';
@@ -245,13 +259,14 @@
     return load(url).then(function (d) { var def = actorFor(d, key); return def ? { def: def, base: baseOf(d, def) } : null; }, function () { return null; });
   }
   /* 카드 하나의 도트를 host 에 세운다 — 도감 상세의 작은 무대. → Promise<인물 | null>. 인물이 없거나 그림을 못 받으면 null(부르는 쪽이 자리를 숨긴다).
-     opts: url(자료, 기본 data/sprites.json), label, points([0.3, 0.7]), floor(10), seed, scale, idleMs, onSelect(기본: 반응) */
+     opts: url(자료, 기본 data/sprites.json), label, points([0.3, 0.7]), floor(10), seed, scale, idleMs, onSelect(기본: 반응),
+     grow(기본 참 — 무대가 도트 크기만큼 늘어나 머리가 안 잘린다) */
   function mount(host, key, opts) {
     opts = opts || {};
     return forCard(key, opts.url).then(function (r) {
       if (!r || !host || !host.isConnected) return null;
       var a = create(host, r.def, { base: r.base, label: opts.label, points: opts.points || [0.3, 0.7], floor: opts.floor == null ? 10 : opts.floor,
-        seed: opts.seed || 5, scale: opts.scale, idleMs: opts.idleMs, onSelect: opts.onSelect });
+        seed: opts.seed || 5, scale: opts.scale, idleMs: opts.idleMs, onSelect: opts.onSelect, grow: opts.grow !== false });
       return a.ready.then(function (x) { if (x.failed) { a.destroy(); return null; } return a; });
     });
   }
@@ -259,7 +274,7 @@
 
   /* 여러 인물을 한 바닥에 — 공방 메인(격납고·연구소·대장간·군막·서재). 인물마다 바닥의 제 몫(폭을 나눈 칸) 안에서 걷는다.
      data — sprites.json. opts: keys(이 카드들만), count(몇 명 — 수 또는 폭 → 수, 기본 좁으면 2·넓으면 3), seed(차례 — 기본 오늘 날짜라 날마다 돈다),
-     labelOf(카드 열쇠, def) → 누르는 이름, onSelect(카드 열쇠, actor), scale, floor, fit, idleMs.
+     labelOf(카드 열쇠, def) → 누르는 이름, onSelect(카드 열쇠, actor), scale, floor, fit, grow, idleMs.
      돌려주는 것 { list() → [{key, actor}], ready() → Promise, pause(까닭), resume(까닭), destroy() }. 인물이 없으면 빈 바닥(아무것도 안 붙인다) */
   function floor(host, data, opts) {
     opts = opts || {};
@@ -278,7 +293,7 @@
         var a = create(host, def, {
           base: baseOf(data, def), label: opts.labelOf ? opts.labelOf(ck, def) : ck,
           points: [lo + w * 0.18, lo + w * 0.82], start: i % 2, seed: (s + i + 1) * 7919,
-          scale: opts.scale, floor: opts.floor, fit: opts.fit, idleMs: opts.idleMs,
+          scale: opts.scale, floor: opts.floor, fit: opts.fit, grow: opts.grow, idleMs: opts.idleMs,
           onSelect: opts.onSelect ? (function (key) { return function (actor) { opts.onSelect(key, actor); }; })(ck) : null
         });
         a.el.dataset.who = ck;
