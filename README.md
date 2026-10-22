@@ -84,7 +84,12 @@ API(`window.AtelierFavorites`): `has(a, file)` · `toggle(칸)` → 담겼으면
 ## 도트 재생기 — 다섯 공방이 같이 쓰는 도트 인물
 
 도구는 `sprite-actor.js`(모양은 `sprite-actor.css`)이고, **같은 파일을 다섯 저장소(atelier · pkm-atelier · myth-atelier · book-atelier · sam-atelier)의 `lib/sprite-actor.js`·`lib/sprite-actor.css` 에 글자 하나 다르지 않게 복사해 둔다**(여기 것이 원본, 맨 위 줄에 판). 고치면 여섯 곳을 같이 고친다 — 각 저장소의 `tests/sprite-actor-copy.cjs` 가 옆에 받아 둔 이 파일과 견주고, 여기 `tests/dot.cjs` 도 옆의 다섯 복사본을 본다. 화면 말은 없다.
-지금 부르는 곳: book 의 서재 바닥 · 서가 상세 도트 줄 · 서고 복도 · 도트 진열실, 그리고 도트 공방(`dot.html`)의 무대 미리보기. 나머지 공방은 도트 인물이 생기면 부른다.
+지금 부르는 곳(도트가 있는 인물만 뜬다 — 없으면 자리째 숨는다):
+- 책: 서재 바닥 · 책을 펼치면 그 책의 도트가 뛰쳐나와 화면을 거닌다 · 서가 상세 도트 줄 · 서고 복도 · 도트 진열실
+- 포켓몬: 연구소 바닥(캡슐 벽 밑) · 캡슐을 열면 그 포켓몬의 도트가 뛰쳐나온다 · 도감 상세 도트 줄 · 목록 「도트」 표
+- 신화 무기: 대장간 무대 아래 띠 · 도감 상세 · 목록 표 / 건담: 격납고 메인 메뉴 위 띠(이동 스틱 자리는 비운다) · 도감 상세 시트 · 목록 표 / 삼국지: 군막 바닥 띠 · 인물 확대·지명 상세의 작은 무대
+- 도트 공방(`dot.html`)의 무대 미리보기
+인물 칸은 그 공방의 `data/sprites.json` 의 `actors` 에, 그림은 그 공방의 그림 저장소 `sprites/` 에(책 `book-atelier-img` · 포켓몬 `pkm-atelier-img-2` · 신화 `myth-atelier-img` · 건담 `atelier` · 삼국지 `sam-atelier`) — 도트 공방이 「올릴 곳」으로 알려 준다.
 
 인물 자료 `data/sprites.json`(공방마다 하나 — 도트 공방의 「인물 칸 복사」가 이 꼴로 준다):
 

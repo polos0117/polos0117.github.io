@@ -232,7 +232,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
 </main>
 <footer>polos0117 · 도트 공방 · 정리 셈은 rust/dot-core (book-atelier 파이썬 도구와 같은 화소)</footer>
 
-<script src="dot/dot.js?v=3"></script>
+<script src="dot/dot.js?v=4"></script>
 <script src="sprite-actor.js?v=2"></script>
 <script>
 (function () {
@@ -510,6 +510,8 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     if (info.pitch) rows.push(['격자 간격', [].concat(info.pitch).join(' · ') + ' px']);
     rows.push(['색', info.colours + '색']);
     if (made.walk) rows.push(['걷기', '빠르기 ' + made.walk.speed + ' (보폭 ' + made.walk.stride + ' ÷ 0.6초) · dy ' + made.walk.dy.join(', ')]);
+    var put = A().put, nm = D.names(me().id || 'name', me().form || 'base', made.state);
+    if (put) rows.push(['올릴 곳', put.repo + '/' + nm.cleaned + ' · 원본 ' + put.repo + '/' + nm.raw + ' · 기록 ' + put.repo + '/' + nm.record]);
     $('facts').innerHTML = '';
     rows.forEach(function (x) { var dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = x[0]; dd.textContent = x[1]; $('facts').appendChild(dt); $('facts').appendChild(dd); });
     var m = me();
@@ -596,7 +598,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
       onError: function () { $('roomNote').textContent = '그림을 못 세웠다'; } });
     var miss = ['still', 'idle', 'walk', 'react'].filter(function (k) { return !session[k]; }).map(function (k) { return STATE_TAB[k]; });
     $('roomNote').textContent = '세운 상태: ' + have.map(function (k) { return STATE_TAB[k]; }).join(' · ') + (miss.length ? ' — 아직 없는 것: ' + miss.join(' · ') : ' — 넷 다 있다') +
-      '. 공방 화면과 같은 재생기라 여기서 보는 대로 움직인다.';
+      '. 공방 화면과 같은 재생기라 여기서 보는 대로 움직인다.' + (A().put ? ' 인물 칸은 ' + A().put.data + ' 의 actors 에.' : '');
     $('actorEntry').value = JSON.stringify(def, null, 1);
   }
   $('cpActor').onclick = function () {

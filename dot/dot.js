@@ -257,11 +257,12 @@
 
   /* ── 다섯 공방의 그림 목록 — 같은 출처(polos0117.github.io)라 각 공방의 자료를 그대로 읽는다 ── */
   var ATELIERS = [
-    { key: 'book', name: '책', data: '/book-atelier/data/img.json', names: '/book-atelier/data/book-design.json', bases: ['/book-atelier-img/img/'], subject: 'woman' },
-    { key: 'pkm', name: '포켓몬', data: '/pkm-atelier/data/img.json', names: '/pkm-atelier/data/card.json', bases: ['/pkm-atelier-img/img/', '/pkm-atelier-img-2/img/'], subject: 'woman' },
-    { key: 'myth', name: '신화 무기', data: '/myth-atelier/data/img.json', names: '/myth-atelier/data/card.json', bases: ['/myth-atelier-img/img/'], subject: 'woman' },
-    { key: 'gundam', name: '건담', data: '/atelier/data/img.json', bases: ['/atelier/img/'], subject: 'woman' },
-    { key: 'samguk', name: '삼국지', data: '/sam-atelier/images/manifest.json', bases: ['/sam-atelier/'], subject: 'person', noThumb: true }
+    /* put — 정리본을 올릴 그림 저장소(sprites/<이름>/)와 인물 칸을 넣을 자료(sprites.json 의 actors) */
+    { key: 'book', name: '책', data: '/book-atelier/data/img.json', names: '/book-atelier/data/book-design.json', bases: ['/book-atelier-img/img/'], subject: 'woman', put: { repo: 'book-atelier-img', data: 'book-atelier/data/sprites.json' } },
+    { key: 'pkm', name: '포켓몬', data: '/pkm-atelier/data/img.json', names: '/pkm-atelier/data/card.json', bases: ['/pkm-atelier-img/img/', '/pkm-atelier-img-2/img/'], subject: 'woman', put: { repo: 'pkm-atelier-img-2', data: 'pkm-atelier/data/sprites.json' } },
+    { key: 'myth', name: '신화 무기', data: '/myth-atelier/data/img.json', names: '/myth-atelier/data/card.json', bases: ['/myth-atelier-img/img/'], subject: 'woman', put: { repo: 'myth-atelier-img', data: 'myth-atelier/data/sprites.json' } },
+    { key: 'gundam', name: '건담', data: '/atelier/data/img.json', bases: ['/atelier/img/'], subject: 'woman', put: { repo: 'atelier', data: 'atelier/data/sprites.json' } },
+    { key: 'samguk', name: '삼국지', data: '/sam-atelier/images/manifest.json', bases: ['/sam-atelier/'], subject: 'person', noThumb: true, put: { repo: 'sam-atelier', data: 'sam-atelier/data/sprites.json' } }
   ];
 
   /* 자리 표시 — byStyle·byForm 같은 칸 이름과 화풍 이름은 빼고 폼·컷만("begin · f", "casual · f · 2") */
