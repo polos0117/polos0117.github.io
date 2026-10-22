@@ -509,6 +509,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     if (info.frame) { var sp = info.frame.map(function (f) { return f.dropped_specks; }); if (sp.some(Boolean)) rows.push(['지운 쪼가리', sp.join(' · ') + ' 칸']); }
     if (info.pitch) rows.push(['격자 간격', [].concat(info.pitch).join(' · ') + ' px']);
     rows.push(['색', info.colours + '색']);
+    if (info.fitted_pitch) rows.push(['칸에 맞춤', '칸보다 크게 나와 격자 간격을 ' + info.fitted_pitch + 'px 로 키워 다시 뽑았다']);
     if (info.background_keyed) rows.push(['바탕', '투명이 아니라 한 색(' + info.background_keyed + ') 바탕 — 가장자리에서 이어진 바탕을 지웠다']);
     if (made.walk) rows.push(['걷기', '빠르기 ' + made.walk.speed + ' (보폭 ' + made.walk.stride + ' ÷ 0.6초) · dy ' + made.walk.dy.join(', ')]);
     var put = A().put, nm = D.names(me().id || 'name', me().form || 'base', made.state);
@@ -609,7 +610,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   };
 
   chips(); tabs(); prompt(); options(); loadAtelier();
-  D.load('dot/dot.wasm?v=2').then(function (w) { W = w; ready(); }).catch(function (e) { status($('runStatus'), '정리기를 못 불러왔다 — ' + e.message, 'bad'); });
+  D.load('dot/dot.wasm?v=3').then(function (w) { W = w; ready(); }).catch(function (e) { status($('runStatus'), '정리기를 못 불러왔다 — ' + e.message, 'bad'); });
 })();
 </script>
 </body>

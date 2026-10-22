@@ -658,11 +658,13 @@ pub fn sheet(src: &Img, still: &Img, o: &SheetOpts) -> Result<Out, String> {
         median(&mut hs) / r as f64
     });
     struct F { rgb: Vec<[u8; 3]>, m: Vec<bool>, w: usize, h: usize, pitch: f64, anchor: f64, dropped: usize, bx: (usize, usize, usize, usize) }
+    /* 프레임마다 격자로 뽑는다. fit 을 주면 그 간격의 고른 격자로(칸에 안 들어가 다시 뽑을 때) */
+    let sample_all = |fit: Option<f64>| -> Result<Vec<F>, String> {
     let mut fr: Vec<F> = Vec::new();
     for &(x0, y0, x1, y1) in &boxes {
         let pad = 4;
         let crop = src.crop(x0.saturating_sub(pad), y0.saturating_sub(pad), x1 + pad, y1 + pad);
-        let (g, p) = match rows_pitch {
+        let (g, p) = match fit.or(rows_pitch) {
             Some(rp) => (sample_fixed(&crop, &pal, rp, 0.3).0, rp),
             None => sample_elastic(&crop, &pal, o.lo, o.hi, o.fixed_pitch),
         };
@@ -681,12 +683,28 @@ pub fn sheet(src: &Img, still: &Img, o: &SheetOpts) -> Result<Out, String> {
         let cx = s as f64 / n as f64;
         fr.push(F { rgb, m: mk, w, h, pitch: p, anchor: round2(cx), dropped, bx: (x0, y0, x1, y1) });
     }
+    Ok(fr)
+    };
+    let mut fr = sample_all(None)?;
+    /* 칸에 안 들어가면(생성기가 도트를 지시보다 잘게 그렸거나 그림이 크다) 간격을 그만큼 키워 다시 뽑는다 — 칸 높이 -4·폭 -2 안으로, 세 번까지.
+       파이썬 도구는 여기서 멈췄다(들어가는 그림은 그대로라 같은 화소) */
+    let mut fitted: Option<f64> = None;
+    if let Some((cw, ch)) = o.cell {
+        for _ in 0..3 {
+            let (maxw, maxh) = (fr.iter().map(|f| f.w).max().unwrap(), fr.iter().map(|f| f.h).max().unwrap());
+            if maxw <= cw && maxh + 2 <= ch { break; }
+            let mut ps: Vec<f64> = fr.iter().map(|f| f.pitch).collect();
+            let k = (maxh as f64 / (ch - 4) as f64).max(maxw as f64 / (cw - 2) as f64) * 1.01;
+            let p = median(&mut ps) * k.max(1.01);
+            fr = sample_all(Some(p))?; fitted = Some(p);
+        }
+    }
     let mut hh = fr.iter().map(|f| f.h).max().unwrap() + 2;
     let reach = fr.iter().map(|f| f.anchor.max(f.w as f64 - f.anchor)).fold(f64::NEG_INFINITY, f64::max);
     let mut ww = (((2.0 * reach + 4.0) / 2.0).ceil() * 2.0) as usize;
     if let Some((cw, ch)) = o.cell {
         let maxw = fr.iter().map(|f| f.w).max().unwrap();
-        if cw < maxw || ch < hh { return Err(format!("칸 {cw}x{ch} 가 프레임보다 작다({maxw}x{hh})")); }
+        if cw < maxw || ch < hh { return Err(format!("칸 {cw}x{ch} 에 프레임({maxw}x{hh})이 들어가지 않는다 — 간격을 키워도 안 된다. 생성 그림의 칸·인물 크기를 본다")); }
         ww = cw; hh = ch;
     }
     let mut out = Img::new(ww * fr.len(), hh);
@@ -708,7 +726,8 @@ pub fn sheet(src: &Img, still: &Img, o: &SheetOpts) -> Result<Out, String> {
     }
     let mut cols: Vec<[u8; 3]> = (0..out.w * out.h).filter(|&i| out.px[i * 4 + 3] > 0).map(|i| [out.px[i * 4], out.px[i * 4 + 1], out.px[i * 4 + 2]]).collect();
     cols.sort(); cols.dedup();
-    let keyed_json = bgc.map_or(String::new(), |c| format!(", \"background_keyed\": {}", hex(&c)));
+    let keyed_json = bgc.map_or(String::new(), |c| format!(", \"background_keyed\": {}", hex(&c)))
+        + &fitted.map_or(String::new(), |p| format!(", \"fitted_pitch\": {}", round2(p)));
     let json = format!("{{\"cell\": [{ww}, {hh}], \"frames\": {}, \"foot_y\": {}, \"colours\": {}{keyed_json}, \"frame\": [{}]}}",
         fr.len(), hh - 2, cols.len(), info.join(", "));
     Ok(Out { img: out, json })
@@ -784,6 +803,18 @@ mod tests {
         assert_eq!(frame_boxes(&a, None).len(), 2, "빈 줄로만 나누면 둘");
         let b = frame_boxes(&a, Some((2, 2)));
         assert_eq!(b.len(), 4, "{b:?}");
+    }
+    /// 칸보다 크게 나오면 간격을 키워 다시 뽑아 칸에 넣는다
+    #[test]
+    fn fits_into_cell() {
+        let (w, h) = (300usize, 400usize);
+        let mut a = Img::new(w, h);
+        for y in 20..380 { for x in 60..240 { a.px[(y * w + x) * 4..(y * w + x) * 4 + 4].copy_from_slice(&[200, 80, 60, 255]); } }
+        let still = Img { w: 1, h: 1, px: vec![200, 80, 60, 255] };
+        let o = SheetOpts { frames: 1, cell: Some((96, 128)), rows: Some(200), speck: 6, ..Default::default() };
+        let r = sheet(&a, &still, &o).unwrap();
+        assert!(r.json.contains("fitted_pitch"), "{}", r.json);
+        assert_eq!((r.img.w, r.img.h), (96, 128));
     }
     #[test]
     fn transparent_left_alone() {
