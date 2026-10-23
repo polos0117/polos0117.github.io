@@ -81,6 +81,16 @@ API(`window.AtelierFavorites`): `has(a, file)` · `toggle(칸)` → 담겼으면
 검사: `node tests/dot.cjs` — wasm 이 소스와 같다 · book 기록 12장 다시 정리 · 걷기 dy·빠르기 · 지시문·이름·기록 · 다섯 공방 그림 목록.
 `CHROMIUM_PATH=<chrome> NODE_PATH=<playwright 가 있는 node_modules> node tests/dot-screen.cjs` — 화면에서 고르기·요청문·상태 넷, 앨리스 정지·손자 걷기를 화면에서 정리해 그림 저장소 정리본과 같다, 받기 넷, 공방 다섯, 새로 고침, 네 크기(344×882 · 390×844 · 844×390 · 1280×900). 옆에 `../book-atelier-img` 가 있어야 한다.
 
+### 검토안 — Layer `layer-pixel-art` 스킬 (2026-10-23, 보류)
+
+[layerai/skills](https://github.com/layerai/skills) 의 `layer-pixel-art`(MIT). 스킬은 요령 글뿐이고, 그림은 **Layer MCP 서버**(Layer 계정 · 생성마다 유료 Creative Units)가 그린다 —
+연결이 없으면 아무것도 만들지 못한다. 유료라 지금은 쓰지 않고, 쓸 수 있게 되면 캐릭터 하나로 시험해 GPT 결과와 견준다.
+
+- 이미 하고 있는 것: 격자·팔레트를 숫자로, 흐림·안티에일리어싱 금지, 투명(안 되면 #00FF00) 바탕, 모든 칸이 정지 도트를 참조, 시트 자르기·붙이기는 결정적 도구로.
+- 우리에게 없는 것(시험할 거리): ① 시트를 한 번에 뽑지 않고 **칸마다 따로** — 정지 도트를 첨부하고 바뀐 자세만 적는다(칸마다 얼굴·키가 흔들리고 다리가 안 번갈아 나오는 걸 막는다. 생성 6번, 정리기에 "여러 장 → 한 시트" 입력이 필요).
+  ② 걷기 **4칸**(접지·내려감·지나감·올라감)부터 — 보폭·오르내림 셈이 6칸 전제라 같이 고친다. ③ Layer 의 픽셀 전용 모델이 96×128 칸·121줄 인물도 격자 맞게 그리는지.
+- 쓰게 되면: Claude Code 에서 `/plugin marketplace add layerai/skills` → `/mcp` 에서 Layer 로그인. 결과가 나으면 도트 공방에 "Layer 로 뽑기" 를 붙인다.
+
 ## 도트 재생기 — 다섯 공방이 같이 쓰는 도트 인물
 
 도구는 `sprite-actor.js`(모양은 `sprite-actor.css`)이고, **같은 파일을 다섯 저장소(atelier · pkm-atelier · myth-atelier · book-atelier · sam-atelier)의 `lib/sprite-actor.js`·`lib/sprite-actor.css` 에 글자 하나 다르지 않게 복사해 둔다**(여기 것이 원본, 맨 위 줄에 판). 고치면 여섯 곳을 같이 고친다 — 각 저장소의 `tests/sprite-actor-copy.cjs` 가 옆에 받아 둔 이 파일과 견주고, 여기 `tests/dot.cjs` 도 옆의 다섯 복사본을 본다. 화면 말은 없다.
