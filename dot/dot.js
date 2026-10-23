@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  var API = 1;
+  var API = 2;   // 2 — frames_sheet(칸마다 따로 뽑은 원본) · 걷기 4칸
   var CELL = [96, 128], FOOT = [48, 126];
 
   /* 상태 — 칸 수·생성 시트의 칸 배치·재생 차례와 칸마다 시간(book 서재 세 인물이 쓰는 값) */
@@ -13,6 +13,9 @@
     still: { frames: 1 },
     idle: { frames: 4, grid: [2, 2], order: [0, 1, 2, 3], ms: [700, 220, 140, 220] },
     walk: { frames: 6, grid: [3, 2], order: [0, 1, 2, 3, 4, 5], ms: [200, 200, 200, 200, 200, 200] },
+    /* 걷기 4칸을 칸마다 따로 뽑는다(시험 — Layer layer-pixel-art 스킬의 요령: 한 장에 여러 칸을 그리면 칸마다 인물이 흔들린다).
+       접지 · 지나감 · 거울 접지 · 거울 지나감. 정리본은 …_walk4.png, 공방 재생기에는 걷기(walk) 자리로 들어간다 */
+    walk4: { frames: 4, separate: true, as: 'walk', order: [0, 1, 2, 3], ms: [250, 250, 250, 250] },
     react: { frames: 4, grid: [2, 2], order: [0, 1, 2, 3], ms: [120, 180, 320, 200] }
   };
   /* 정리 기본값 — 손자·춘향 때 굳힌 것: 정지는 121줄 고른 격자 + 바깥 윤곽(123줄), 시트는 정지 도트 키(121줄)에 맞춘다 */
@@ -66,6 +69,16 @@
         var r = id(X.sheet(i, stillId, o.frames, g[0], g[1], o.rows || 0, o.fixedPitch || 0, o.lo, o.hi, o.speck, c[0], c[1]));
         return { id: r, info: json() };
       },
+      /* 칸마다 따로 뽑은 원본 여러 장 → { id, info } */
+      framesSheet: function (ids, stillId, o) {
+        o = Object.assign({}, CLEAN.sheet, o || {});
+        var c = o.cell || [0, 0], n = ids.length, p = X.alloc(n * 4);
+        try {
+          new Int32Array(X.memory.buffer, p, n).set(ids);
+          var r = id(X.frames_sheet(p, n, stillId, o.rows || 0, o.fixedPitch || 0, o.lo, o.hi, o.speck, c[0], c[1]));
+          return { id: r, info: json() };
+        } finally { X.dealloc(p, n * 4); }
+      },
       bob: function (i, cw, amount) { ok(X.bob(i, cw || CELL[0], amount == null ? 1 : amount)); return json(); },
       stride: function (i, cw, ms) { ok(X.stride(i, cw || CELL[0], ms || 200)); return json(); }
     };
@@ -80,7 +93,8 @@
       return [String(o.colors)].concat(o.rows ? ['--rows', String(o.rows)] : []).concat(o.outline ? ['--outline'] : []);
     }
     o = Object.assign({}, CLEAN.sheet, { frames: STATES[state].frames, grid: STATES[state].grid }, o || {});
-    var a = ['--frames', String(o.frames)];
+    var a = (STATES[state].separate ? ['--separate'] : []).concat(['--frames', String(o.frames)]);
+    if (STATES[state].separate) o.grid = null;   // 칸마다 따로 — 명령줄은 dot frames
     if (o.grid) a.push('--grid', o.grid.join('x'));
     a.push('--palette', paletteFile || '<정지 도트>');
     if (o.rows) a.push('--rows', String(o.rows));
@@ -94,13 +108,16 @@
   /* ── 파일 이름 · 자리 (그림 저장소 sprites/ — img/ 밖이라 등록기·썸네일이 읽지 않는다) ── */
   function slug(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''); }
   function names(id, form, state, gen, version) {
-    var stem = id + '_' + (form || 'base') + '_' + state;
-    return {
-      raw: 'sprites/' + id + '/raw/' + stem + '_gen' + (gen || 1) + '.png',
+    var stem = id + '_' + (form || 'base') + '_' + state, st = STATES[state] || {};
+    var raws = st.separate ? st.order.map(function (_, k) { return 'sprites/' + id + '/raw/' + stem + '_' + (k + 1) + '_gen' + (gen || 1) + '.png'; }) : null;
+    var n = {
+      raw: raws ? raws[0] : 'sprites/' + id + '/raw/' + stem + '_gen' + (gen || 1) + '.png',
       cleaned: 'sprites/' + id + '/' + stem + (version ? '_' + version : '') + '.png',
       record: 'records/sprites/' + id + '/' + state + (version ? '_' + version : '') + '.json',
       x6: id + '_' + (form || 'base') + '_still_x6.png'
     };
+    if (raws) n.raws = raws;   // 칸마다 따로 뽑는 상태 — 원본이 칸 수만큼
+    return n;
   }
 
   /* ── 생성 지시문 (GPT 이미지 생성에 그대로) — book-atelier docs/ATELIER_PIXEL_ART_PLAN.md 11절에서 일반화 ── */
@@ -182,7 +199,34 @@
     'The hem sways opposite to the forward foot. The loop 6 -> 1 must be seamless.'
   ];
 
-  /* 지시문 + 첨부(차례대로). o: {state, subject, identity, outfit(bool), sample(bool), skirt(bool)} */
+  /* 걷기 4칸 — 칸마다 따로. 칸 하나의 자세(가까운 다리 = 보는 사람 쪽 다리) */
+  var WALK4 = [
+    'frame 1 of 4 — CONTACT: the NEAR leg (the one closer to the viewer) reaches forward with the heel down; the FAR leg is stretched back with only its toe touching. Near arm swings back, far arm forward.',
+    'frame 2 of 4 — PASSING: the weight is on the NEAR leg, straight under the body; the FAR leg swings forward past it with the knee lifted and the foot off the ground. Body 1 sprite pixel higher than frame 1. Arms close to the body.',
+    'frame 3 of 4 — CONTACT, the MIRROR of frame 1: the FAR leg reaches forward with the heel down; the NEAR leg is stretched BACK with only its toe touching. Near arm swings forward, far arm back. It must look clearly different from frame 1: here the near leg is behind.',
+    'frame 4 of 4 — PASSING, the mirror of frame 2: the weight is on the FAR leg, straight under the body; the NEAR leg swings forward past it with the knee lifted. Body 1 sprite pixel higher than frame 3. Arms close to the body.'
+  ];
+  var WALK4_SKIRT = [
+    'frame 1 of 4 — the legs are hidden by a long skirt or robe: the NEAR foot peeks out forward in front of the hem, the FAR foot is behind (only its toe showing at the back of the hem); the hem pushes forward.',
+    'frame 2 of 4 — feet close together under the hem, the FAR foot about to swing forward; the hem settles; body 1 sprite pixel higher than frame 1.',
+    'frame 3 of 4 — the MIRROR of frame 1: the FAR foot peeks out forward in front of the hem, the NEAR foot is behind. It must clearly show a different foot in front than frame 1.',
+    'frame 4 of 4 — feet close together under the hem, the NEAR foot about to swing forward; body 1 sprite pixel higher than frame 3.'
+  ];
+  function walk4Prompt(o) {
+    var k = Math.min(4, Math.max(1, o.frame || 1)), ref = k === 1 ? 2 : 3;
+    var L = sheetHead(o, 'Pixel art WALK CYCLE frame ' + k + ' of 4', ref);
+    if (k > 1) L.push('Attached image 2 is frame 1 of this same walk cycle, already approved: match its character size, position on the canvas, foot baseline, facing and lighting exactly — change only the legs and arms as described below.');
+    L.push('', 'Single frame: portrait canvas 1024 x 1536 with ONE character only (not a sheet, no other frames).',
+      'Draw the character the same size as image 1: about 121 sprite pixels tall, each sprite pixel a crisp 12 x 12 square, centred horizontally,',
+      'both feet on a baseline about 40 pixels above the bottom edge.',
+      'Side three-quarter view walking toward the viewer\'s right, walking in place. ' + CLEAN_LINE,
+      NO_EXTRA + ' If transparency is not possible, use one flat solid #00FF00 green with nothing else.', '',
+      (o.skirt ? WALK4_SKIRT : WALK4)[k - 1],
+      'Draw only this one pose. Head, face, hair and outfit identical to image 1.');
+    return L.join('\n');
+  }
+
+  /* 지시문 + 첨부(차례대로). o: {state, subject, identity, outfit(bool), sample(bool), skirt(bool), frame(걷기 4칸의 몇째 칸)} */
   function prompt(o) {
     var s = o.state || 'still', attach;
     if (s === 'still') {
@@ -195,6 +239,7 @@
       ], o.skirt ? SKIRT : LEGS);
       return { text: t.join('\n'), attach: ['still_x6', 'leg_guide', 'canonical'] };
     }
+    if (s === 'walk4') return { text: walk4Prompt(o), attach: (o.frame || 1) > 1 ? ['still_x6', 'walk4_f1', 'canonical'] : ['still_x6', 'canonical'] };
     var body = s === 'idle' ? IDLE : REACT;
     return { text: sheetHead(o, 'Pixel art sprite sheet', 2).concat([''], layout(2, 2, 512), [''], body).join('\n'), attach: ['still_x6', 'canonical'] };
   }
@@ -204,19 +249,21 @@
     outfit: '입힐 옷이 보이는 그림',
     sample_x6: '같은 공방의 다 만든 정지 도트 6배 — 도트 크기·윤곽·비율 본보기(옷·색은 따르지 않는다)',
     still_x6: '그 인물의 정지 도트 6배(576×768)',
-    leg_guide: '다리 자세 안내 walk_leg_guide.png (남색 = 가까운 다리, 회색 = 먼 다리, 4칸은 1칸의 거울)'
+    leg_guide: '다리 자세 안내 walk_leg_guide.png (남색 = 가까운 다리, 회색 = 먼 다리, 4칸은 1칸의 거울)',
+    walk4_f1: '이 걷기 4칸의 1칸 원본(먼저 뽑아 확정한 것) — 크기·자리·발 기준선 본보기'
   };
-  var STATE_NAME = { still: '정지 도트', idle: '대기 시트(4칸)', walk: '걷기 시트(6칸)', react: '반응 시트(4칸)' };
+  var STATE_NAME = { still: '정지 도트', idle: '대기 시트(4칸)', walk: '걷기 시트(6칸)', walk4: '걷기 4칸(칸마다 따로)', react: '반응 시트(4칸)' };
 
   /* GPT 세션에 보낼 요청문 — 사람이 그대로 붙여 넣는다 */
   function request(o) {
     var p = prompt(o), n = names(o.id, o.form, o.state, o.gen);
-    var files = o.files || {};
-    var L = [(o.atelierName || '') + ' 도트 — ' + (o.name || o.id) + '(' + o.id + ') ' + STATE_NAME[o.state] + ' 한 장.', '', '첨부 ' + p.attach.length + '장 (순서대로):'];
+    var files = o.files || {}, k = o.frame || 1;
+    var what = n.raws ? STATE_NAME[o.state] + ' 가운데 ' + k + '칸 한 장(4장을 따로 뽑는다 — 1칸을 먼저 확정하고 2~4칸은 그것을 붙인다)' : STATE_NAME[o.state] + ' 한 장';
+    var L = [(o.atelierName || '') + ' 도트 — ' + (o.name || o.id) + '(' + o.id + ') ' + what + '.', '', '첨부 ' + p.attach.length + '장 (순서대로):'];
     p.attach.forEach(function (a, i) { L.push((i + 1) + '. ' + ATTACH[a] + (files[a] ? ' — ' + files[a] : '')); });
     L.push('', '지킬 것:',
       '- 한 번만 생성한다. 결과가 마음에 안 들어도 다시 뽑거나 고치지 말고 그대로 보여줘. 크롭·축소·보정 금지.',
-      '- 저장소에 올리지 마. 원본 PNG 만 넘겨줘. 이름은 ' + n.raw.split('/').pop(),
+      '- 저장소에 올리지 마. 원본 PNG 만 넘겨줘. 이름은 ' + (n.raws ? n.raws[k - 1] : n.raw).split('/').pop(),
       '- 기존 이미지 삭제, 강제 push, 이력 재작성 금지.', '', '프롬프트:', '', p.text);
     return L.join('\n');
   }
@@ -227,7 +274,9 @@
     var r = {
       date: o.date, author: o.author || 'claude', atelier: o.atelier, id: o.id, form: o.form || 'base', state: o.state,
       plan: 'polos0117.github.io dot.html — 공용 도트 공방',
-      generation: { file: n.raw, sha256: o.rawSha256 || null, by: 'gpt' },
+      generation: n.raws
+        ? { files: n.raws.map(function (f, i) { return { file: f, sha256: (o.rawSha256 || [])[i] || null, received_as: (o.received || [])[i] || null }; }), by: 'gpt' }
+        : { file: n.raw, sha256: o.rawSha256 || null, by: 'gpt' },
       cleaned: Object.assign({ file: n.cleaned, sha1: o.sha1 || null, tool: 'polos0117.github.io dot.html (rust/dot-core — book-atelier 파이썬 도구와 같은 셈)', args: o.args }, o.info || {})
     };
     if (o.state !== 'still') r.playback = Object.assign({ order: st.order, ms: st.ms }, o.walk || {});
@@ -248,7 +297,8 @@
   /* sprites.json 의 인물 칸 하나 — 가진 상태만. walk: {speed, dy} */
   function actor(o) {
     var states = {};
-    (o.states || []).forEach(function (s) { states[s] = spriteState({ state: s, id: o.id, form: o.form, walk: s === 'walk' ? o.walk : null }); });
+    /* 걷기 4칸(walk4)은 재생기의 걷기(walk) 자리로 — 둘 다 주면 뒤의 것(4칸) */
+    (o.states || []).forEach(function (s) { states[(STATES[s] && STATES[s].as) || s] = spriteState({ state: s, id: o.id, form: o.form, walk: s === 'walk' || s === 'walk4' ? o.walk : null }); });
     /* card — 그 공방 그림 등록부의 열쇠(공용 재생기의 actorFor 가 이것으로 찾는다 — 도감 상세·캡슐·책 펼치기) */
     var e = { id: o.id, form: o.form || 'base', cell: CELL.slice(), foot: FOOT.slice(), scale: 1, flip: o.flip !== false, facing: 'right', states: states };
     if (o.card) e = Object.assign({ card: o.card }, e);

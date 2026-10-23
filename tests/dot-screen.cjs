@@ -141,6 +141,53 @@ const server = http.createServer((q, s) => {
     await page.click('#playBtn'); assert.equal(await page.getAttribute('#playBtn', 'aria-pressed'), 'true');
     checks += 4;
 
+    /* 걷기 4칸을 칸마다 따로 — 손자 6칸 원본에서 0·2·3·5칸을 잘라 장마다 다른 자리의 초록 바탕에(따로 뽑은 것처럼), 네 장을 한 번에 넣는다 */
+    {
+      const r6 = fs.readdirSync(path.join(IMG, 'records/sprites/sunzi')).filter(f => /^walk.*\.json$/.test(f)).map(f => JSON.parse(fs.readFileSync(path.join(IMG, 'records/sprites/sunzi', f), 'utf8'))).find(x => x.cleaned.frame && x.cleaned.frame.length === 6);
+      const src = r6.generations ? r6.generations.find(g => g.file.endsWith((r6.cleaned.from || 'gen1') + '.png')).file : r6.generation.file;
+      const big = W.rgba(W.decode(fs.readFileSync(path.join(IMG, src)))), files = [], ids = [];
+      [0, 2, 3, 5].forEach((fi, k) => {
+        const [x0, y0, x1, y1] = r6.cleaned.frame[fi].box_px, cw = 1024, ch = 1536, px = new Uint8Array(cw * ch * 4);
+        for (let i = 0; i < cw * ch; i++) px.set([0, 255, 0, 255], i * 4);
+        const ox = 300 + k * 9, oy = 600 - k * 7;
+        for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { const s = (y * big.w + x) * 4; if (big.data[s + 3] >= 128) px.set(big.data.subarray(s, s + 4), ((oy + y - y0) * cw + ox + x - x0) * 4); }
+        const id = W.put(px, cw, ch), f = path.join(tmp, 'sunzi_begin_walk4_' + (k + 1) + '_gen1.png');
+        fs.writeFileSync(f, W.png(id)); files.push(f); ids.push(id);
+      });
+      await page.goto(BASE + '/dot.html?a=book&c=sunzi&s=walk4');
+      await page.waitForSelector('#who:not([hidden])');
+      assert.equal(await page.locator('#frames button').count(), 4, '칸 고르기 넷');
+      assert.equal(await page.isHidden('#guide'), true, '다리 안내는 6칸 걷기만');
+      await page.click('#frames button:has-text("3칸")');
+      const req3 = await page.inputValue('#req');
+      assert(req3.includes('frame 3 of 4') && req3.includes('sunzi_begin_walk4_3_gen1.png') && req3.includes('1칸 원본'), '3칸 지시문');
+      await page.setInputFiles('#raw', files.slice().reverse());   // 차례가 섞여도 이름의 칸 번호로
+      await page.setInputFiles('#stillFile', path.join(IMG, 'sprites/sunzi/sunzi_begin_still.png'));
+      await page.waitForFunction(() => !document.getElementById('run').disabled);
+      assert.match(await page.textContent('#rawName'), /1칸 sunzi_begin_walk4_1_gen1\.png.*4칸 sunzi_begin_walk4_4_gen1\.png/);
+      await page.click('#run');
+      await page.waitForSelector('#result:not([hidden])');
+      const g4 = await save('#dlPng');
+      assert.equal(g4.name, 'sunzi_begin_walk4.png');
+      const want = W.framesSheet(ids, W.decode(fs.readFileSync(path.join(IMG, 'sprites/sunzi/sunzi_begin_still.png'))), { rows: 121, speck: 40, cell: [96, 128] });
+      assert.deepEqual(W.rgba(W.decode(g4.buf)).data, W.rgba(want.id).data, '화면에서 정리한 4칸 = wasm 을 바로 부른 것');
+      const s4 = W.decode(g4.buf), t4 = W.stride(s4, 96, 250), b4 = W.bob(s4, 96, 1);
+      assert.deepEqual(JSON.parse(await page.inputValue('#entry')), { file: 'sunzi/sunzi_begin_walk4.png', frames: 4, order: [0, 1, 2, 3], ms: [250, 250, 250, 250], speed: t4.speed, dy: b4.dy });
+      assert((await page.textContent('#facts')).includes('따로 뽑은 원본'));
+      const rec4 = JSON.parse((await save('#dlRec')).buf.toString('utf8'));
+      assert.equal(rec4.state, 'walk4'); assert.equal(rec4.cleaned.file, 'sprites/sunzi/sunzi_begin_walk4.png');
+      assert.deepEqual(rec4.generation.files.map(f => f.file), [1, 2, 3, 4].map(k => 'sprites/sunzi/raw/sunzi_begin_walk4_' + k + '_gen1.png'));
+      assert(rec4.generation.files.every(f => /^[0-9a-f]{64}$/.test(f.sha256)), '원본 넷의 sha256');
+      assert.deepEqual(rec4.cleaned.args.slice(0, 3), ['--separate', '--frames', '4']);
+      await page.waitForSelector('#stageBox:not([hidden]) .sprite-actor:not([hidden])');
+      const a4 = JSON.parse(await page.inputValue('#actorEntry'));
+      assert.deepEqual(Object.keys(a4.states), ['still', 'walk']); assert.equal(a4.states.walk.file, 'sunzi/sunzi_begin_walk4.png', '재생기에는 걷기 자리로');
+      ids.concat([want.id, s4]).forEach(i => W.free(i));
+      checks += 2;
+      /* 아래 검사는 6칸 걷기 자리에서 이어진다 */
+      await page.goto(BASE + '/dot.html?a=book&c=sunzi&s=walk'); await page.waitForSelector('#who:not([hidden])');
+    }
+
     /* 공방 바꾸기 — 포켓몬 */
     await page.click('.chip:has-text("포켓몬")');
     await page.waitForFunction(() => /모두 \d+명/.test(document.getElementById('more').textContent));

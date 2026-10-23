@@ -186,6 +186,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     <h2 id="s2h"><b>2</b>지시문</h2>
     <p class="note">상태마다 한 장씩 따로 생성한다. 정지 도트가 마음에 든 뒤에 동작(대기·걷기·반응)으로 간다 — 동작 시트는 정지 도트 6배를 첫 첨부로 붙인다.</p>
     <div class="tabs" role="tablist" aria-label="상태" id="tabs"></div>
+    <div class="row" id="frames" role="group" aria-label="걷기 4칸 — 몇째 칸 지시문" hidden style="margin-bottom:10px"></div>
     <ol class="attach" id="attach"></ol>
     <div class="row" style="margin-bottom:10px">
       <a class="btn" id="guide" href="dot/walk_leg_guide.png" download="walk_leg_guide.png" hidden>다리 자세 안내 받기</a>
@@ -200,7 +201,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     <h2 id="s3h"><b>3</b>정리</h2>
     <p class="note">GPT 가 준 원본 PNG 를 그대로 넣는다(자르거나 줄이지 않는다). 동작 시트는 확정한 정지 도트(정리본)도 같이 — 색을 거기서 뽑아 맞춘다.</p>
     <div class="files">
-      <div class="drop" id="dropRaw"><b>생성 원본</b><input type="file" id="raw" accept="image/png,image/*"><small id="rawName">아직 없다</small></div>
+      <div class="drop" id="dropRaw"><b id="rawTitle">생성 원본</b><input type="file" id="raw" accept="image/png,image/*"><small id="rawName">아직 없다</small></div>
       <div class="drop" id="dropStill"><b>정지 도트 (동작 시트만)</b><input type="file" id="stillFile" accept="image/png"><small id="stillName">아직 없다 — 여기서 정지를 정리하면 그것을 쓴다</small></div>
     </div>
     <details class="opt" id="opts"><summary>정리 값 (기본값은 book 서재 세 인물이 쓴 값)</summary>
@@ -232,24 +233,26 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
 </main>
 <footer>polos0117 · 도트 공방 · 정리 셈은 rust/dot-core (book-atelier 파이썬 도구와 같은 화소)</footer>
 
-<script src="dot/dot.js?v=4"></script>
+<script src="dot/dot.js?v=5"></script>
 <script src="sprite-actor.js?v=3"></script>
 <script>
 (function () {
   'use strict';
   var D = window.AtelierDot, $ = function (id) { return document.getElementById(id); };
   var COLORS = { gundam: '#7fb3ff', book: '#e39b6b', samguk: '#c9a227', pkm: '#f4c542', myth: '#d9b45a' };
-  var STATE_TAB = { still: '정지', idle: '대기', walk: '걷기', react: '반응' };
+  var STATE_TAB = { still: '정지', idle: '대기', walk: '걷기', walk4: '걷기 4칸(따로)', react: '반응' };
   var KEY = 'atelier_dot_v1';
   var saved = {};
   try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { saved = {}; }
   var q = new URLSearchParams(location.search);
   var S = {
-    atelier: q.get('a') || saved.atelier || 'book', card: q.get('c') || saved.card || '', state: q.get('s') || saved.state || 'still',
+    atelier: q.get('a') || saved.atelier || 'book', card: q.get('c') || saved.card || '', state: q.get('s') || saved.state || 'still', frame: 1,
     per: saved.per || {}   // 인물마다 적은 값 { '<공방>/<카드>': {id, form, subject, identity, canon, outfit, skirt, sample} }
   };
   if (!STATE_TAB[S.state]) S.state = 'still';
   var docs = {}, list = [], W = null, raw = null, still = null, made = null, play = null;
+  var raws = [null, null, null, null];   // 걷기 4칸 — 칸마다 따로 뽑은 원본(1~4칸)
+  function sep() { return !!(D.STATES[S.state] || {}).separate; }
   var session = {}, actor = null;   // 무대 — 이번에 정리한 상태마다 {url(그림), walk}
 
   function save() {
@@ -367,6 +370,14 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
       b.onclick = function () { S.state = s; save(); tabs(); prompt(); options(); };
       $('tabs').appendChild(b);
     });
+    /* 걷기 4칸 — 칸마다 지시문이 다르다. 1칸을 먼저 뽑아 확정하고 2~4칸은 그것을 첨부한다 */
+    $('frames').hidden = !sep(); $('frames').innerHTML = '';
+    if (sep()) [1, 2, 3, 4].forEach(function (k) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'btn'; b.textContent = k + '칸'; b.setAttribute('aria-pressed', String(k === S.frame));
+      b.onclick = function () { S.frame = k; tabs(); prompt(); };
+      $('frames').appendChild(b);
+    });
   }
   function fileURL(file) { var c = cur(); var f = c && c.files.filter(function (x) { return x.file === file; })[0]; return f ? new URL(f.url, location.href).href : ''; }
   function prompt() {
@@ -374,9 +385,10 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     if (!c) { $('req').value = '먼저 ① 에서 인물을 고른다.'; $('attach').innerHTML = ''; $('copy').disabled = true; return; }
     var m = me(), s = S.state, id = m.id || 'name';
     var o = { state: s, subject: m.subject, identity: m.identity, outfit: !!m.outfit && s === 'still', sample: !!m.sample && s === 'still', skirt: !!m.skirt,
-      id: id, form: m.form || 'base', name: c.name, atelierName: A().name };
+      id: id, form: m.form || 'base', name: c.name, atelierName: A().name, frame: S.frame };
     var n = D.names(id, o.form, s);
-    o.files = { canonical: fileURL(m.canon), outfit: fileURL(m.outfit), still_x6: n.x6, leg_guide: 'walk_leg_guide.png', sample_x6: '본보기 정지 도트 6배(예: alice_begin_still_x6.png)' };
+    o.files = { canonical: fileURL(m.canon), outfit: fileURL(m.outfit), still_x6: n.x6, leg_guide: 'walk_leg_guide.png', sample_x6: '본보기 정지 도트 6배(예: alice_begin_still_x6.png)',
+      walk4_f1: n.raws ? n.raws[0].split('/').pop() : '' };
     $('req').value = D.request(o);
     var p = D.prompt(o);
     $('attach').innerHTML = '';
@@ -420,10 +432,18 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
       i.id = 'opt-' + o[0]; l.appendChild(i); box.appendChild(l);
     });
     $('dropStill').hidden = kind === 'still';
+    $('raw').multiple = sep();
+    $('rawTitle').textContent = sep() ? '생성 원본 4장 (1~4칸 — 한 번에 넷을 골라도 된다)' : '생성 원본';
+    rawList();
     ready();
   }
+  /* 걷기 4칸 원본 자리 — 이름에 _walk4_<칸>_ 이 있으면 그 칸, 없으면 빈 칸부터 */
+  function rawList() {
+    if (!sep()) { $('rawName').textContent = raw ? raw.label : '아직 없다'; return; }
+    $('rawName').textContent = raws.map(function (r, i) { return (i + 1) + '칸 ' + (r ? r.label : '— 비었다'); }).join(' · ');
+  }
   function opt(k) { var i = $('opt-' + k); return !i ? null : i.type === 'checkbox' ? i.checked : +i.value; }
-  function ready() { $('run').disabled = !W || !raw || (S.state !== 'still' && !still); }
+  function ready() { $('run').disabled = !W || (sep() ? raws.some(function (r) { return !r; }) : !raw) || (S.state !== 'still' && !still); }
 
   function decodeFile(file) {
     return file.arrayBuffer().then(function (buf) {
@@ -439,6 +459,22 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
       });
     });
   }
+  function takeRaws(files) {
+    if (!files.length || !W) return;
+    files = Array.prototype.slice.call(files).sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+    $('rawName').textContent = '읽는 중…';
+    Promise.all(files.map(decodeFile)).then(function (rs) {
+      rs.forEach(function (r, i) {
+        var f = files[i], m = /_walk4_([1-4])_/.exec(f.name), k = m ? +m[1] - 1 : raws.indexOf(null);
+        if (files.length >= 4 && !m) k = i;   // 넷을 한 번에 — 이름 차례대로
+        if (k < 0 || k > 3) { W.free(r.id); return; }
+        if (raws[k]) W.free(raws[k].id);
+        var sz = W.size(r.id);
+        r.name = f.name; r.label = f.name + ' · ' + sz[0] + '×' + sz[1]; raws[k] = r;
+      });
+      rawList(); ready();
+    }).catch(function (e) { $('rawName').textContent = '못 읽었다 — ' + e.message; });
+  }
   function take(which, file) {
     if (!file || !W) return;
     var nameEl = which === 'raw' ? $('rawName') : $('stillName');
@@ -446,7 +482,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     decodeFile(file).then(function (r) {
       r.name = file.name;
       var sz = W.size(r.id);
-      if (which === 'raw') { if (raw) W.free(raw.id); raw = r; }
+      if (which === 'raw') { if (raw) W.free(raw.id); raw = r; r.label = file.name + ' · ' + sz[0] + '×' + sz[1]; }
       else { if (still && still.own) W.free(still.id); still = r; prompt(); keepSheet('still', r.bytes, null); }
       nameEl.textContent = file.name + ' · ' + sz[0] + '×' + sz[1] + (r.png ? '' : ' · PNG 가 아니라 브라우저가 풀었다');
       /* 정지 도트 칸에 생성 원본을 넣었으면 — 정리한 정지 도트(96×128)를 넣는 자리다. 원본이어도 색을 24색으로 묶어 쓰지만 색이 정지 도트와 어긋날 수 있다 */
@@ -454,13 +490,13 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
       ready();
     }).catch(function (e) { nameEl.textContent = '못 읽었다 — ' + e.message; });
   }
-  $('raw').onchange = function () { take('raw', this.files[0]); };
+  $('raw').onchange = function () { if (sep()) takeRaws(this.files); else take('raw', this.files[0]); this.value = ''; };
   $('stillFile').onchange = function () { take('still', this.files[0]); };
   [['dropRaw', 'raw'], ['dropStill', 'still']].forEach(function (p) {
     var el = $(p[0]);
     el.addEventListener('dragover', function (e) { e.preventDefault(); el.classList.add('over'); });
     el.addEventListener('dragleave', function () { el.classList.remove('over'); });
-    el.addEventListener('drop', function (e) { e.preventDefault(); el.classList.remove('over'); take(p[1], e.dataTransfer.files[0]); });
+    el.addEventListener('drop', function (e) { e.preventDefault(); el.classList.remove('over'); if (p[1] === 'raw' && sep()) takeRaws(e.dataTransfer.files); else take(p[1], e.dataTransfer.files[0]); });
   });
 
   function hex(buf, n) { return Array.prototype.map.call(new Uint8Array(buf), function (x) { return ('0' + x.toString(16)).slice(-2); }).join('').slice(0, n); }
@@ -473,7 +509,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
       try {
         var s = S.state, out, walk = null, swapped = false;
         /* 두 칸을 바꿔 넣었으면 — 생성 시트는 정지 도트(정리본 96×128 · 6배 576×768)보다 늘 크다. 작은 쪽이 원본 칸에 있으면 바꿔 쓴다 */
-        if (s !== 'still' && still && raw) {
+        if (s !== 'still' && !sep() && still && raw) {
           var a = W.size(raw.id), b = W.size(still.id);
           if (a[0] * a[1] < b[0] * b[1]) {
             var t = raw; raw = still; still = t; swapped = true;
@@ -481,13 +517,14 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
           }
         }
         if (s === 'still') out = W.still(raw.id, { colors: opt('colors'), rows: opt('rows'), outline: opt('outline') });
+        else if (sep()) out = W.framesSheet(raws.map(function (r) { return r.id; }), still.id, { rows: opt('rows'), fixedPitch: opt('fixedPitch'), speck: opt('speck'), cell: [opt('cellW'), opt('cellH')] });
         else {
           var gc = opt('gridC'), gr = opt('gridR');
           out = W.sheet(raw.id, still.id, { frames: D.STATES[s].frames, grid: gc && gr ? [gc, gr] : null, rows: opt('rows'), fixedPitch: opt('fixedPitch'),
             speck: opt('speck'), cell: [opt('cellW'), opt('cellH')] });
         }
-        if (s === 'walk') {
-          var b = W.bob(out.id, opt('cellW'), 1), t = W.stride(out.id, opt('cellW'), D.STATES.walk.ms[0]);
+        if (s === 'walk' || s === 'walk4') {
+          var b = W.bob(out.id, opt('cellW'), 1), t = W.stride(out.id, opt('cellW'), D.STATES[s].ms[0]);
           walk = { speed: t.speed, dy: b.dy, stride: t.stride };
         }
         if (made) W.free(made.id);
@@ -522,9 +559,10 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     if (info.palette_quantized) rows.push(['색 고르기', '정지 도트 칸의 그림이 정리본이 아니라(색이 64개 넘게) 그 그림에서 24색을 묶어 썼다']);
     if (info.fitted_pitch) rows.push(['칸에 맞춤', '칸보다 크게 나와 격자 간격을 ' + info.fitted_pitch + 'px 로 키워 다시 뽑았다']);
     if (info.background_keyed) rows.push(['바탕', '투명이 아니라 한 색(' + info.background_keyed + ') 바탕 — 가장자리에서 이어진 바탕을 지웠다']);
-    if (made.walk) rows.push(['걷기', '빠르기 ' + made.walk.speed + ' (보폭 ' + made.walk.stride + ' ÷ 0.6초) · dy ' + made.walk.dy.join(', ')]);
+    if (made.walk) rows.push(['걷기', '빠르기 ' + made.walk.speed + ' (보폭 ' + made.walk.stride + ' ÷ ' + (st.frames / 2 * st.ms[0] / 1000) + '초) · dy ' + made.walk.dy.join(', ')]);
+    if (info.separate) rows.push(['따로 뽑은 원본', info.separate + '장을 한 시트로 — 장마다 바탕을 지우고 발 기준선·가로 중심을 맞췄다']);
     var put = A().put, nm = D.names(me().id || 'name', me().form || 'base', made.state);
-    if (put) rows.push(['올릴 곳', put.repo + '/' + nm.cleaned + ' · 원본 ' + put.repo + '/' + nm.raw + ' · 기록 ' + put.repo + '/' + nm.record]);
+    if (put) rows.push(['올릴 곳', put.repo + '/' + nm.cleaned + ' · 원본 ' + put.repo + '/' + (nm.raws ? nm.raws[0].replace('_1_gen', '_{1~4}_gen') : nm.raw) + ' · 기록 ' + put.repo + '/' + nm.record]);
     $('facts').innerHTML = '';
     rows.forEach(function (x) { var dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = x[0]; dd.textContent = x[1]; $('facts').appendChild(dt); $('facts').appendChild(dd); });
     var m = me();
@@ -578,13 +616,16 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   };
   $('dlRec').onclick = function () {
     var m = me(), n = names();
-    Promise.all([digest('SHA-256', raw.bytes), digest('SHA-1', made.png)]).then(function (h) {
+    var srcs = D.STATES[made.state].separate ? raws : [raw];
+    Promise.all(srcs.map(function (r) { return digest('SHA-256', r.bytes); }).concat([digest('SHA-1', made.png)])).then(function (h) {
+      var sha1 = h.pop(), sep4 = srcs.length > 1;
       var sheetArgs = made.state === 'still' ? D.args('still', { colors: opt('colors'), rows: opt('rows'), outline: opt('outline') })
         : D.args(made.state, { rows: opt('rows'), fixedPitch: opt('fixedPitch'), speck: opt('speck'), cell: [opt('cellW'), opt('cellH')],
             grid: opt('gridC') && opt('gridR') ? [opt('gridC'), opt('gridR')] : null }, D.names(m.id || 'name', m.form || 'base', 'still').cleaned);
       var rec = D.record({ state: made.state, id: m.id || 'name', form: m.form, atelier: S.atelier, date: new Date().toISOString().slice(0, 10),
-        rawSha256: h[0] ? hex(h[0]) : null, sha1: h[1] ? hex(h[1], 12) : null, args: sheetArgs, info: made.info, walk: made.walk });
-      rec.generation.received_as = raw.name;
+        rawSha256: sep4 ? h.map(function (x) { return x ? hex(x) : null; }) : h[0] ? hex(h[0]) : null, received: sep4 ? srcs.map(function (r) { return r.name; }) : null,
+        sha1: sha1 ? hex(sha1, 12) : null, args: sheetArgs, info: made.info, walk: made.walk });
+      if (!sep4) rec.generation.received_as = raw.name;
       download(new TextEncoder().encode(JSON.stringify(rec, null, 1) + '\n'), n.record.split('/').pop(), 'application/json');
     });
   };
@@ -601,15 +642,16 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   }
   function stage() {
     if (!window.AtelierSprite || (!session.still && !session.idle)) { $('stageBox').hidden = true; return; }
-    var m = me(), have = ['still', 'idle', 'walk', 'react'].filter(function (k) { return session[k]; });
-    var def = D.actor({ card: S.card, id: m.id || 'name', form: m.form, states: have, walk: session.walk && session.walk.walk, flip: true });
+    var m = me(), have = ['still', 'idle', 'walk', 'walk4', 'react'].filter(function (k) { return session[k]; });
+    var wk = session.walk4 || session.walk;   // 걷기 4칸이 있으면 그것을 재생기의 걷기로
+    var def = D.actor({ card: S.card, id: m.id || 'name', form: m.form, states: have, walk: wk && wk.walk, flip: true });
     var view = JSON.parse(JSON.stringify(def));
-    have.forEach(function (k) { view.states[k].file = session[k].url; });
+    have.forEach(function (k) { view.states[(D.STATES[k] && D.STATES[k].as) || k].file = session[k === 'walk' && session.walk4 ? 'walk4' : k].url; });
     if (actor) actor.destroy();
     $('stageBox').hidden = false;
     actor = window.AtelierSprite.create($('room'), view, { base: '', label: (cur() || {}).name || m.id, floor: 30, scale: 2, fit: true, idleMs: [1500, 3000], seed: 5,
       onError: function () { $('roomNote').textContent = '그림을 못 세웠다'; } });
-    var miss = ['still', 'idle', 'walk', 'react'].filter(function (k) { return !session[k]; }).map(function (k) { return STATE_TAB[k]; });
+    var miss = ['still', 'idle', 'walk', 'react'].filter(function (k) { return !session[k] && !(k === 'walk' && session.walk4); }).map(function (k) { return STATE_TAB[k]; });
     $('roomNote').textContent = '세운 상태: ' + have.map(function (k) { return STATE_TAB[k]; }).join(' · ') + (miss.length ? ' — 아직 없는 것: ' + miss.join(' · ') : ' — 넷 다 있다') +
       '. 공방 화면과 같은 재생기라 여기서 보는 대로 움직인다.' + (A().put ? ' 인물 칸은 ' + A().put.data + ' 의 actors 에.' : '');
     $('actorEntry').value = JSON.stringify(def, null, 1);
@@ -621,7 +663,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   };
 
   chips(); tabs(); prompt(); options(); loadAtelier();
-  D.load('dot/dot.wasm?v=4').then(function (w) { W = w; ready(); }).catch(function (e) { status($('runStatus'), '정리기를 못 불러왔다 — ' + e.message, 'bad'); });
+  D.load('dot/dot.wasm?v=5').then(function (w) { W = w; ready(); }).catch(function (e) { status($('runStatus'), '정리기를 못 불러왔다 — ' + e.message, 'bad'); });
 })();
 </script>
 </body>

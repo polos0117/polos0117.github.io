@@ -81,6 +81,14 @@ API(`window.AtelierFavorites`): `has(a, file)` · `toggle(칸)` → 담겼으면
 검사: `node tests/dot.cjs` — wasm 이 소스와 같다 · book 기록 12장 다시 정리 · 걷기 dy·빠르기 · 지시문·이름·기록 · 다섯 공방 그림 목록.
 `CHROMIUM_PATH=<chrome> NODE_PATH=<playwright 가 있는 node_modules> node tests/dot-screen.cjs` — 화면에서 고르기·요청문·상태 넷, 앨리스 정지·손자 걷기를 화면에서 정리해 그림 저장소 정리본과 같다, 받기 넷, 공방 다섯, 새로 고침, 네 크기(344×882 · 390×844 · 844×390 · 1280×900). 옆에 `../book-atelier-img` 가 있어야 한다.
 
+### 걷기 4칸 — 칸마다 따로 (시험, 2026-10-23)
+
+상태 「걷기 4칸(따로)」(`walk4`). 아래 Layer 스킬의 요령 ①·② 를 GPT 로 시험한다 — 한 장에 여섯 칸을 그리면 칸마다 얼굴·키가 흔들리고 다리가 안 번갈아 나왔다.
+- **지시문 넷** — 접지(가까운 다리 앞) · 지나감 · 거울 접지(먼 다리 앞) · 거울 지나감. 1칸을 먼저 뽑아 확정하고, 2~4칸은 정지 도트 6배와 그 1칸 원본을 붙여 "바뀐 다리·팔만" 그리게 한다. 장마다 1024×1536 에 한 명, 정지와 같은 12×12 도트 크기.
+- **정리** — 원본 넷(`<이름>_<폼>_walk4_<칸>_gen<N>.png`, 이름의 칸 번호로 자리를 찾는다)을 한 번에 넣으면 `frames_sheet` 가 장마다 바탕을 지우고 발 기준선·가로 중심을 맞춰 4칸 시트로. 색은 정지 도트의 것만.
+- **재생** — 250ms × 4(한 바퀴 1초), dy 는 접지 +½ · 지나감 −½, 빠르기 = 보폭 ÷ 0.5초. 정리본은 `…_walk4.png`(6칸 걷기 파일과 따로), `sprites.json` 에는 걷기(`walk`) 자리로 들어간다 — 6칸보다 나으면 그 인물의 걷기를 바꾼다.
+- 검사: `node tests/dot.cjs`(지시문 넷·이름·기록·앨리스 원본에서 자른 넷을 한 시트로) · `tests/dot-screen.cjs`(손자 원본에서 자른 넷을 화면에서 정리 = wasm 바로 부른 것). 명령줄 `dot verify` 가 기록(`--separate`)대로 다시 정리해 견준다.
+
 ### 검토안 — Layer `layer-pixel-art` 스킬 (2026-10-23, 보류)
 
 [layerai/skills](https://github.com/layerai/skills) 의 `layer-pixel-art`(MIT). 스킬은 요령 글뿐이고, 그림은 **Layer MCP 서버**(Layer 계정 · 생성마다 유료 Creative Units)가 그린다 —

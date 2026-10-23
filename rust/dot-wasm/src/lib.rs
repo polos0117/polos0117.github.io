@@ -3,7 +3,7 @@
 //!
 //! 그림은 번호로 쥔다(0 부터). 차례
 //!   1. `alloc(n)` 자리에 PNG 바이트를 써 넣고 `decode(ptr, n)` → 번호. 브라우저가 푼 RGBA 는 `put(ptr, w, h)` → 번호.
-//!   2. `still(번호, 색 수, 줄 수(0 = 격자 찾기), 윤곽)` · `sheet(번호, 정지 도트 번호, …)` → 정리본 번호, 옆에 `json`.
+//!   2. `still(번호, 색 수, 줄 수(0 = 격자 찾기), 윤곽)` · `sheet(번호, 정지 도트 번호, …)` · `frames_sheet(번호들 자리, 장 수, 정지 도트 번호, …)` → 정리본 번호, 옆에 `json`.
 //!      `bob(번호, 칸 폭, 오르내림)` · `stride(번호, 칸 폭, ms)` → `json`.
 //!   3. `img_w/img_h/img_ptr(번호)` 로 RGBA 를 읽거나 `encode(번호)` → `bytes_ptr/bytes_len` 의 PNG. 다 쓴 번호는 `free`.
 //!   실패하면 -1 이고 까닭은 `err_ptr/err_len`(UTF-8).
@@ -16,7 +16,7 @@ use std::cell::RefCell;
 include!(concat!(env!("OUT_DIR"), "/source_hash.rs"));
 
 /// 내보내기 꼴이 바뀌면 올린다 — dot/dot.js 가 맞춰 본다.
-pub const API_VERSION: u32 = 1;
+pub const API_VERSION: u32 = 2;   // 2 — frames_sheet(칸마다 따로 뽑은 원본), 걷기 4칸
 
 #[derive(Default)]
 struct State { imgs: Vec<Option<Img>>, json: String, err: String, bytes: Vec<u8> }
@@ -116,9 +116,27 @@ pub extern "C" fn sheet(id: i32, still: i32, frames: u32, grid_c: u32, grid_r: u
     done(dot_core::sheet(&src, &st, &o))
 }
 
+/// 칸마다 따로 뽑은 원본 여러 장 → 한 시트(걷기 4칸). ids 는 그림 번호 n 개(i32)를 써 넣은 자리
+#[no_mangle]
+pub extern "C" fn frames_sheet(ids: *const i32, n: u32, still: i32, rows: u32, fixed_pitch: f64, lo: f64, hi: f64, speck: u32, cell_w: u32, cell_h: u32) -> i32 {
+    // SAFETY: 부르는 쪽이 alloc 으로 받은 자리에 i32 n 개를 써 넣었다
+    let ids = unsafe { std::slice::from_raw_parts(ids, n as usize) };
+    let mut srcs = Vec::new();
+    for &i in ids { match get(i) { Ok(x) => srcs.push(x), Err(e) => return fail(e) } }
+    let st = match get(still) { Ok(x) => x, Err(e) => return fail(e) };
+    let o = SheetOpts {
+        frames: srcs.len(), lo, hi, speck: speck as usize,
+        cell: (cell_w > 0 && cell_h > 0).then_some((cell_w as usize, cell_h as usize)),
+        fixed_pitch: (fixed_pitch > 0.0).then_some(fixed_pitch),
+        rows: (rows > 0).then_some(rows as usize),
+        grid: None,
+    };
+    done(dot_core::frames_sheet(&srcs, &st, &o))
+}
+
 fn nums(v: &[f64]) -> String { v.iter().map(|x| dot_core::round2(*x).to_string()).collect::<Vec<_>>().join(", ") }
 
-/// 걷기 6칸의 칸마다 dy (sprite-bob.py) → json {"head": [...], "dy": [...]}
+/// 걷기(6칸 · 4칸)의 칸마다 dy (sprite-bob.py) → json {"head": [...], "dy": [...]}
 #[no_mangle]
 pub extern "C" fn bob(id: i32, cw: u32, amount: f64) -> i32 {
     let img = match get(id) { Ok(i) => i, Err(e) => return fail(e) };
@@ -133,7 +151,7 @@ pub extern "C" fn bob(id: i32, cw: u32, amount: f64) -> i32 {
 pub extern "C" fn stride(id: i32, cw: u32, ms: f64) -> i32 {
     let img = match get(id) { Ok(i) => i, Err(e) => return fail(e) };
     match dot_core::stride(&img, cw as usize) {
-        Ok(st) => { S.with(|s| s.borrow_mut().json = format!("{{\"stride\": {st}, \"ms\": {ms}, \"speed\": {}}}", dot_core::speed(st, ms))); 0 }
+        Ok(st) => { S.with(|s| s.borrow_mut().json = format!("{{\"stride\": {st}, \"ms\": {ms}, \"speed\": {}}}", dot_core::speed_n(st, ms, img.w / cw as usize))); 0 }
         Err(e) => fail(e),
     }
 }

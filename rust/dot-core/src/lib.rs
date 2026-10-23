@@ -641,13 +641,45 @@ pub fn still_palette(still: &Img) -> Vec<[u8; 3]> {
 pub fn sheet(src: &Img, still: &Img, o: &SheetOpts) -> Result<Out, String> {
     let mut keyed = src.clone();
     let bgc = key_background(&mut keyed);
-    let src = &keyed;
-    let boxes = frame_boxes(src, o.grid);
+    let boxes = frame_boxes(&keyed, o.grid);
     if boxes.len() != o.frames {
         let grid = o.grid.map_or("없음".to_string(), |g| format!("{}x{}", g.0, g.1));
         return Err(format!("프레임 {} 개를 찾았다(기대 {}, 칸 배치 {grid}{}) — 생성 그림의 칸 수·배치가 지시와 같은지 본다(칸끼리 겹쳐 그렸거나 칸 수가 다르면 다시 생성)",
             boxes.len(), o.frames, if bgc.is_some() { ", 한 색 바탕을 지웠다" } else { "" }));
     }
+    sheet_at(&keyed, &boxes, bgc, still, o, "")
+}
+
+/// 칸마다 따로 뽑은 원본 여러 장 → 한 시트(걷기 4칸을 칸마다 따로 생성할 때). 장마다 바탕을 지우고, 장 사이에 빈 열 32칸을 두고
+/// 가로로 이어, 장마다 그림의 테두리 상자를 프레임으로 sheet 와 같은 길로 정리한다(줄 수 간격은 장들 키의 중앙값 ÷ rows).
+/// json 에 "separate": 장 수 · "source_x": 이은 그림에서 장마다 시작 x(box_px 는 이은 그림 좌표)
+pub fn frames_sheet(frames: &[Img], still: &Img, o: &SheetOpts) -> Result<Out, String> {
+    if frames.is_empty() { return Err("원본이 없다".into()); }
+    let gap = 32;
+    let mut keyed = Vec::new();
+    let mut bgc = None;
+    for f in frames {
+        let mut k = f.clone();
+        if let Some(c) = key_background(&mut k) { bgc = bgc.or(Some(c)); }
+        keyed.push(k);
+    }
+    let (w, h) = (keyed.iter().map(|k| k.w).sum::<usize>() + gap * (keyed.len() - 1), keyed.iter().map(|k| k.h).max().unwrap());
+    let mut strip = Img::new(w, h);
+    let (mut x0, mut xs, mut boxes) = (0, Vec::new(), Vec::new());
+    for (i, k) in keyed.iter().enumerate() {
+        for y in 0..k.h { let d = (y * w + x0) * 4; strip.px[d..d + k.w * 4].copy_from_slice(&k.px[y * k.w * 4..(y + 1) * k.w * 4]); }
+        let solid: Vec<bool> = (0..k.w * k.h).map(|j| k.px[j * 4 + 3] >= 160).collect();
+        let b = bbox(&solid, k.w, k.h).ok_or(format!("{}번 원본이 비었다(불투명한 화소가 없다)", i + 1))?;
+        boxes.push((x0 + b.0, b.1, x0 + b.2, b.3));
+        xs.push(x0.to_string());
+        x0 += k.w + gap;
+    }
+    let o2 = SheetOpts { frames: frames.len(), grid: None, ..*o };
+    sheet_at(&strip, &boxes, bgc, still, &o2, &format!(", \"separate\": {}, \"source_x\": [{}]", frames.len(), xs.join(", ")))
+}
+
+fn sheet_at(src: &Img, boxes: &[(usize, usize, usize, usize)], bgc: Option<[u8; 3]>, still: &Img, o: &SheetOpts, extra: &str) -> Result<Out, String> {
+    let boxes = boxes.to_vec();
     let mut pal = still_palette(still);
     if pal.is_empty() { return Err("정지 도트가 비었다".into()); }
     /* 정리한 정지 도트가 아니라 생성 원본을 넣었으면 색이 수십만 개라 셈이 끝나지 않는다 — 64색이 넘으면 그 그림에서 24색을 묶어 쓴다 */
@@ -738,7 +770,7 @@ pub fn sheet(src: &Img, still: &Img, o: &SheetOpts) -> Result<Out, String> {
     cols.sort(); cols.dedup();
     let keyed_json = bgc.map_or(String::new(), |c| format!(", \"background_keyed\": {}", hex(&c)))
         + &fitted.map_or(String::new(), |p| format!(", \"fitted_pitch\": {}", round2(p)))
-        + if quantized { ", \"palette_quantized\": true" } else { "" };
+        + if quantized { ", \"palette_quantized\": true" } else { "" } + extra;
     let json = format!("{{\"cell\": [{ww}, {hh}], \"frames\": {}, \"foot_y\": {}, \"colours\": {}{keyed_json}, \"frame\": [{}]}}",
         fr.len(), hh - 2, cols.len(), info.join(", "));
     Ok(Out { img: out, json })
@@ -746,10 +778,11 @@ pub fn sheet(src: &Img, still: &Img, o: &SheetOpts) -> Result<Out, String> {
 
 // ── 걷기: 오르내림·보폭 ──
 
-/// sprite-bob.py — 6칸 걷기의 칸마다 dy(도트 화소, + 는 아래). (머리 높이, dy)
+/// sprite-bob.py — 걷기의 칸마다 dy(도트 화소, + 는 아래). (머리 높이, dy).
+/// 6칸(파이썬 도구 그대로): 접지 0 · 내려감 +1 · 지나감 −1 를 두 번. 4칸(칸마다 따로 뽑는 걷기): 접지 +½ · 지나감 −½ 를 두 번
 pub fn bob(sheet: &Img, cw: usize, bob: f64) -> Result<(Vec<f64>, Vec<f64>), String> {
     let n = sheet.w / cw;
-    if n != 6 { return Err(format!("걷기 6칸만 — {n}칸")); }
+    if n != 6 && n != 4 { return Err(format!("걷기 6칸·4칸만 — {n}칸")); }
     let mut head = Vec::new();
     for k in 0..n {
         let ys: Vec<usize> = (0..sheet.h).filter(|&y| (k * cw..(k + 1) * cw).any(|x| sheet.alpha(x, y) > 0)).collect();
@@ -761,15 +794,17 @@ pub fn bob(sheet: &Img, cw: usize, bob: f64) -> Result<(Vec<f64>, Vec<f64>), Str
         head.push(top as f64 + s as f64 / c as f64);
     }
     let m = mean(&head);
-    let curve = [0.0, 1.0, -1.0, 0.0, 1.0, -1.0];
-    let dy = (0..6).map(|i| (rnd((m + bob * curve[i] - head[i]) * 3.0) / 3.0).clamp(-2.0, 2.0) + 0.0).collect();   // + 0 — -0 을 0 으로
+    let curve: &[f64] = if n == 6 { &[0.0, 1.0, -1.0, 0.0, 1.0, -1.0] } else { &[0.5, -0.5, 0.5, -0.5] };
+    let dy = (0..n).map(|i| (rnd((m + bob * curve[i] - head[i]) * 3.0) / 3.0).clamp(-2.0, 2.0) + 0.0).collect();   // + 0 — -0 을 0 으로
     Ok((head, dy))
 }
 
-/// 접지 칸(0·3)의 발 폭 평균 — 아래 일곱 줄의 가로 폭. 빠르기 = round(보폭 ÷ 반 주기(3칸 × ms))
+/// 접지 칸(6칸이면 0·3, 4칸이면 0·2 — 첫 칸과 반 바퀴 뒤)의 발 폭 평균 — 아래 일곱 줄의 가로 폭. 빠르기 = round(보폭 ÷ 반 주기(칸 수의 반 × ms))
 pub fn stride(sheet: &Img, cw: usize) -> Result<f64, String> {
+    let n = sheet.w / cw;
+    if n < 2 || n % 2 != 0 { return Err(format!("걷기 칸 수가 짝수가 아니다 — {n}칸")); }
     let mut sp = Vec::new();
-    for k in [0usize, 3] {
+    for k in [0usize, n / 2] {
         if (k + 1) * cw > sheet.w { return Err("걷기 칸이 모자란다".into()); }
         let ys: Vec<usize> = (0..sheet.h).filter(|&y| (k * cw..(k + 1) * cw).any(|x| sheet.alpha(x, y) > 0)).collect();
         let bot = *ys.last().ok_or("칸이 비었다")?;
@@ -780,7 +815,9 @@ pub fn stride(sheet: &Img, cw: usize) -> Result<f64, String> {
     Ok(mean(&sp))
 }
 
-pub fn speed(stride: f64, ms: f64) -> f64 { rnd(stride / (3.0 * ms / 1000.0)) }
+pub fn speed(stride: f64, ms: f64) -> f64 { speed_n(stride, ms, 6) }
+/// 칸 수 frames 인 걷기 — 반 주기는 frames/2 칸
+pub fn speed_n(stride: f64, ms: f64, frames: usize) -> f64 { rnd(stride / ((frames / 2) as f64 * ms / 1000.0)) }
 
 #[cfg(test)]
 mod tests {

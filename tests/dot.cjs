@@ -142,6 +142,55 @@ function sourceHash() {
   assert.equal(act.states.walk.speed, 60); assert.equal(act.flip, true);
   n++;
 
+  /* ── 걷기 4칸을 칸마다 따로(walk4) — 지시문 넷 · 이름 · 기록 · 재생기의 걷기 자리 · 따로 뽑은 원본 넷을 한 시트로 ── */
+  {
+    const p1 = D.prompt({ state: 'walk4', frame: 1 }), p3 = D.prompt({ state: 'walk4', frame: 3, skirt: true });
+    assert.deepEqual(p1.attach, ['still_x6', 'canonical']); assert.deepEqual(p3.attach, ['still_x6', 'walk4_f1', 'canonical']);
+    assert(p1.text.includes('frame 1 of 4') && p1.text.includes('ONE character only') && p1.text.includes('NEAR leg') && !p1.text.includes('image 2 is frame 1'));
+    assert(p3.text.includes('frame 3 of 4') && p3.text.includes('image 2 is frame 1') && p3.text.includes('long skirt') === false && p3.text.includes('FAR foot peeks out'));
+    const nm = D.names('alice', 'begin', 'walk4');
+    assert.deepEqual(nm.raws, [1, 2, 3, 4].map(k => 'sprites/alice/raw/alice_begin_walk4_' + k + '_gen1.png'));
+    assert.equal(nm.cleaned, 'sprites/alice/alice_begin_walk4.png');
+    assert(D.request({ state: 'walk4', frame: 2, id: 'alice', form: 'begin' }).includes('alice_begin_walk4_2_gen1.png'));
+    assert.deepEqual(D.args('walk4', {}, 'p.png'), ['--separate', '--frames', '4', '--palette', 'p.png', '--rows', '121', '--speck', '40', '--cell', '96x128']);
+    const rec4 = D.record({ state: 'walk4', id: 'alice', form: 'begin', rawSha256: ['a', 'b', 'c', 'd'], received: ['1.png', '2.png', '3.png', '4.png'] });
+    assert.equal(rec4.generation.files.length, 4); assert.equal(rec4.generation.files[2].sha256, 'c'); assert.deepEqual(rec4.playback.ms, [250, 250, 250, 250]);
+    const a4 = D.actor({ id: 'alice', form: 'begin', states: ['still', 'walk', 'walk4'], walk: { speed: 100, dy: [1, -1, 1, -1] } });
+    assert.deepEqual(Object.keys(a4.states), ['still', 'walk'], '4칸은 재생기의 걷기 자리'); assert.equal(a4.states.walk.file, 'alice/alice_begin_walk4.png'); assert.equal(a4.states.walk.frames, 4);
+    n++;
+    /* 앨리스 6칸 걷기 원본에서 접지·지나감·거울 접지·거울 지나감(0·2·3·5칸)을 잘라, 장마다 다른 자리의 1024×1536 초록 바탕에 — 따로 뽑은 것처럼 */
+    const IMG = path.join(ROOT, '..', 'book-atelier-img');
+    if (fs.existsSync(path.join(IMG, 'records/sprites/alice'))) {
+      const recs = fs.readdirSync(path.join(IMG, 'records/sprites/alice')).filter(f => /^walk.*\.json$/.test(f)).map(f => JSON.parse(fs.readFileSync(path.join(IMG, 'records/sprites/alice', f), 'utf8')));
+      const r = recs.find(x => x.cleaned.frame && x.cleaned.frame.length === 6);
+      const src = r.generations ? r.generations.find(g => g.file.endsWith((r.cleaned.from || 'gen1') + '.png')).file : r.generation.file;
+      const big = W.rgba(W.decode(fs.readFileSync(path.join(IMG, src))));
+      const pal = W.decode(fs.readFileSync(path.join(IMG, r.cleaned.args[r.cleaned.args.indexOf('--palette') + 1])));
+      const ids = [0, 2, 3, 5].map((fi, k) => {
+        const [x0, y0, x1, y1] = r.cleaned.frame[fi].box_px, cw = 1024, ch = 1536, px = new Uint8Array(cw * ch * 4);
+        for (let i = 0; i < cw * ch; i++) px.set([0, 255, 0, 255], i * 4);
+        const ox = 300 + k * 9, oy = 600 - k * 7;
+        for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+          const s = (y * big.w + x) * 4; if (big.data[s + 3] < 128) continue;
+          px.set(big.data.subarray(s, s + 4), ((oy + y - y0) * cw + ox + x - x0) * 4);
+        }
+        return W.put(px, cw, ch);
+      });
+      const out = W.framesSheet(ids, pal, { rows: 121, speck: 40, cell: [96, 128] }), out2 = W.framesSheet(ids, pal, { rows: 121, speck: 40, cell: [96, 128] });
+      assert.equal(out.info.separate, 4); assert.equal(out.info.frames, 4); assert.equal(out.info.background_keyed, '#00ff00'); assert.deepEqual(W.size(out.id), [384, 128]);
+      assert.deepEqual(W.rgba(out.id).data, W.rgba(out2.id).data, '같은 원본이면 같은 화소');
+      const colours = c => { const d = W.rgba(c).data, s = new Set(); for (let i = 0; i < d.length; i += 4) if (d[i + 3]) s.add(d[i] + ',' + d[i + 1] + ',' + d[i + 2]); return s; };
+      const mine = colours(out.id), still = colours(pal);
+      assert([...mine].every(c => still.has(c)), '색은 정지 도트의 것만');
+      assert(out.info.frame.every(f => f.at[1] + f.size[1] === 126), '네 칸 모두 발이 기준선 126');
+      const b = W.bob(out.id, 96, 1), t = W.stride(out.id, 96, 250);
+      assert.equal(b.dy.length, 4); assert(b.dy.every(v => Math.abs(v) <= 2));
+      assert.equal(t.speed, Math.round(t.stride / 0.5), '빠르기 = 보폭 ÷ 반 주기(2칸 × 250ms)');
+      ids.concat([out.id, out2.id, pal]).forEach(i => W.free(i));
+      n++;
+    }
+  }
+
   /* ── 도트 재생기 복사본 — 옆에 받아 둔 다섯 공방 저장소의 lib/sprite-actor.{js,css} 가 여기 원본과 같다 ── */
   const copies = [];
   for (const repo of ['atelier', 'pkm-atelier', 'myth-atelier', 'book-atelier', 'sam-atelier']) {

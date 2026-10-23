@@ -25,8 +25,9 @@ cargo test -p dot-core
 cargo build --release -p dot-cli
 target/release/dot still  <생성 원본.png> <정리본.png> [색 수=24] [--rows 121] [--outline]
 target/release/dot sheet  <생성 시트.png> <정리 시트.png> --frames 6 --grid 3x2 --palette <정지 도트.png> --rows 121 --speck 40 --cell 96x128
-target/release/dot bob    <걷기 시트.png> [--cell 96x128] [--bob 1]        # 칸마다 dy
-target/release/dot stride <걷기 시트.png> [--cell 96x128] [--ms 200]       # 보폭과 빠르기
+target/release/dot frames <정리 시트.png> <원본 1.png> … <원본 4.png> --palette <정지 도트.png> --rows 121 --speck 40 --cell 96x128   # 칸마다 따로 뽑은 걷기 4칸
+target/release/dot bob    <걷기 시트.png> [--cell 96x128] [--bob 1]        # 칸마다 dy (6칸 · 4칸)
+target/release/dot stride <걷기 시트.png> [--cell 96x128] [--ms 200]       # 보폭과 빠르기 (반 주기 = 칸 수의 반 × ms)
 target/release/dot verify ../../book-atelier-img                          # 기록대로 다시 정리해 견준다
 ```
 
@@ -36,6 +37,7 @@ target/release/dot verify ../../book-atelier-img                          # 기�
 - **한 색 바탕 지우기** — 생성기가 투명 대신 `#00FF00` 같은 한 색 바탕으로 그리면(네 귀퉁이가 불투명하고 가장자리의 60% 넘게 한 색) 가장자리에서 이어진 바탕을 투명으로(`key_background`, 기록 JSON 에 `background_keyed`).
 - **칸 배치로 위아래 자르기** — `--grid CxR` 를 주면 위아래 칸이 머리카락·자락으로 이어져 빈 가로줄이 없을 때 기대 경계 가까이 가장 빈 줄에서 자른다(가로는 원래대로).
 - **칸에 맞추기** — 정리한 프레임이 `--cell` 보다 크면(생성기가 도트를 지시보다 잘게 그렸을 때) 간격을 그만큼 키워 고른 격자로 다시 뽑는다(세 번까지, 기록 JSON 에 `fitted_pitch`).
+- **칸마다 따로 뽑은 원본**(`frames_sheet`, 명령줄 `dot frames`) — 걷기 4칸을 장마다 따로 생성했을 때. 장마다 바탕을 지우고 빈 열 32칸을 두고 이어, 장마다 그림 상자를 프레임으로 시트와 같은 길로 정리한다(기록 JSON 에 `separate`·`source_x`). 걷기 4칸의 dy 는 접지 +½ · 지나감 −½, 보폭은 접지 칸 0·2.
 - **원본을 정지 도트로 넣었을 때** — 정지 도트의 색이 64개를 넘으면(정리본이 아니라 생성 원본) 그 그림에서 24색을 묶어 쓴다(기록 JSON 에 `palette_quantized`). 안 그러면 색이 수십만 개라 셈이 끝나지 않는다.
 
 ## wasm 다시 짓기
@@ -54,7 +56,7 @@ cp target/wasm32-unknown-unknown/wasm/dot_wasm.wasm ../dot/dot.wasm
 `dot-core/src/gamma.rs` 는 손으로 고치지 않는다. 다시 만들려면 numpy 로 `v = np.arange(0, 511) / 2 / 255`, `np.where(v > .04045, ((v + .055) / 1.055) ** 2.4, v / 12.92)` 를
 `f64::from_bits(0x…)` 로 적는다(파일 맨 위 설명 그대로).
 
-## 내보내기 (`API_VERSION` 1)
+## 내보내기 (`API_VERSION` 2)
 
 | 이름 | 무엇 |
 |---|---|
@@ -63,6 +65,7 @@ cp target/wasm32-unknown-unknown/wasm/dot_wasm.wasm ../dot/dot.wasm
 | `img_w` · `img_h` · `img_ptr(번호)` · `encode(번호)` → `bytes_ptr/len` | RGBA 읽기 · PNG 싸기 |
 | `still(번호, 색 수, 줄 수, 윤곽) → 번호` | 정지 도트(줄 수 0 = 격자 찾기) |
 | `sheet(번호, 정지 도트, 칸 수, 배치 가로, 배치 세로, 줄 수, 고정 간격, lo, hi, 쪼가리, 칸 폭, 칸 높이) → 번호` | 동작 시트(0 은 주지 않음) |
-| `bob(번호, 칸 폭, 오르내림)` · `stride(번호, 칸 폭, ms)` | 걷기 dy · 보폭과 빠르기 |
+| `frames_sheet(번호들 자리, 장 수, 정지 도트, 줄 수, 고정 간격, lo, hi, 쪼가리, 칸 폭, 칸 높이) → 번호` | 칸마다 따로 뽑은 원본 여러 장 → 한 시트(번호들 = i32 를 써 넣은 자리) |
+| `bob(번호, 칸 폭, 오르내림)` · `stride(번호, 칸 폭, ms)` | 걷기 dy · 보폭과 빠르기 (6칸 · 4칸) |
 | `json_ptr/len` · `err_ptr/len` | 마지막 결과 JSON · 실패 까닭(UTF-8, 실패하면 -1) |
 | `api_version` · `source_hash_ptr/len` | 맞춰 보기 |
