@@ -101,7 +101,11 @@ textarea { width: 100%; resize: vertical; line-height: 1.45; }
 
 .tabs { display: flex; gap: 6px; margin: 0 0 12px; flex-wrap: wrap; }
 .tab { min-height: 44px; padding: 0 16px; border: 1px solid #ffffff2b; border-radius: 10px; background: #ffffff06; cursor: pointer; font-weight: 700; }
-.tab[aria-selected="true"] { border-color: var(--gold); background: #d9b45a22; color: #fff; }
+.tab[aria-selected="true"], .seg[aria-pressed="true"] { border-color: var(--gold); background: var(--gold); color: #1a1408; }
+.tab[aria-selected="true"]::before, .seg[aria-pressed="true"]::before { content: "✓ "; }
+.framebar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
+.framebar > b { font-size: 13px; color: var(--muted, #b9b3a6); font-weight: 600; }
+.framenote { margin: 0 0 10px; font-size: 13.5px; color: var(--gold); }
 .attach { margin: 0 0 12px; padding-left: 22px; }
 .attach li { margin: 4px 0; word-break: keep-all; }
 .attach li small { color: var(--muted); }
@@ -186,7 +190,8 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     <h2 id="s2h"><b>2</b>지시문</h2>
     <p class="note">상태마다 한 장씩 따로 생성한다. 정지 도트가 마음에 든 뒤에 동작(대기·걷기·반응)으로 간다 — 동작 시트는 정지 도트 6배를 첫 첨부로 붙인다.</p>
     <div class="tabs" role="tablist" aria-label="상태" id="tabs"></div>
-    <div class="row" id="frames" role="group" aria-label="걷기 4칸 — 몇째 칸 지시문" hidden style="margin-bottom:10px"></div>
+    <div class="framebar" id="frames" role="group" aria-label="걷기 4칸 — 몇째 칸 지시문" hidden></div>
+    <p class="framenote" id="frameNote" role="status" hidden></p>
     <ol class="attach" id="attach"></ol>
     <div class="row" style="margin-bottom:10px">
       <a class="btn" id="guide" href="dot/walk_leg_guide.png" download="walk_leg_guide.png" hidden>다리 자세 안내 받기</a>
@@ -241,6 +246,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   var D = window.AtelierDot, $ = function (id) { return document.getElementById(id); };
   var COLORS = { gundam: '#7fb3ff', book: '#e39b6b', samguk: '#c9a227', pkm: '#f4c542', myth: '#d9b45a' };
   var STATE_TAB = { still: '정지', idle: '대기', walk: '걷기', walk4: '걷기 4칸(따로)', react: '반응' };
+  var FRAME_NOTE = ['접지(가까운 다리가 앞)', '지나감(가까운 다리로 서고 먼 다리가 앞으로)', '거울 접지(먼 다리가 앞)', '거울 지나감(먼 다리로 서고 가까운 다리가 앞으로)'];
   var KEY = 'atelier_dot_v1';
   var saved = {};
   try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { saved = {}; }
@@ -371,13 +377,17 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
       $('tabs').appendChild(b);
     });
     /* 걷기 4칸 — 칸마다 지시문이 다르다. 1칸을 먼저 뽑아 확정하고 2~4칸은 그것을 첨부한다 */
-    $('frames').hidden = !sep(); $('frames').innerHTML = '';
-    if (sep()) [1, 2, 3, 4].forEach(function (k) {
-      var b = document.createElement('button');
-      b.type = 'button'; b.className = 'btn'; b.textContent = k + '칸'; b.setAttribute('aria-pressed', String(k === S.frame));
-      b.onclick = function () { S.frame = k; tabs(); prompt(); };
-      $('frames').appendChild(b);
-    });
+    $('frames').hidden = $('frameNote').hidden = !sep(); $('frames').innerHTML = '';
+    if (sep()) {
+      var lab = document.createElement('b'); lab.textContent = '몇째 칸'; $('frames').appendChild(lab);
+      [1, 2, 3, 4].forEach(function (k) {
+        var b = document.createElement('button');
+        b.type = 'button'; b.className = 'btn seg'; b.textContent = k + '칸'; b.setAttribute('aria-pressed', String(k === S.frame));
+        b.onclick = function () { S.frame = k; tabs(); prompt(); };
+        $('frames').appendChild(b);
+      });
+      $('frameNote').textContent = '아래는 ' + S.frame + '칸 지시문 — ' + FRAME_NOTE[S.frame - 1] + (S.frame === 1 ? '. 이 칸을 먼저 뽑아 확정한다' : '. 확정한 1칸 원본을 같이 붙인다');
+    }
   }
   function fileURL(file) { var c = cur(); var f = c && c.files.filter(function (x) { return x.file === file; })[0]; return f ? new URL(f.url, location.href).href : ''; }
   function prompt() {
