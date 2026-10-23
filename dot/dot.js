@@ -302,14 +302,16 @@
     /* card — 그 공방 그림 등록부의 열쇠(공용 재생기의 actorFor 가 이것으로 찾는다 — 도감 상세·캡슐·책 펼치기) */
     var e = { id: o.id, form: o.form || 'base', cell: CELL.slice(), foot: FOOT.slice(), scale: 1, flip: o.flip !== false, facing: 'right', states: states };
     if (o.card) e = Object.assign({ card: o.card }, e);
+    /* base — 그림이 sprites.json 의 base 와 다른 저장소에 있을 때(포켓몬: 새 인물은 img-3) */
+    if (o.base) e.base = o.base;
     return e;
   }
 
   /* ── 다섯 공방의 그림 목록 — 같은 출처(polos0117.github.io)라 각 공방의 자료를 그대로 읽는다 ── */
   var ATELIERS = [
-    /* put — 정리본을 올릴 그림 저장소(sprites/<이름>/)와 인물 칸을 넣을 자료(sprites.json 의 actors) */
+    /* put — 정리본을 올릴 그림 저장소(sprites/<이름>/)와 인물 칸을 넣을 자료(sprites.json 의 actors). base — 그 저장소가 sprites.json 의 base 와 다르면 인물 칸에 넣을 그림 주소 앞 */
     { key: 'book', name: '책', data: '/book-atelier/data/img.json', names: '/book-atelier/data/book-design.json', bases: ['/book-atelier-img/img/'], subject: 'woman', put: { repo: 'book-atelier-img', data: 'book-atelier/data/sprites.json' } },
-    { key: 'pkm', name: '포켓몬', data: '/pkm-atelier/data/img.json', names: '/pkm-atelier/data/card.json', bases: ['/pkm-atelier-img/img/', '/pkm-atelier-img-2/img/'], subject: 'woman', put: { repo: 'pkm-atelier-img-2', data: 'pkm-atelier/data/sprites.json' } },
+    { key: 'pkm', name: '포켓몬', data: '/pkm-atelier/data/img.json', names: '/pkm-atelier/data/card.json', bases: ['/pkm-atelier-img/img/', '/pkm-atelier-img-2/img/', '/pkm-atelier-img-3/img/'], subject: 'woman', put: { repo: 'pkm-atelier-img-3', data: 'pkm-atelier/data/sprites.json', base: 'https://polos0117.github.io/pkm-atelier-img-3/sprites/' } },
     { key: 'myth', name: '신화 무기', data: '/myth-atelier/data/img.json', names: '/myth-atelier/data/card.json', bases: ['/myth-atelier-img/img/'], subject: 'woman', put: { repo: 'myth-atelier-img', data: 'myth-atelier/data/sprites.json' } },
     { key: 'gundam', name: '건담', data: '/atelier/data/img.json', bases: ['/atelier/img/'], subject: 'woman', put: { repo: 'atelier', data: 'atelier/data/sprites.json' } },
     { key: 'samguk', name: '삼국지', data: '/sam-atelier/images/manifest.json', bases: ['/sam-atelier/'], subject: 'person', noThumb: true, put: { repo: 'sam-atelier', data: 'sam-atelier/data/sprites.json' } }

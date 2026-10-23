@@ -107,7 +107,7 @@ API(`window.AtelierFavorites`): `has(a, file)` · `toggle(칸)` → 담겼으면
 - 포켓몬: 연구소 바닥(캡슐 벽 밑) · 캡슐을 열면 그 포켓몬의 도트가 뛰쳐나온다 · 도감 상세 도트 줄 · 목록 「도트」 표
 - 신화 무기: 대장간 무대 아래 띠 · 도감 상세 · 목록 표 / 건담: 격납고 메인 메뉴 위 띠(이동 스틱 자리는 비운다) · 도감 상세 시트 · 목록 표 / 삼국지: 군막 바닥 띠 · 인물 확대·지명 상세의 작은 무대
 - 도트 공방(`dot.html`)의 무대 미리보기
-인물 칸은 그 공방의 `data/sprites.json` 의 `actors` 에, 그림은 그 공방의 그림 저장소 `sprites/` 에(책 `book-atelier-img` · 포켓몬 `pkm-atelier-img-2` · 신화 `myth-atelier-img` · 건담 `atelier` · 삼국지 `sam-atelier`) — 도트 공방이 「올릴 곳」으로 알려 준다.
+인물 칸은 그 공방의 `data/sprites.json` 의 `actors` 에, 그림은 그 공방의 그림 저장소 `sprites/` 에(책 `book-atelier-img` · 포켓몬 `pkm-atelier-img-3`(루기아 등 앞선 인물은 `pkm-atelier-img-2` — 새 인물 칸에는 `base` 가 붙는다) · 신화 `myth-atelier-img` · 건담 `atelier` · 삼국지 `sam-atelier`) — 도트 공방이 「올릴 곳」으로 알려 준다.
 
 인물 자료 `data/sprites.json`(공방마다 하나 — 도트 공방의 「인물 칸 복사」가 이 꼴로 준다):
 

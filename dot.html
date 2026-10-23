@@ -654,8 +654,8 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     if (!window.AtelierSprite || (!session.still && !session.idle)) { $('stageBox').hidden = true; return; }
     var m = me(), have = ['still', 'idle', 'walk', 'walk4', 'react'].filter(function (k) { return session[k]; });
     var wk = session.walk4 || session.walk;   // 걷기 4칸이 있으면 그것을 재생기의 걷기로
-    var def = D.actor({ card: S.card, id: m.id || 'name', form: m.form, states: have, walk: wk && wk.walk, flip: true });
-    var view = JSON.parse(JSON.stringify(def));
+    var def = D.actor({ card: S.card, id: m.id || 'name', form: m.form, states: have, walk: wk && wk.walk, flip: true, base: A().put && A().put.base });
+    var view = JSON.parse(JSON.stringify(def)); delete view.base;
     have.forEach(function (k) { view.states[(D.STATES[k] && D.STATES[k].as) || k].file = session[k === 'walk' && session.walk4 ? 'walk4' : k].url; });
     if (actor) actor.destroy();
     $('stageBox').hidden = false;

@@ -139,7 +139,9 @@ function sourceHash() {
   /* ── 인물 칸 전체 ── */
   const act = D.actor({ id: 'x', form: 'base', states: ['still', 'walk'], walk: { speed: 60, dy: [0, 1, -1, 0, 1, -1] } });
   assert.deepEqual(Object.keys(act.states), ['still', 'walk']); assert.deepEqual(act.cell, [96, 128]); assert.deepEqual(act.foot, [48, 126]);
-  assert.equal(act.states.walk.speed, 60); assert.equal(act.flip, true);
+  assert.equal(act.states.walk.speed, 60); assert.equal(act.flip, true); assert.equal('base' in act, false);
+  /* 그림이 sprites.json 의 base 와 다른 저장소에 있으면 인물 칸에 base */
+  assert.equal(D.actor({ id: 'x', states: ['still'], base: 'https://h/pkm-atelier-img-3/sprites/' }).base, 'https://h/pkm-atelier-img-3/sprites/');
   n++;
 
   /* ── 걷기 4칸을 칸마다 따로(walk4) — 지시문 넷 · 이름 · 기록 · 재생기의 걷기 자리 · 따로 뽑은 원본 넷을 한 시트로 ── */
