@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&display=swap">
 <!--
-  첫 화면 = 공방 지도 한 장(img/map.webp 2896×2172 — 지붕을 걷어낸 큰 건물, 방 다섯). 방 자리는 ROOMS 표의 다각형(1448×1086 기준 좌표 — 그림은 그 2배라 비율로 맞는다)이고
+  첫 화면 = 공방 지도 한 장(img/map.webp 2896×2172 — 지붕을 걷어낸 큰 건물, 방 여섯 — 위 셋·아래 셋). 방 자리는 ROOMS 표의 다각형(1448×1086 기준 좌표 — 그림은 그 2배라 비율로 맞는다)이고
   SVG viewBox 가 그림 크기라 화면이 바뀌어도 같이 늘어난다. 글자는 그림에 없다 — 이름표·미리보기는 화면이 얹는다.
   방에 올리면 빛나고 이름·대표 그림이 뜬다. 누르면 지도가 그 방으로 다가가고(transform) 그 공방의 문들(하위 링크)이 보인다.
   주소에 #gundam 처럼 남아 뒤로 가기·공유가 된다. 등불이 복도를 오간다(SMIL). 지도 아래 "모든 공방" 목록은 지도가 불편한 사람·화면 읽기 프로그램의 길.
@@ -184,13 +184,13 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
 <section class="map" id="map" aria-label="공방 지도">
   <div class="stage" id="stage">
     <div class="inner" id="inner">
-      <img src="img/map.webp" alt="지붕을 걷어낸 큰 건물 안에 방 다섯 — 격납고·서재·군막·연구소·대장간" decoding="async" fetchpriority="high">
+      <img src="img/map.webp" alt="지붕을 걷어낸 큰 건물 안에 방 여섯 — 격납고·서재·군막·연구소·오락실·대장간" decoding="async" fetchpriority="high">
       <svg id="svg" viewBox="0 0 1448 1086" aria-hidden="true" focusable="false">
         <defs>
           <filter id="glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
           <filter id="lamp" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-          <!-- 복도 — 등불이 다니는 길. 그림을 바꾸면 같이 다시 긋는다 -->
-          <path id="way1" d="M 640 905 C 650 760, 640 600, 660 470 C 700 440, 800 440, 900 450 C 980 455, 1000 480, 960 500"/>
+          <!-- 복도 — 등불이 다니는 길. 그림을 바꾸면 같이 다시 긋는다(2026-10-26 오락실이 옛 복도 자리에 들어와 첫 길은 입구에서 오락실을 지나 뒤 복도로) -->
+          <path id="way1" d="M 615 905 C 630 760, 640 600, 660 470 C 700 440, 800 440, 900 450 C 980 455, 1000 480, 960 500"/>
           <path id="way2" d="M 660 470 C 640 420, 600 420, 560 410 C 480 395, 300 400, 150 420 C 280 405, 500 410, 630 430"/>
           <path id="way3" d="M 1300 560 C 1200 540, 1100 520, 980 500 C 900 480, 760 460, 690 480 C 760 500, 900 520, 1300 560"/>
         </defs>
@@ -240,15 +240,22 @@ const ROOMS = [
     desc: '위·촉·오의 장수들을 드래프트로 모아 한 진영을 짠다.',
     links: [['들어가기', '/sam-atelier/']], daily: '/sam-atelier/?daily' },
   { key: 'pokemon', name: '포켓몬 연구소', title: '포켓몬 메카 연구소', sub: '메카 의인화 · 연구소', num: '04 / LAB', c: '#f4c542', tint: '#2a2718',
-    poly: [[95, 425], [505, 440], [640, 498], [565, 778], [105, 700]], at: [330, 610],
+    poly: [[95, 425], [470, 450], [405, 748], [105, 700]], at: [280, 580],
     peek: '/pkm-atelier-img/img/thumb/피카츄_heavy_cinematic_semi_real_f.webp', cover: '/pkm-atelier-img/img/thumb/피카츄_heavy_cinematic_semi_real_f.webp',
     desc: '포켓몬을 메카로 의인화한 도감과 전투, 일곱 판 달리기, 진화 결투, 폼 결투.',
     links: [['연구소', '/pkm-atelier/'], ['도감', '/pkm-atelier/dex.html'], ['전투', '/pkm-atelier/battle.html'], ['런', '/pkm-atelier/run.html'], ['결투', '/pkm-atelier/lane.html'], ['폼 결투', '/pkm-atelier/gwent.html'], ['프롬프트', '/pkm-atelier/prompt.html']], daily: '/pkm-atelier/survey.html?daily' },
   { key: 'myth', name: '신화 무기 대장간', title: '신화 무기 공방', sub: '열한 권 · 백여든일곱 자루', num: '05 / FORGE', c: '#d9b45a', tint: '#121016',
-    poly: [[790, 548], [1342, 612], [1305, 878], [712, 830]], at: [1050, 720],
+    poly: [[950, 535], [1342, 605], [1305, 878], [885, 848]], at: [1110, 710],
     peek: '/myth-atelier-img/img/thumb/묠니르_game_keyart_f.webp', cover: '/myth-atelier-img/img/thumb/묠니르_game_keyart_f.webp',
     desc: '신화 속 무기가 사람이 되어 싸운다. 오토 배틀러·결투와 3D 박물관.',
     links: [['공방', '/myth-atelier/'], ['오토 배틀', '/myth-atelier/auto.html'], ['박물관', '/myth-atelier/museum.html'], ['도감', '/myth-atelier/dex.html'], ['드래프트', '/myth-atelier/draft.html'], ['던전', '/myth-atelier/run.html'], ['결투', '/myth-atelier/duel.html'], ['프롬프트', '/myth-atelier/prompt.html']], daily: '/myth-atelier/duel.html?daily' },
+  /* 오락실(2026-10-26) — 옛 아래 가운데 복도 자리, 앞 계단 입구가 이리로 열린다. 미리보기는 시범 그림이 올라오기 전까지 지도의 오락실 자리(img/room-game.webp).
+     오늘의 판(daily)은 결투가 붙으면 적는다 — 없으면 문 패널에 그 문을 두지 않는다 */
+  { key: 'game', name: '게임 오락실', title: '게임의 공방', sub: '게임 의인화 · 타이틀 · 중반 · 엔딩', num: '06 / ARCADE', c: '#ff6ad5', tint: '#1d1020',
+    poly: [[505, 488], [935, 528], [868, 838], [425, 785]], at: [680, 660],
+    peek: 'img/room-game.webp', cover: 'img/room-game.webp',
+    desc: '게임 한 편이 한 사람이 되고, 그 게임의 조작이 그녀의 능력이 된다. 첫 묶음 열 편과 그림 프롬프트.',
+    links: [['첫 화면', '/game-atelier/'], ['프롬프트', '/game-atelier/prompt.html']] },
 ];
 const IW = 1448, IH = 1086;
 const $ = s => document.querySelector(s);
@@ -285,7 +292,7 @@ const roomEl = k => rooms.querySelector(`.room[data-key="${k}"]`), pinEl = k => 
 const NEWS = {};   /* 방 → 그 공방 첫 화면의 Last-Modified(ms). HEAD 로 한 번 묻는다 */
 const todayText = t => !t.n ? '' : `오늘 ${t.n}판 · ${t.w}승${t.daily ? ' · 오늘의 판 ✓' : ''}`;
 const isNews = k => { const t = T.read(k); return !!(NEWS[k] && t.seen > 0 && NEWS[k] > t.seen); };
-function dailyHTML(r) { const t = T.read(r.key); return `<a class="daily" href="${r.daily}">오늘의 판${t.daily ? ' <span class="done">✓ 끝냈다</span>' : ''}</a>`; }
+function dailyHTML(r) { if (!r.daily) return ''; const t = T.read(r.key); return `<a class="daily" href="${r.daily}">오늘의 판${t.daily ? ' <span class="done">✓ 끝냈다</span>' : ''}</a>`; }
 function statusText(r) {
   const t = T.read(r.key), life = T.record(r.key), parts = [];
   if (t.n) parts.push(todayText(t));

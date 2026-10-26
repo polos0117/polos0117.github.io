@@ -218,14 +218,14 @@ const SIZES = [['344', { width: 344, height: 882 }, true], ['390', { width: 390,
       await noOverflow(b.p, name + ' 저장 막힘'); assert.deepEqual(b.errors, [], name + ' 저장이 막혀도 오류 없음');
       await b.ctx.close();
     }
-    /* 공방 지도 — 머리의 「즐겨찾기 n」 · 목록 아래 줄. 목록의 공방 줄(.card)은 그대로 다섯 */
+    /* 공방 지도 — 머리의 「즐겨찾기 n」 · 목록 아래 줄. 목록의 공방 줄(.card)은 그대로 여섯 */
     for (const [name, vp, mobile] of [SIZES[1], SIZES[2], SIZES[4]]) {
       const { ctx, p, errors } = await page(vp, mobile, { seed: SEED });
       await p.goto(BASE + '/'); await p.waitForSelector('.room');
       assert.equal(await p.locator('#fav-link').textContent(), '즐겨찾기 8', name + ' 머리의 즐겨찾기 수');
       assert.equal(await p.locator('#fav-link').getAttribute('href'), 'favorites.html');
       assert.equal(await p.locator('#fav-all').getAttribute('href'), 'favorites.html'); assert.match(await p.locator('#fav-all').textContent(), /내 즐겨찾기.*8장/, name + ' 목록 아래 줄');
-      assert.equal(await p.locator('.card').count(), 5, name + ' 공방 줄은 다섯 그대로');
+      assert.equal(await p.locator('.card').count(), 6, name + ' 공방 줄은 여섯 그대로');
       const r = await p.locator('#fav-link').boundingBox(); assert(r.height >= 44, name + ' 머리 링크 누르는 자리');
       await noOverflow(p, name + ' 지도');
       await p.locator('#fav-all').click(); await p.waitForURL(/favorites\.html/); await p.waitForSelector('.tile');

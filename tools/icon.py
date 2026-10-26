@@ -1,13 +1,13 @@
-# 허브 아이콘 — 지붕을 걷어낸 건물 블록, 방 다섯(지도와 같은 위 셋·아래 둘)에 공방 빛.
+# 허브 아이콘 — 지붕을 걷어낸 건물 블록, 방 여섯(지도와 같은 위 셋·아래 셋)에 공방 빛.
 # 512 정사각, 바깥 꼭짓점이 maskable 안전 원(반지름 40%) 안에 든다.
 import math
-C=[('#7fb3ff'),('#e39b6b'),('#c9a227'),('#f4c542'),('#e0703a')]
+C=[('#7fb3ff'),('#e39b6b'),('#c9a227'),('#f4c542'),('#ff6ad5'),('#e0703a')]
 cx,cy,a,bb,h=256,186,30,17.5,50
 U,V=6,4.4
 def P(u,v,z=0): return (cx+(u-v)*a, cy+(u+v)*bb - z)
 def pts(l): return ' '.join(f'{x:.1f},{y:.1f}' for x,y in l)
 def poly(l,**k): return '<polygon points="%s" %s/>'%(pts(l),' '.join(f'{kk.replace("_","-")}="{vv}"' for kk,vv in k.items()))
-rooms=[(0,0,2,2.2),(2,0,4,2.2),(4,0,6,2.2),(0,2.2,3,4.4),(3,2.2,6,4.4)]
+rooms=[(0,0,2,2.2),(2,0,4,2.2),(4,0,6,2.2),(0,2.2,2,4.4),(2,2.2,4,4.4),(4,2.2,6,4.4)]
 defs=['<radialGradient id="bg" cx="50%" cy="48%" r="62%"><stop offset="0" stop-color="#2a221c"/><stop offset=".55" stop-color="#16141a"/><stop offset="1" stop-color="#0f0e12"/></radialGradient>',
  '<filter id="blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="14"/></filter>',
  '<filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="2.2"/></filter>',
