@@ -130,7 +130,8 @@ const server = http.createServer((q, s) => {
         return F.ready().then(() => { r.floorGrow = floorFits(); r.floorMin = document.getElementById('floor').style.minHeight; return r; });
       });
     });
-    assert.ok(Math.abs(grown.unit - 3 / 2.625) < 1e-9, '폴드에서 도트 한 칸 = 3화소 ' + grown.unit);
+    const fine = data => { const d = data.actors.alice.dot; return d > 0 && d < 1 ? d : 1; }, fa = fine(JSON.parse(fs.readFileSync(path.join(SIB, 'book-atelier/data/sprites.json'), 'utf8')));
+    assert.ok(Math.abs(grown.unit - 3 / 2.625 * fa) < 1e-9, '폴드에서 도트 한 칸 = 3화소(dot ' + fa + ' 만큼 잘게) ' + grown.unit);
     assert.equal(grown.mount, true, 'mount 는 기본으로 무대를 늘린다');
     assert.equal(grown.after, '', '인물을 치우면 늘린 높이도 치운다');
     assert.equal(grown.off, false, 'grow:false 면 그대로(이 배율에서는 머리가 잘린다)');

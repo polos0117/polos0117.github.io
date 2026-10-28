@@ -1,5 +1,6 @@
 /* 도트 재생기 v3 (2026-10-28) — 도트 인물을 작은 공간에서 움직인다(대기·걷기·고르기 반응). 한 명(create · 카드로 mount) · 여러 명의 바닥(floor) · 뛰쳐나오기(popOut).
    v3: 인물 칸의 dot(도트 한 칸이 보통 인물의 몇 배인가 — 4K 인물 칸 192×256 은 0.5)로 잘게 찍은 인물도 같은 화면 크기로 선다.
+       floor 는 카드마다 한 명 — 같은 카드의 다른 도트(alice 와 alice_classic)는 자료에서 앞선 것만 세운다.
    원본은 polos0117.github.io/sprite-actor.js(모양은 sprite-actor.css) — 다섯 공방 저장소의 lib/ 에 글자 하나 다르지 않게 복사해 둔다
    (고치면 여섯 곳을 같이 — 각 저장소의 tests/sprite-actor-copy.cjs 가 옆에 받아 둔 원본과 견준다).
    약속(sprites.json 꼴 · API)은 polos0117.github.io/README.md 「도트 재생기」절. 인물의 그림은 도트 공방(dot.html)에서 만든다.
@@ -280,7 +281,12 @@
      돌려주는 것 { list() → [{key, actor}], ready() → Promise, pause(까닭), resume(까닭), destroy() }. 인물이 없으면 빈 바닥(아무것도 안 붙인다) */
   function floor(host, data, opts) {
     opts = opts || {};
-    var all = keysOf(data).filter(function (k) { return !opts.keys || opts.keys.indexOf(cardKey(k, data.actors[k])) >= 0; }).sort();
+    /* 카드마다 한 명 — 같은 카드의 다른 도트(alice 와 alice_classic)는 자료에서 앞선 것만 */
+    var seen = {}, all = keysOf(data).filter(function (k) {
+      var ck = cardKey(k, data.actors[k]);
+      if (seen[ck] || (opts.keys && opts.keys.indexOf(ck) < 0)) return false;
+      seen[ck] = true; return true;
+    }).sort();
     var list = [], count = -1, reasons = {}, dead = false, ro = null;
     function want() {
       var w = host.clientWidth || 0, n = typeof opts.count === 'function' ? opts.count(w) : opts.count || (w < 560 ? 2 : 3);
