@@ -125,7 +125,7 @@
 
   /* ── 원본 번호 — 그림 저장소의 기록(records/sprites/<이름>/<상태>.json, 판 붙은 <상태>_v2.json …)에 적힌 원본 파일에서 가장 큰 gen.
      새 기록은 generation.file 또는 generation.files[].file(걷기 4칸), 앞선 book 기록은 generations[].file. 없으면 0 ── */
-  var RECORD_VERSIONS = ['', '_v2', '_v3', '_v4'];
+  var RECORD_VERSIONS = ['', '_v2', '_v3', '_v4', '_4k'];   // _4k — 4K 시험 한 벌(앨리스)
   function recordPaths(id, state) { return RECORD_VERSIONS.map(function (v) { return 'records/sprites/' + id + '/' + state + v + '.json'; }); }
   function recordedGen(docs, id, form, state) {
     var re = new RegExp('^' + id.replace(/[^a-z0-9_]/g, '') + '_' + (form || 'base').replace(/[^a-z0-9_]/g, '') + '_' + state + '(?:_[1-4])?_gen(\\d+)\\.png$'), top = 0;
@@ -341,6 +341,8 @@
     /* card — 그 공방 그림 등록부의 열쇠(공용 재생기의 actorFor 가 이것으로 찾는다 — 도감 상세·캡슐·책 펼치기) */
     var cv = (CANVAS[o.canvas] || CANVAS[SIZE]).clean;
     var e = { id: o.id, form: o.form || 'base', cell: (o.cell || cv.sheet.cell).slice(), foot: (o.foot || cv.foot).slice(), scale: 1, flip: o.flip !== false, facing: 'right', states: states };
+    /* dot — 칸이 보통(128줄)보다 크면 그만큼 잘게 찍은 것: 재생기 v3 가 화면 크기를 같게 맞춘다(4K 192×256 → 0.5) */
+    if (e.cell[1] !== CELL[1]) e.dot = +(CELL[1] / e.cell[1]).toFixed(3);
     if (o.card) e = Object.assign({ card: o.card }, e);
     /* base — 그림이 sprites.json 의 base 와 다른 저장소에 있을 때(포켓몬: 새 인물은 img-3) */
     if (o.base) e.base = o.base;

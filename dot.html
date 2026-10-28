@@ -336,7 +336,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
 <footer>polos0117 · 도트 공방 · 정리 셈은 rust/dot-core (book-atelier 파이썬 도구와 같은 화소)</footer>
 
 <script src="dot/dot.js?v=9"></script>
-<script src="sprite-actor.js?v=3"></script>
+<script src="sprite-actor.js?v=4"></script>
 <script>
 (function () {
   'use strict';
@@ -619,13 +619,13 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     k = recKey(); if (recGen[k]) return;
     var id = m.id, form = m.form || 'base', state = S.state, here = { n: 0, unknown: false, loading: true };
     recGen[k] = here;
-    /* 차례로 — <상태>.json, 그다음 _v2 · _v3 …, 처음 없는 판에서 멈춘다(없는 판을 줄줄이 묻지 않게).
-       기본 기록이 없어도 _v2 는 한 번 본다. 기본 기록을 못 읽으면(404 가 아닌 실패) unknown */
+    /* 차례로 — <상태>.json, _v2 · _v3 · _v4 · _4k. 없는 판(404)은 건너뛴다(앨리스 정지는 still.json 과 still_4k.json 만 있다).
+       기본 기록을 못 읽으면(404 가 아닌 실패) unknown */
     var paths = D.recordPaths(id, state), docs = [];
     here.ready = (function next(i) {
       if (i >= paths.length) return Promise.resolve(docs);
       return fetch('/' + put.repo + '/' + paths[i], { cache: 'no-cache' }).then(function (r) {
-        if (r.status === 404) return i === 0 ? next(1) : docs;
+        if (r.status === 404) return next(i + 1);   // 없는 판은 건너뛴다 — _v2 가 없어도 _4k 는 있을 수 있다
         if (!r.ok) throw new Error(r.status);
         return r.json().then(function (d) { docs.push(d); return next(i + 1); });
       }).catch(function () { if (i === 0) here.unknown = true; return docs; });

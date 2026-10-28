@@ -166,7 +166,7 @@ target/release/dot stride alice_begin_walk.png --cell 192x256 --ms 200
 - **원본 PNG 받기**: `dot.html` 의 `tabRaw()` — ③ 의 지금 탭 원본(`rawBy[S.state]`, 걷기 4칸은 `raws[S.frame-1]`). 단추도 그 탭에 원본이 있을 때만 보인다.
   `tests/dot-screen.cjs`: 「한꺼번에」 뒤 대기·걷기·반응 탭마다 받은 원본의 이름 = 그 탭 ③ 의 원본 이름, 바이트 = 흉내 API 가 그 상태에 돌려준 PNG.
 - **원본 번호**: `dot.js` 의 `recordPaths(이름, 상태)`(`<상태>.json`, `_v2` … `_v4`) · `recordedGen(기록들, 이름, 폼, 상태)`(새 꼴 `generation.file`·`generation.files[]`, 앞선 book 꼴 `generations[]` 의 원본 파일에서 `<이름>_<폼>_<상태>(_칸)_gen<N>.png` 의 가장 큰 N).
-  화면은 같은 출처 `/<그림 저장소>/records/sprites/…` 를 차례로 읽다가 처음 없는 판에서 멈춘다(기본이 없어도 `_v2` 는 한 번). 404 는 "기록 없음"(0), 그 밖의 실패는 "못 읽음" — 1 부터 세고 「지금 할 일」에 "원본 번호는 올릴 때 확인".
+  화면은 같은 출처 `/<그림 저장소>/records/sprites/…` 를 차례로 읽는다(`<상태>.json` · `_v2` · `_v3` · `_v4` · `_4k` — 없는 판은 건너뛴다, 2026-10-28 앨리스 4K 한 벌 뒤 고침). 404 는 "기록 없음"(0), 그 밖의 실패는 "못 읽음" — 1 부터 세고 「지금 할 일」에 "원본 번호는 올릴 때 확인".
   읽는 동안은 「그린다」를 막고, 「한꺼번에」는 탭을 옮긴 뒤 읽기를 기다렸다가 그린다(처음엔 반응이 gen1 로 붙는 걸 검사가 잡았다).
   앨리스 기록으로: 정지 gen3 · 대기 gen2 · 걷기 gen3(`walk.json` gen1 + `walk_v2.json` gen2) · 반응 gen2.
 - **본보기 문장**: ① 의 체크박스 둘 — 「같은 공방의 다른 인물」(앞 문장) / 「이 인물의 확정 도트」(`sampleSelf` — "Attached image N is this same character's approved sprite: match its pixel size, outline, shading and proportions exactly.", 첨부 `self_x6` = ③ 정지 도트 6배). 하나만 고른다. 「그린다」는 ③ 에 정지 도트가 없으면 뺀다.
@@ -211,3 +211,17 @@ target/release/dot stride alice_begin_walk.png --cell 192x256 --ms 200
 230줄 인물에 scale 0.5 를 주면 PC(화소비 1)에서는 round(0.5) 로 230px(두 배), 화소비 2 폰에서는 실제 1화소라 도트가 안 보이고, 화소비 3 폰에서는 2화소 154px(바닥 띠 160 에 간당).
 옮기려면 재생기에 "반 칸 모드"(화소비가 낮은 기기용 121줄 사본, 또는 2:1 로 줄여 그리기)를 먼저 설계한다. 위 ②·③ 을 보고 사용자가 정한다.
 
+
+## 9. 앨리스 4K 한 벌 — 올렸다 (2026-10-28, 열쇠가 든 세션에서)
+
+사용자 결정 "앨리스 4K 한 벌 먼저". 7절 그대로 node 에서 `dot/dot.js` 의 `prompt`·`generate` 와 `dot.wasm` 으로 — 정지 한 장, 그 정지 도트 6배를 첨부해 대기·걷기·반응 셋을 나란히.
+4K · `gpt-image-2.5-sunburst` · medium, 장마다 출력 이미지 토큰 865, 35~39초.
+
+- 정지: 원본 `sprites/alice/raw/alice_begin_still_gen3.png` → 격자 찾기(간격 10~24)가 **16.0px**, 인물 92×230(윤곽 포함), 칸 192×256, 24색 → `sprites/alice/alice_begin_still_4k.png`.
+- 시트: 줄 수 = 정지 도트 키 230 − 2 = 228, 쪼가리 150, 칸 192×256. 대기 4칸 94~95×228 · 걷기 6칸 82~94×226~230 · 반응 4칸 94~104×217~231.
+  걷기 `bob --bob 2` dy `[-0.33, 2, -1.33, -1.33, 0.67, -0.33]`, 보폭 78 → 빠르기 130. **이번엔 다리가 번갈아 나왔다**(1칸 무늬 다리 앞 · 4칸 민 다리 앞) — 손보기 없이 그대로.
+- 기록 `records/sprites/alice/{still,idle,walk,react}_4k.json`(canvas · cell · 지시문 · 첨부 · 토큰 · 초). 원본 번호는 기록의 다음부터(정지 gen3 · 대기 gen2 · 걷기 gen3 · 반응 gen2) — `RECORD_VERSIONS` 에 `_4k` 를 더하고 없는 판은 건너뛰게 고쳐 화면도 이 기록을 센다(다음은 정지 gen4 · 걷기 gen4 · 대기·반응 gen3).
+- 그림 저장소 커밋 `571ec85`. 지금 121줄 앨리스는 그대로.
+- **재생기 v3** — 인물 칸의 `dot`(도트 한 칸이 보통 인물의 몇 배인가, 4K 0.5): 실제 화소 정수배에 dot 을 곱해 CSS 크기를 같게(96×128). 화소비 1 에선 반 화소(브라우저가 줄여 그린다), 2 에선 1화소, 3 에선 1.5화소 — 크기를 맞추는 쪽을 골랐다(④ 의 "반 칸 모드"가 이것). `actor()` 가 192×256 칸이면 `dot: 0.5` 를 넣는다. 여섯 곳 복사.
+- book-atelier `data/sprites.json` 에 `alice_4k`(book alice · dot 0.5 · 걷기 130), 낱말 `sprite.name.alice_4k`. 서재 바닥(인물 수를 셀 때 칸 폭에 dot 을 곱한다)·진열실(`sprite.html?who=alice_4k`)·도감 상세(alice 가 먼저 — 4K 는 진열실에서)에서 지금 앨리스와 나란히 본다.
+- 남은 결정(5절): 이 둘을 보고 공방 인물 전체를 4K 로 옮길지. 옮기면 손자·춘향도 같은 길(한 벌 넷 ≈ 출력 3,460 토큰).

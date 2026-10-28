@@ -1,4 +1,5 @@
-/* 도트 재생기 v2 (2026-10-22) — 도트 인물을 작은 공간에서 움직인다(대기·걷기·고르기 반응). 한 명(create · 카드로 mount) · 여러 명의 바닥(floor) · 뛰쳐나오기(popOut).
+/* 도트 재생기 v3 (2026-10-28) — 도트 인물을 작은 공간에서 움직인다(대기·걷기·고르기 반응). 한 명(create · 카드로 mount) · 여러 명의 바닥(floor) · 뛰쳐나오기(popOut).
+   v3: 인물 칸의 dot(도트 한 칸이 보통 인물의 몇 배인가 — 4K 인물 칸 192×256 은 0.5)로 잘게 찍은 인물도 같은 화면 크기로 선다.
    원본은 polos0117.github.io/sprite-actor.js(모양은 sprite-actor.css) — 다섯 공방 저장소의 lib/ 에 글자 하나 다르지 않게 복사해 둔다
    (고치면 여섯 곳을 같이 — 각 저장소의 tests/sprite-actor-copy.cjs 가 옆에 받아 둔 원본과 견준다).
    약속(sprites.json 꼴 · API)은 polos0117.github.io/README.md 「도트 재생기」절. 인물의 그림은 도트 공방(dot.html)에서 만든다.
@@ -7,6 +8,7 @@
    지키는 것:
    - 그리기는 시트 한 장의 background-position 과 transform 뿐 — 루프 안에서 배치를 읽지 않는다(공간 폭은 ResizeObserver 가 미리).
    - 선명하게: 도트 한 칸 = 실제 화소의 정수배. CSS 크기는 devicePixelRatio 로 나눠 정하고, 자리도 실제 화소에 맞춘다.
+     dot 이 1 아래인 인물(4K, 0.5)은 그 정수배를 dot 배 한 것이라 화소비 1 에서는 반 화소(브라우저가 줄여 그린다), 3 에서는 1.5화소 — 크기를 맞추는 쪽을 골랐다.
    - 움직임 끔(AtelierMotion — scene-motion.js 의 atelier_motion_v1·동작 줄이기, 없으면 동작 줄이기만)이면 대기 첫 칸에 멈춰 선다. 고르기는 그래도 된다.
    - 숨은 탭·화면 밖·pause() 면 루프가 쉰다(대기 시간도 같이 멈춘다). 감상 창(dialog) 뒤에서 쉬게 하는 것은 부르는 쪽이 pause/resume.
    - 고르기는 반응이 끝나기를 기다리지 않는다 — onSelect 를 바로 부른다. 반응이 도는 동안 다시 누른 것은 버린다(두 번 열리지 않게).
@@ -42,7 +44,7 @@
 
   /* host — position:relative 인 공간. def — sprites.json 의 인물 하나. opts:
      base(그림 주소 앞), label(누르는 이름), points([왼쪽, 오른쪽] 공간 폭의 비율 0~1), start(처음 자리 0 또는 1),
-     idleMs([최소, 최대] 걷기 전 서 있는 시간), seed, scale(도트 한 칸의 CSS 배율, 기본 def.scale), floor(공간 바닥에서 발까지 CSS px),
+     idleMs([최소, 최대] 걷기 전 서 있는 시간), seed, scale(도트 한 칸의 CSS 배율, 기본 def.scale — def.dot 이 있으면 그만큼 곱한다), floor(공간 바닥에서 발까지 CSS px),
      fit(참이면 공간 높이에 들어가게 배율을 낮춘다 — 그래도 실제 화소 정수배),
      grow(참이면 공간의 min-height 를 늘려 머리(걷기 오르내림 2칸 더)까지 들어가게 — 화소 배율이 정수가 아니면(폴드 2.625 → 3화소 = 1.14배,
        노트북 150% → 2화소 = 1.33배) 도트가 scale 보다 커진다. 같은 공간의 여럿은 가장 큰 쪽. 배율이 바뀌면 다시 잰다),
@@ -75,7 +77,7 @@
       at: opts.start ? 1 : 0, x: 0, target: null, march: 0, facing: def.facing || 'right',
       paused: {}, width: 0, unit: 1, dpr: 1, raf: 0, last: 0, dead: false, sheets: {}
     };
-    var scale = opts.scale || def.scale || 2;
+    var scale = opts.scale || def.scale || 2, fine = def.dot > 0 && def.dot < 1 ? def.dot : 1;   // dot — 잘게 찍은 인물(4K 0.5)은 칸이 커도 화면 크기는 같게
 
     function has(name) { return !!A.sheets[name]; }
     function order(name) { return (S[name] && S[name].order) || [0]; }
@@ -87,8 +89,8 @@
     function measure() {
       A.dpr = root.devicePixelRatio || 1;
       var n = Math.max(1, Math.round(scale * A.dpr)), room = opts.fit ? host.clientHeight - (opts.floor || 0) - 4 : Infinity;
-      while (n > 1 && cell[1] * n / A.dpr > room) n -= 1;   // 낮은 공간(휴대폰 가로)에서는 들어가는 가장 큰 정수배로
-      A.unit = n / A.dpr;
+      while (n > 1 && cell[1] * n / A.dpr * fine > room) n -= 1;   // 낮은 공간(휴대폰 가로)에서는 들어가는 가장 큰 정수배로
+      A.unit = n / A.dpr * fine;
       el.style.setProperty('--sprite-px', A.unit + 'px');
       el.style.width = cell[0] * A.unit + 'px'; el.style.height = cell[1] * A.unit + 'px';
       body.style.width = cell[0] * A.unit + 'px'; body.style.height = cell[1] * A.unit + 'px';

@@ -136,7 +136,7 @@ API(`window.AtelierFavorites`): `has(a, file)` · `toggle(칸)` → 담겼으면
 | 칸 | 값 |
 |---|---|
 | `base` | 그림 주소 앞(예: `https://polos0117.github.io/book-atelier-img/sprites/`) — 그림은 그 공방의 그림 저장소 `sprites/`(`img/` 밖) |
-| `actors.<열쇠>` | 인물 하나: `cell`([96, 128]) · `foot`(발 기준선 [48, 126]) · `scale`(1) · `flip`(좌우 뒤집어 걸어도 되나) · `facing`('right') · `states` · 그 밖의 칸(책 `book`·`form` 처럼)은 공방이 쓴다 |
+| `actors.<열쇠>` | 인물 하나: `cell`([96, 128]) · `foot`(발 기준선 [48, 126]) · `scale`(1) · `dot`(도트 한 칸이 보통 인물의 몇 배인가 — 없으면 1, 4K 인물(칸 192×256)은 0.5: 두 배 잘게 찍었으니 화면 크기는 같게 선다. 화소비 1 에선 반 화소라 브라우저가 줄여 그리고 3 에선 1.5화소 — 크기를 맞추는 쪽을 골랐다, v3) · `flip`(좌우 뒤집어 걸어도 되나) · `facing`('right') · `states` · 그 밖의 칸(책 `book`·`form` 처럼)은 공방이 쓴다 |
 | `states.still` | `{file, frames: 1}` — 정지 도트 |
 | `states.idle` · `react` | `{file, frames: 4, order, ms}` — 칸 차례와 칸마다 시간(ms). 반응이 끝나면 대기로 |
 | `states.walk` | `{file, frames: 6, order, ms, speed, dy}` — speed 는 도트 화소/초(접지 칸 발 폭 ÷ 반 주기 — 발이 미끄러지지 않게), dy 는 칸마다 위아래(+ 는 아래) |
