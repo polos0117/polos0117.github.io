@@ -349,14 +349,16 @@
     return e;
   }
 
-  /* ── 다섯 공방의 그림 목록 — 같은 출처(polos0117.github.io)라 각 공방의 자료를 그대로 읽는다 ── */
+  /* ── 여섯 공방의 그림 목록 — 같은 출처(polos0117.github.io)라 각 공방의 자료를 그대로 읽는다 ── */
   var ATELIERS = [
     /* put — 정리본을 올릴 그림 저장소(sprites/<이름>/)와 인물 칸을 넣을 자료(sprites.json 의 actors). base — 그 저장소가 sprites.json 의 base 와 다르면 인물 칸에 넣을 그림 주소 앞 */
     { key: 'book', name: '책', data: '/book-atelier/data/img.json', names: '/book-atelier/data/book-design.json', bases: ['/book-atelier-img/img/'], subject: 'woman', put: { repo: 'book-atelier-img', data: 'book-atelier/data/sprites.json' } },
     { key: 'pkm', name: '포켓몬', data: '/pkm-atelier/data/img.json', names: '/pkm-atelier/data/card.json', bases: ['/pkm-atelier-img/img/', '/pkm-atelier-img-2/img/', '/pkm-atelier-img-3/img/'], subject: 'woman', put: { repo: 'pkm-atelier-img-3', data: 'pkm-atelier/data/sprites.json', base: 'https://polos0117.github.io/pkm-atelier-img-3/sprites/' } },
     { key: 'myth', name: '신화 무기', data: '/myth-atelier/data/img.json', names: '/myth-atelier/data/card.json', bases: ['/myth-atelier-img/img/'], subject: 'woman', put: { repo: 'myth-atelier-img', data: 'myth-atelier/data/sprites.json' } },
     { key: 'gundam', name: '건담', data: '/atelier/data/img.json', bases: ['/atelier/img/'], subject: 'woman', put: { repo: 'atelier', data: 'atelier/data/sprites.json' } },
-    { key: 'samguk', name: '삼국지', data: '/sam-atelier/images/manifest.json', bases: ['/sam-atelier/'], subject: 'person', noThumb: true, put: { repo: 'sam-atelier', data: 'sam-atelier/data/sprites.json' } }
+    { key: 'samguk', name: '삼국지', data: '/sam-atelier/images/manifest.json', bases: ['/sam-atelier/'], subject: 'person', noThumb: true, put: { repo: 'sam-atelier', data: 'sam-atelier/data/sprites.json' } },
+    /* 게임(2026-10-28) — 설계표의 games 가 이름(title)·열쇠(key = 영문 열쇠 그대로 id). 도트는 game-atelier-img 의 sprites/ 로 */
+    { key: 'game', name: '게임', data: '/game-atelier/data/img.json', names: '/game-atelier/data/game-design.json', bases: ['/game-atelier-img/img/'], subject: 'woman', put: { repo: 'game-atelier-img', data: 'game-atelier/data/sprites.json' } }
   ];
 
   /* 자리 표시 — byStyle·byForm 같은 칸 이름과 화풍 이름은 빼고 폼·컷만("begin · f", "casual · f · 2") */
@@ -383,7 +385,7 @@
   function cards(at, doc, namesDoc) {
     var A = typeof at === 'string' ? ATELIERS.filter(function (x) { return x.key === at; })[0] : at, out = [];
     var en = {}, title = {};
-    if (namesDoc && namesDoc.books) namesDoc.books.forEach(function (b) { title[b.key] = b.title; en[b.key] = b.key; });
+    (namesDoc && (namesDoc.books || namesDoc.games) || []).forEach(function (b) { title[b.key] = b.title; en[b.key] = b.key; });   // 책·게임 설계표 — 열쇠가 곧 영문 id
     /* 카드 자료의 영어 이름 — pkm 은 cards: {갈래: [카드]}, myth 는 cards: [카드] */
     var cs = namesDoc && namesDoc.cards, lists = Array.isArray(cs) ? [cs] : cs ? Object.keys(cs).map(function (k) { return cs[k]; }) : [];
     lists.forEach(function (l) { (Array.isArray(l) ? l : []).forEach(function (c) { if (c && c.name && c.en) en[c.name] = c.en; }); });

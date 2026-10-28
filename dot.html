@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>도트 공방</title>
-<meta name="description" content="다섯 공방의 인물을 도트로 — 인물을 고르고, GPT 에 줄 지시문을 받고, 받은 그림을 이 브라우저에서 정리한다.">
+<meta name="description" content="여섯 공방의 인물을 도트로 — 인물을 고르고, GPT 에 줄 지시문을 받고, 받은 그림을 이 브라우저에서 정리한다.">
 <meta name="theme-color" content="#0f0e12">
 <link rel="icon" href="icon-192.png">
 <link rel="manifest" href="app.webmanifest">
@@ -17,7 +17,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&display=swap">
 <link rel="stylesheet" href="sprite-actor.css?v=2">
 <!--
-  도트 공방 — 다섯 공방(책·포켓몬·신화 무기·건담·삼국지)이 같이 쓰는 도트 인물 만들기. README 「도트 공방」.
+  도트 공방 — 여섯 공방(책·포켓몬·신화 무기·건담·삼국지·게임)이 같이 쓰는 도트 인물 만들기. README 「도트 공방」.
   ① 인물: 공방을 고르면 그 공방의 그림 등록부(/<공방>/data/img.json — 같은 출처라 그대로 읽는다)에서 인물 목록, 고르면 그 인물의 그림들.
      정본·의상 그림을 짚고, 영문 이름·폼·생김새 한 줄을 적는다.
   ② 지시문: 상태(정지·대기·걷기·반응)마다 GPT 이미지 생성에 그대로 줄 요청문과 첨부 차례. 정지 도트 6배·다리 자세 안내 그림을 여기서 받는다.
@@ -25,7 +25,7 @@
      이때만 첨부와 지시문이 OpenAI 로 간다. 마음에 안 들면 「다시」(원본 번호 gen1·gen2… 가 올라간다).
   ③ 정리: 받은 원본 PNG 를 dot/dot.wasm(rust/dot-core — book-atelier 파이썬 도구와 같은 셈, 화소 하나 다르지 않다)으로 정리해
      미리 보고 재생하고, 정리본 PNG · 기록 JSON · sprites.json 칸을 받는다. 정리는 이 브라우저 안에서만 — 올리기는 세션이 한다.
-     무대: 이번에 정리한(또는 넣은) 상태들을 모아 공용 재생기(sprite-actor.js — 다섯 공방이 같은 파일)로 공방에서처럼 세운다. 인물 칸 전체도 받는다.
+     무대: 이번에 정리한(또는 넣은) 상태들을 모아 공용 재생기(sprite-actor.js — 여섯 공방이 같은 파일)로 공방에서처럼 세운다. 인물 칸 전체도 받는다.
   고른 값은 이 기기에만 남는다(atelier_dot_v1). 주소 ?a=book&c=alice&s=walk 로 바로 연다.
 -->
 <style>
@@ -203,7 +203,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   <a class="home" href="./">공방 모음</a>
 </header>
 <main class="wrap">
-  <p class="lede">다섯 공방의 인물을 도트로. <b>① 인물을 고르고 ② 정지 → 대기 → 걷기 → 반응 차례로 「그린다」 ③ 「정리하기」 → 「다음」, 넷 다 되면 「받기」.</b>
+  <p class="lede">여섯 공방의 인물을 도트로. <b>① 인물을 고르고 ② 정지 → 대기 → 걷기 → 반응 차례로 「그린다」 ③ 「정리하기」 → 「다음」, 넷 다 되면 「받기」.</b>
     위 「지금 할 일」이 다음 단추를 알려 준다. 정리는 이 브라우저 안에서만(「그린다」만 첨부와 지시문을 OpenAI 로 보낸다) — 저장소에 올리기는 세션이 검토한 뒤에 한다.</p>
 
   <section class="step" id="s1" aria-labelledby="s1h">
@@ -341,7 +341,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
 (function () {
   'use strict';
   var D = window.AtelierDot, $ = function (id) { return document.getElementById(id); };
-  var COLORS = { gundam: '#7fb3ff', book: '#e39b6b', samguk: '#c9a227', pkm: '#f4c542', myth: '#d9b45a' };
+  var COLORS = { gundam: '#7fb3ff', book: '#e39b6b', samguk: '#c9a227', pkm: '#f4c542', myth: '#d9b45a', game: '#8fd19e' };
   var STATE_TAB = { still: '정지', idle: '대기', walk: '걷기', walk4: '걷기 4칸(따로)', react: '반응' };
   var FRAME_NOTE = ['접지(가까운 다리가 앞)', '지나감(가까운 다리로 서고 먼 다리가 앞으로)', '거울 접지(먼 다리가 앞)', '거울 지나감(먼 다리로 서고 가까운 다리가 앞으로)'];
   var KEY = 'atelier_dot_v1';

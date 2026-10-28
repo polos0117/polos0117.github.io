@@ -2,7 +2,7 @@
    - wasm 이 소스보다 묵지 않았나: wasm 안의 source_hash 와 rust/ 소스를 같은 규칙으로 셈한 값(rust/dot-wasm/build.rs)
    - book 서재 세 인물: 그림 저장소(../book-atelier-img)의 기록(records/sprites/<인물>/<상태>.json)마다 원본을 같은 인자로 다시 정리해
      올린 정리본과 화소 하나 다르지 않다 — 정지 셋 · 대기 셋 · 걷기 셋 · 반응 셋, 걷기 v2 의 dy·빠르기는 book 의 data/sprites.json 과 같다
-   - 지시문 · 요청문 · 파일 이름 · 기록 · sprites.json 칸 · 공방 그림 목록(옆에 저장소가 있으면 다섯 공방 실제 자료로) */
+   - 지시문 · 요청문 · 파일 이름 · 기록 · sprites.json 칸 · 공방 그림 목록(옆에 저장소가 있으면 여섯 공방 실제 자료로) */
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict');
 const ROOT = path.resolve(__dirname, '..');
 const D = require('../dot/dot.js');
@@ -301,9 +301,9 @@ function sourceHash() {
     n += 3;
   }
 
-  /* ── 도트 재생기 복사본 — 옆에 받아 둔 다섯 공방 저장소의 lib/sprite-actor.{js,css} 가 여기 원본과 같다 ── */
+  /* ── 도트 재생기 복사본 — 옆에 받아 둔 여섯 공방 저장소의 lib/sprite-actor.{js,css} 가 여기 원본과 같다 ── */
   const copies = [];
-  for (const repo of ['atelier', 'pkm-atelier', 'myth-atelier', 'book-atelier', 'sam-atelier']) {
+  for (const repo of ['atelier', 'pkm-atelier', 'myth-atelier', 'book-atelier', 'sam-atelier', 'game-atelier']) {
     for (const f of ['sprite-actor.js', 'sprite-actor.css']) {
       const p = path.join(ROOT, '..', repo, 'lib', f);
       if (!fs.existsSync(path.join(ROOT, '..', repo))) continue;
@@ -322,7 +322,7 @@ function sourceHash() {
     if (!doc) continue;
     const nm = A.names ? near(dir, A.names.split('/').slice(2).join('/')) : null;
     const list = D.cards(A, doc, nm);
-    assert(list.length > 10, A.key + ' 인물 목록');
+    assert(list.length > (A.key === 'game' ? 0 : 10), A.key + ' 인물 목록');   // 게임은 아직 그림이 적다
     assert(list.every(c => c.files.length && c.files.every(f => f.url.startsWith(A.bases[0].split('/').slice(0, 2).join('/')))), A.key + ' 주소');
     seen.push(A.key + ' ' + list.length);
     if (A.key === 'book') { const al = list.find(c => c.key === 'alice'); assert.equal(al.id, 'alice'); assert.equal(al.name, '이상한 나라의 앨리스'); assert(al.files.some(f => f.file === 'alice_end_literary_fantasy_f.webp')); }
