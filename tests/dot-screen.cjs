@@ -157,12 +157,15 @@ const server = http.createServer((q, s) => {
     await page.waitForFunction(() => !document.getElementById('draw').disabled);
     assert.equal(await page.evaluate(() => document.getElementById('setup').open || document.getElementById('byhand').open), false, '한 번 그렸으면 열쇠 칸·파일 칸이 접힌다');
     await page.click('#setup summary');
-    await page.selectOption('#model', 'gpt-image-2.5-flare'); await page.selectOption('#quality', 'low');
+    await page.selectOption('#model', 'gpt-image-2.5-flare'); await page.selectOption('#quality', 'low'); await page.selectOption('#size', '2160x3840');
+    assert((await page.inputValue('#req')).includes('cell 720 x 1920'), '크기를 바꾸면 지시문의 칸도');
     await page.click('#draw'); await page.waitForFunction(() => /alice_begin_walk_gen1\.png/.test(document.getElementById('rawName').textContent), null, { timeout: 20000 });
     const c3 = genCalls[2];
     assert.deepEqual(c3.images, ['alice_begin_still_x6.png', 'walk_leg_guide.png', canonFile], '걷기 첨부 셋 — 정지 6배·다리 안내·정본');
     assert(c3.fields.prompt.includes('WALK CYCLE sprite sheet'), '걷기 지시문');
-    assert.equal(c3.fields.model, 'gpt-image-2.5-flare'); assert.equal(c3.fields.quality, 'low');
+    assert.equal(c3.fields.model, 'gpt-image-2.5-flare'); assert.equal(c3.fields.quality, 'low'); assert.equal(c3.fields.size, '2160x3840', '4K 로 보낸다'); assert(c3.fields.prompt.includes('canvas 2160 x 3840'));
+    if (!(await page.evaluate(() => document.getElementById('setup').open))) await page.click('#setup summary');   // 그리고 나면 접힌다
+    await page.selectOption('#size', '1024x1536');
     genFail = 401;
     await page.click('.tab[data-s="still"]'); await page.click('#draw');
     await page.waitForFunction(() => /못 그렸다/.test(document.getElementById('genStatus').textContent), null, { timeout: 20000 });
@@ -183,7 +186,7 @@ const server = http.createServer((q, s) => {
     await page.click('.tab[data-s="still"]');
     await page.reload(); await page.waitForSelector('#who:not([hidden])');
     assert.equal(await page.inputValue('#key'), 'sk-test-123', '열쇠는 이 기기에 남는다');
-    assert.equal(await page.inputValue('#model'), 'gpt-image-2.5-flare'); assert.equal(await page.inputValue('#quality'), 'low', '고른 모델·품질도 남는다');
+    assert.equal(await page.inputValue('#model'), 'gpt-image-2.5-flare'); assert.equal(await page.inputValue('#quality'), 'low', '고른 모델·품질도 남는다'); assert.equal(await page.inputValue('#size'), '1024x1536', '크기도');
     assert.equal(await page.evaluate(() => document.getElementById('setup').open || document.getElementById('byhand').open), false, '열쇠가 있으면 열쇠 칸·파일 칸은 접혀 있다');
     await page.click('#setup summary');
     await page.click('#keyClear');

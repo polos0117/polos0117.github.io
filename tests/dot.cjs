@@ -219,6 +219,15 @@ function sourceHash() {
     const ims = f.getAll('image[]');
     assert.deepEqual(ims.map(b => [b.name, b.type, b.size]), [['a.webp', 'image/webp', 2], ['b.png', 'image/png', 1]], '첨부가 차례대로 image[]');
     assert.equal(D.genForm({ prompt: 'x', images: [], quality: 'bogus' }).get('quality'), 'medium', '모르는 품질은 보통');
+    assert.equal(D.genForm({ prompt: 'x', images: [], size: '2160x3840' }).get('size'), '2160x3840', '4K'); assert.equal(D.genForm({ prompt: 'x', images: [], size: '999x999' }).get('size'), '1024x1536', '모르는 크기는 보통');
+    /* 크기에 따라 지시문의 화소 블록·칸·발 기준선이 바뀐다 — 보통은 전과 같은 글 */
+    const big = { state: 'still', subject: 'woman', id: 'alice', form: 'begin', size: '2160x3840' }, small = Object.assign({}, big, { size: '1024x1536' });
+    assert(D.prompt(small).text.includes('crisp 12 x 12 square') && D.prompt(small).text.includes('Portrait canvas 1024 x 1536'), '보통 정지');
+    assert(D.prompt(big).text.includes('crisp 25 x 25 square') && D.prompt(big).text.includes('Portrait canvas 2160 x 3840'), '4K 정지');
+    const w4 = D.prompt(Object.assign({}, big, { state: 'walk' })).text, w1 = D.prompt(Object.assign({}, small, { state: 'walk' })).text;
+    assert(w1.includes('cell 341 x 768') && w1.includes('crisp 6 x 6 square'), '보통 걷기 시트'); assert(w4.includes('canvas 2160 x 3840, 6 frames in a 3 x 2 grid (cell 720 x 1920)') && w4.includes('crisp 13 x 13 square'), '4K 걷기 시트');
+    assert(D.prompt(Object.assign({}, big, { state: 'idle' })).text.includes('cell 1080 x 1920'), '4K 2x2 칸');
+    assert(D.prompt(Object.assign({}, big, { state: 'walk4', frame: 1 })).text.includes('baseline about 84 pixels') && D.prompt(Object.assign({}, small, { state: 'walk4', frame: 1 })).text.includes('baseline about 40 pixels'), '단칸의 발 기준선');
     assert.equal(D.genForm({ prompt: 'x', images: [], model: 'gpt-image-2.5-flare' }).get('model'), 'gpt-image-2.5-flare', '빠른 모델');
     assert.equal(D.genForm({ prompt: 'x', images: [], model: 'gpt-image-1' }).get('model'), 'gpt-image-2.5-sunburst', '끝난 모델 이름은 기본으로');
     assert.deepEqual(Object.keys(D.GEN.quality), ['low', 'medium', 'high', 'xhigh']);

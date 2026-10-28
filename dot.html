@@ -250,7 +250,9 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
           <label class="wide">OpenAI API 열쇠 — 이 기기에만 남는다<span class="keyrow"><input type="password" id="key" placeholder="sk-…" autocomplete="off" spellcheck="false"><button class="btn" type="button" id="keyClear">지움</button></span></label>
           <label>모델<select id="model">
             <option value="gpt-image-2.5-sunburst" selected>gpt-image-2.5-sunburst — 꼼꼼(기본)</option><option value="gpt-image-2.5-flare">gpt-image-2.5-flare — 빠름</option></select></label>
-          <label>품질 · 한 장 값(대략)<select id="quality">
+          <label>크기 — 4K 는 같은 121줄인데 블록이 두 배라 격자·색이 깨끗하다<select id="size">
+            <option value="1024x1536" selected>보통 1024×1536</option><option value="2160x3840">4K 2160×3840 — 값 네 배쯤</option></select></label>
+          <label>품질 · 한 장 값(대략, 보통 크기)<select id="quality">
             <option value="low">낮음 · 약 $0.005</option><option value="medium" selected>보통 · 약 $0.01</option><option value="high">높음 · 약 $0.04</option><option value="xhigh">아주 높음 · 약 $0.08</option></select></label>
         </div>
         <p class="note2">누르면 지시문과 첨부(정본·의상·정지 도트 6배·다리 안내·1칸 원본)가 gpt 그림 API 로 간다. 본보기(같은 공방의 정지 도트 6배)는 손으로 붙일 때만.</p>
@@ -357,7 +359,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   var session = {}, actor = null;   // 무대 — 이번에 정리한 상태마다 {url(그림), walk}
 
   function save() {
-    try { localStorage.setItem(KEY, JSON.stringify({ atelier: S.atelier, card: S.card, state: S.state, per: S.per, quality: saved.quality, model: saved.model })); } catch (e) { /* 저장이 막혀도 화면은 돈다 */ }
+    try { localStorage.setItem(KEY, JSON.stringify({ atelier: S.atelier, card: S.card, state: S.state, per: S.per, quality: saved.quality, model: saved.model, size: saved.size })); } catch (e) { /* 저장이 막혀도 화면은 돈다 */ }
     /* 주소도 지금 고른 것으로 — 새로 고침·공유가 같은 자리를 연다 */
     var u = new URL(location.href); u.searchParams.set('a', S.atelier); u.searchParams.set('s', S.state);
     if (S.card) u.searchParams.set('c', S.card); else u.searchParams.delete('c');
@@ -535,7 +537,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     /* ③ 의 「다음」 단추와 열쇠 칸 제목도 같이 */
     var nx2 = nextState(), doneNow = session[s] && (s !== 'still' || session.still.made);
     $('next').hidden = !(doneNow && nx2); if (nx2) $('next').textContent = '다음: ' + STATE_TAB[nx2] + ' →';
-    $('setupSum').textContent = hasKey ? '열쇠 있음 · ' + $('model').value + ' · ' + $('quality').value + ' — 바꾸기' : '열쇠·모델 — OpenAI 열쇠를 넣으면 여기서 바로 그린다';
+    $('setupSum').textContent = hasKey ? '열쇠 있음 · ' + $('model').value + ' · ' + $('quality').value + ' · ' + $('size').value + ' — 바꾸기' : '열쇠·모델 — OpenAI 열쇠를 넣으면 여기서 바로 그린다';
   }
   $('next').onclick = function () { var nx = nextState(); if (nx) { goState(nx); $('s2').scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); } };
   function fileURL(file) { var c = cur(); var f = c && c.files.filter(function (x) { return x.file === file; })[0]; return f ? new URL(f.url, location.href).href : ''; }
@@ -543,7 +545,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   function reqOpts() {
     var c = cur(), m = me(), s = S.state, id = m.id || 'name';
     var o = { state: s, subject: m.subject, identity: m.identity, outfit: !!m.outfit && s === 'still', sample: !!m.sample && s === 'still', skirt: !!m.skirt,
-      id: id, form: m.form || 'base', name: c.name, atelierName: A().name, frame: S.frame, gen: genNo() };
+      id: id, form: m.form || 'base', name: c.name, atelierName: A().name, frame: S.frame, gen: genNo(), size: $('size').value };
     var n = D.names(id, o.form, s, o.gen);
     o.files = { canonical: fileURL(m.canon), outfit: fileURL(m.outfit), still_x6: n.x6, leg_guide: 'walk_leg_guide.png', sample_x6: '본보기 정지 도트 6배(예: alice_begin_still_x6.png)',
       walk4_f1: n.raws ? n.raws[0].split('/').pop() : '' };
@@ -584,9 +586,10 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   $('key').value = keyOf();
   $('key').addEventListener('input', function () { try { if ($('key').value.trim()) localStorage.setItem(KEY_KEY, $('key').value.trim()); else localStorage.removeItem(KEY_KEY); } catch (e) { /* 저장이 막혀도 이번 화면에선 쓴다 */ } drawReady(); });
   $('keyClear').onclick = function () { $('key').value = ''; try { localStorage.removeItem(KEY_KEY); } catch (e) { /* 위와 같다 */ } $('setup').open = true; drawReady(); status($('genStatus'), '열쇠를 지웠다'); };
-  try { if (saved.quality && D.GEN.quality[saved.quality]) $('quality').value = saved.quality; if (saved.model && D.GEN.models[saved.model]) $('model').value = saved.model; } catch (e) { /* 없으면 기본 */ }
+  try { if (saved.quality && D.GEN.quality[saved.quality]) $('quality').value = saved.quality; if (saved.model && D.GEN.models[saved.model]) $('model').value = saved.model; if (saved.size && D.CANVAS[saved.size]) $('size').value = saved.size; } catch (e) { /* 없으면 기본 */ }
   $('quality').onchange = function () { saved.quality = $('quality').value; save(); todo(); };
   $('model').onchange = function () { saved.model = $('model').value; save(); todo(); };
+  $('size').onchange = function () { saved.size = $('size').value; save(); prompt(); };
   /* 열쇠가 있으면 열쇠·모델은 접고 파일 칸도 접는다(「그린다」가 길), 없으면 둘 다 열어 둔다(붙여 넣기 길) */
   $('setup').open = !keyOf(); $('byhand').open = !keyOf();
   /* 원본 번호 — 이 인물·상태(·칸)에서 몇 번째로 그렸나. 받을 때마다 하나 오른다(원본은 지우지 않고 gen2·gen3… 로 쌓는다) */
@@ -640,7 +643,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     status($('genStatus'), STATE_TAB[state] + ' — 첨부 ' + p.attach.length + '장을 모아 보낸다… (' + $('model').value + ' · ' + $('quality').value + ' · 보통 10~60초)');
     return Promise.resolve().then(function () { return attachments(o, p); }).then(function (images) {
       status($('genStatus'), STATE_TAB[state] + ' — OpenAI 가 그리는 중… 첨부 ' + images.length + '장 · ' + rawName);
-      return D.generate(key, { prompt: p.text, images: images, quality: $('quality').value, model: $('model').value });
+      return D.generate(key, { prompt: p.text, images: images, quality: $('quality').value, model: $('model').value, size: o.size });
     }).then(function (r) {
       gens[gk] = o.gen;
       var sec = ((Date.now() - t0) / 1000).toFixed(1);
@@ -654,7 +657,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     if ($('genImg').src) URL.revokeObjectURL($('genImg').src);
     $('genImg').src = URL.createObjectURL(new Blob([r.bytes], { type: 'image/png' }));
     $('genFacts').innerHTML = '';
-    var rows = [['원본', r.name], ['걸린 시간', r.sec + '초'], ['모델 · 품질', $('model').value + ' · ' + $('quality').value]];
+    var rows = [['원본', r.name], ['걸린 시간', r.sec + '초'], ['모델 · 품질 · 크기', $('model').value + ' · ' + $('quality').value + ' · ' + $('size').value]];
     if (r.usage && r.usage.total_tokens) rows.push(['토큰', r.usage.total_tokens + (r.usage.input_tokens != null ? ' (들어간 ' + r.usage.input_tokens + ' · 나온 ' + r.usage.output_tokens + ')' : '')]);
     rows.push(['다음', '③ 「정리하기」 — 마음에 안 들면 「다시 그린다」(원본 번호가 오른다)']);
     rows.forEach(function (x) { var dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = x[0]; dd.textContent = x[1]; $('genFacts').appendChild(dt); $('genFacts').appendChild(dd); });

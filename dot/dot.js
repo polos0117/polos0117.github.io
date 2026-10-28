@@ -124,6 +124,13 @@
   var SUBJECTS = {
     woman: 'young woman', man: 'young man', person: 'character', mech: 'robot mecha', creature: 'creature'
   };
+  /* 캔버스 크기 — 지시문의 화소 블록(정지·단칸)·시트 칸 블록·발 기준선이 따라간다. 4K 는 같은 121줄인데 블록이 두 배라 격자·색이 깨끗하다(값은 네 배쯤) */
+  var CANVAS = {
+    '1024x1536': { w: 1024, h: 1536, block: 12, sheet: 6, base: 40, name: '보통 1024×1536' },
+    '2160x3840': { w: 2160, h: 3840, block: 25, sheet: 13, base: 84, name: '4K 2160×3840 — 블록 두 배, 값 네 배쯤' }
+  };
+  var SIZE = '1024x1536';
+  function canvasOf(o) { return CANVAS[o && o.size] || CANVAS[SIZE]; }
   var CLEAN_LINE = 'Hard edges only: no anti-aliasing, no blur, no gradients, no dithering noise.';
   var NO_EXTRA = 'Transparent background. No grid lines, no cell borders, no numbers, no labels, no text, no ground, no shadow, no motion lines, no extra characters.';
 
@@ -135,7 +142,8 @@
     if (o.sample) L.push('Attached image ' + n + ' is a finished sprite of a different character from the same game: match its pixel size, outline, shading style and body proportions exactly, but NOT its outfit or colours.');
     if (o.identity) L.push(o.identity.trim());
     L.push('Do not draw any background, furniture, props or scenery from the attachments.', '');
-    L.push('Draw with very large chunky pixels (each sprite pixel a crisp 12 x 12 square), about 16 colours,',
+    var C = canvasOf(o);
+    L.push('Draw with very large chunky pixels (each sprite pixel a crisp ' + C.block + ' x ' + C.block + ' square), about 16 colours,',
       'about 4 heads tall (not chibi), and about half the decoration of image 1 — keep only the shapes that',
       'make the character recognisable at small size. One full-body character, standing idle on flat ground,',
       'three-quarter view turned slightly toward the viewer\'s right, arms relaxed, feet close together.',
@@ -143,7 +151,7 @@
       'simple 2-3 tone shading lit from the upper left. Keep the face readable: two clear eyes, small mouth.',
       'Transparent background. If transparency is not possible, use one flat solid #00FF00 green with nothing else.',
       'No ground shadow, no floor, no text, no frame, no border, no second character.',
-      'Portrait canvas 1024 x 1536.');
+      'Portrait canvas ' + C.w + ' x ' + C.h + '.');
     return L.join('\n');
   }
 
@@ -155,11 +163,12 @@
       'Keep decoration as simple as image 1 — do not add new details. Image ' + refNo + ' is only a colour and face reference; do not copy its painterly style.'
     ];
   }
-  function layout(cols, rows, cw) {
+  function layout(o, cols, rows) {
+    var C = canvasOf(o), cw = Math.floor(C.w / cols), ch = Math.floor(C.h / rows);
     return [
-      'Sheet layout: portrait canvas 1024 x 1536, ' + (cols * rows) + ' frames in a ' + cols + ' x ' + rows + ' grid (cell ' + cw + ' x 768), read left to right, top to bottom.',
+      'Sheet layout: portrait canvas ' + C.w + ' x ' + C.h + ', ' + (cols * rows) + ' frames in a ' + cols + ' x ' + rows + ' grid (cell ' + cw + ' x ' + ch + '), read left to right, top to bottom.',
       'In every cell the character is the same size (about 125 pixels tall on the sprite\'s own pixel grid, each sprite pixel',
-      'drawn as a crisp 6 x 6 square), centred horizontally, with both feet on the same baseline near the bottom of the cell.',
+      'drawn as a crisp ' + C.sheet + ' x ' + C.sheet + ' square), centred horizontally, with both feet on the same baseline near the bottom of the cell.',
       'Every frame faces the same direction as described below. ' + CLEAN_LINE,
       NO_EXTRA
     ];
@@ -213,12 +222,12 @@
     'frame 4 of 4 — feet close together under the hem, the NEAR foot about to swing forward; body 1 sprite pixel higher than frame 3.'
   ];
   function walk4Prompt(o) {
-    var k = Math.min(4, Math.max(1, o.frame || 1)), ref = k === 1 ? 2 : 3;
+    var k = Math.min(4, Math.max(1, o.frame || 1)), ref = k === 1 ? 2 : 3, C = canvasOf(o);
     var L = sheetHead(o, 'Pixel art WALK CYCLE frame ' + k + ' of 4', ref);
     if (k > 1) L.push('Attached image 2 is frame 1 of this same walk cycle, already approved: match its character size, position on the canvas, foot baseline, facing and lighting exactly — change only the legs and arms as described below.');
-    L.push('', 'Single frame: portrait canvas 1024 x 1536 with ONE character only (not a sheet, no other frames).',
-      'Draw the character the same size as image 1: about 121 sprite pixels tall, each sprite pixel a crisp 12 x 12 square, centred horizontally,',
-      'both feet on a baseline about 40 pixels above the bottom edge.',
+    L.push('', 'Single frame: portrait canvas ' + C.w + ' x ' + C.h + ' with ONE character only (not a sheet, no other frames).',
+      'Draw the character the same size as image 1: about 121 sprite pixels tall, each sprite pixel a crisp ' + C.block + ' x ' + C.block + ' square, centred horizontally,',
+      'both feet on a baseline about ' + C.base + ' pixels above the bottom edge.',
       'Side three-quarter view walking toward the viewer\'s right, walking in place. ' + CLEAN_LINE,
       NO_EXTRA + ' If transparency is not possible, use one flat solid #00FF00 green with nothing else.', '',
       (o.skirt ? WALK4_SKIRT : WALK4)[k - 1],
@@ -234,14 +243,14 @@
       return { text: stillPrompt(o), attach: attach };
     }
     if (s === 'walk') {
-      var t = sheetHead(o, 'Pixel art WALK CYCLE sprite sheet', 3).concat([''], layout(3, 2, 341), [
+      var t = sheetHead(o, 'Pixel art WALK CYCLE sprite sheet', 3).concat([''], layout(o, 3, 2), [
         'Side three-quarter view walking toward the viewer\'s right, walking in place (the character does not travel across the cell).', ''
       ], o.skirt ? SKIRT : LEGS);
       return { text: t.join('\n'), attach: ['still_x6', 'leg_guide', 'canonical'] };
     }
     if (s === 'walk4') return { text: walk4Prompt(o), attach: (o.frame || 1) > 1 ? ['still_x6', 'walk4_f1', 'canonical'] : ['still_x6', 'canonical'] };
     var body = s === 'idle' ? IDLE : REACT;
-    return { text: sheetHead(o, 'Pixel art sprite sheet', 2).concat([''], layout(2, 2, 512), [''], body).join('\n'), attach: ['still_x6', 'canonical'] };
+    return { text: sheetHead(o, 'Pixel art sprite sheet', 2).concat([''], layout(o, 2, 2), [''], body).join('\n'), attach: ['still_x6', 'canonical'] };
   }
 
   var ATTACH = {
@@ -369,12 +378,12 @@
      모델(2026-10-28): gpt-image-1 은 2026-10-23 에 끝났다(1.5·mini 는 12-01). 지금은 gpt-image-2.5-sunburst(기본 — 꼼꼼) · gpt-image-2.5-flare(빠름).
      2 세대부터 첨부는 늘 높은 충실도라 input_fidelity 를 안 보낸다(보내면 모르는 인자). background transparent + png — 지시문의 투명 바탕과 같은 말.
      값은 토큰제라 대략(한 장 1024×1536, 첨부 빼고): low $0.005 · medium $0.01 · high $0.04 · xhigh 그 위 — 모델 둘이 같은 값 ── */
-  var GEN = { url: 'https://api.openai.com/v1/images/edits', size: '1024x1536',
+  var GEN = { url: 'https://api.openai.com/v1/images/edits', size: SIZE, sizes: CANVAS,
     models: { 'gpt-image-2.5-sunburst': '꼼꼼 — 기본', 'gpt-image-2.5-flare': '빠름' }, model: 'gpt-image-2.5-sunburst',
     quality: { low: 0.005, medium: 0.01, high: 0.04, xhigh: 0.08 } };
   function genForm(o) {
     var f = new FormData();
-    f.append('model', GEN.models[o.model] ? o.model : GEN.model); f.append('prompt', o.prompt); f.append('n', '1'); f.append('size', GEN.size);
+    f.append('model', GEN.models[o.model] ? o.model : GEN.model); f.append('prompt', o.prompt); f.append('n', '1'); f.append('size', CANVAS[o.size] ? o.size : GEN.size);
     f.append('quality', GEN.quality[o.quality] ? o.quality : 'medium'); f.append('background', 'transparent'); f.append('output_format', 'png');
     (o.images || []).forEach(function (im) { f.append('image[]', new Blob([im.bytes], { type: im.type || 'image/png' }), im.name || 'image.png'); });
     return f;
@@ -406,7 +415,7 @@
     }, function (e) { throw new Error('OpenAI 에 못 닿았다 — ' + (e && e.message || e)); });
   }
 
-  var api = { API: API, CELL: CELL, FOOT: FOOT, STATES: STATES, CLEAN: CLEAN, SUBJECTS: SUBJECTS, ATTACH: ATTACH, STATE_NAME: STATE_NAME, ATELIERS: ATELIERS, GEN: GEN,
+  var api = { API: API, CELL: CELL, FOOT: FOOT, STATES: STATES, CLEAN: CLEAN, SUBJECTS: SUBJECTS, ATTACH: ATTACH, STATE_NAME: STATE_NAME, ATELIERS: ATELIERS, GEN: GEN, CANVAS: CANVAS,
     load: load, wrap: wrap, args: args, slug: slug, names: names, prompt: prompt, request: request, record: record, spriteState: spriteState, actor: actor, filesOf: filesOf, cards: cards,
     genForm: genForm, genError: genError, generate: generate };
   if (typeof module === 'object' && module.exports) module.exports = api;
