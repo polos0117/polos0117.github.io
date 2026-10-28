@@ -62,6 +62,9 @@ const server = http.createServer((q, s) => {
     await page.waitForSelector('#who:not([hidden])');
     assert.equal(await page.getAttribute('.chip[aria-pressed="true"]', 'style').then(s => /e39b6b/.test(s)), true, '책 칩');
     assert(await page.locator('#people button[aria-pressed="true"]').textContent().then(t => t.includes('앨리스')), '앨리스가 골라져 있다');
+    assert.equal(await page.isHidden('#chooser'), true, '고르면 목록은 접힌다'); assert((await page.textContent('#pickedName')).includes('앨리스') && (await page.textContent('#pickedSub')).includes('alice'), '한 줄 요약');
+    await page.click('#change'); assert.equal(await page.isVisible('#chooser'), true, '바꾸기로 다시 연다'); await page.click('#people button[aria-pressed="true"]'); assert.equal(await page.isHidden('#chooser'), true);
+    const openChooser = async () => { if (await page.isHidden('#chooser')) await page.click('#change'); };
     assert(await page.locator('#refs li').count() >= 3, '앨리스 그림들');
     assert.equal(await page.inputValue('#id'), 'alice'); assert.equal(await page.inputValue('#form'), 'begin');
     assert.equal(await page.locator('#refs li.canon').count(), 1, '정본 하나가 처음부터 짚혀 있다');
@@ -106,8 +109,11 @@ const server = http.createServer((q, s) => {
     await page.goto(BASE + '/dot.html?a=book&c=alice&s=still'); await page.waitForSelector('#who:not([hidden])');
     await page.waitForFunction(() => !document.getElementById('run').disabled || document.getElementById('draw').title !== '정리기를 아직 싣는 중이다');
     assert.equal(await page.isDisabled('#draw'), true, '열쇠가 없으면 못 그린다'); assert.match(await page.getAttribute('#draw', 'title'), /열쇠/);
+    assert.match(await page.textContent('#todo'), /열쇠를 한 번 넣는다/, '할 일: 열쇠'); assert.equal(await page.evaluate(() => document.getElementById('setup').open && document.getElementById('byhand').open), true, '열쇠 없으면 열쇠 칸·파일 칸이 열려 있다');
+    assert.equal(await page.getAttribute('.tab[data-s="still"]', 'data-done'), '', '정지 ○');
     await page.fill('#key', 'sk-test-123');
     await page.waitForFunction(() => !document.getElementById('draw').disabled);
+    assert.match(await page.textContent('#todo'), /정지 — 「그린다」/, '할 일: 그린다'); assert.match(await page.textContent('#setupSum'), /열쇠 있음 · gpt-image-2.5-sunburst · medium/);
     const perOf = () => page.evaluate(() => JSON.parse(localStorage.getItem('atelier_dot_v1')).per['book/alice']);
     if (!(await perOf()).outfit) await page.locator('#refs li').nth(0).locator('button.o').click();   // 의상 → 첨부 둘(앞에서 짚었으면 그대로)
     assert.equal(await page.locator('#attach li').count(), 2);
@@ -125,14 +131,30 @@ const server = http.createServer((q, s) => {
     assert.match(await page.textContent('#rawName'), /^alice_begin_still_gen1\.png · 1024×1536/, '③ 원본 자리에');
     assert.equal(await page.isHidden('#genOut'), false); assert((await page.textContent('#genFacts')).includes('1234'), '토큰');
     assert.equal(await page.textContent('#draw'), '다시 그린다');
+    assert.equal(await page.getAttribute('.tab[data-s="still"]', 'data-done'), 'raw', '정지 ◐'); assert.match(await page.textContent('#todo'), /「정리하기」/, '할 일: 정리'); assert.match(await page.textContent('#inNote'), /원본: alice_begin_still_gen1\.png/);
     const rawDl = await save('#dlGen'); assert.equal(rawDl.name, 'alice_begin_still_gen1.png'); assert(rawDl.buf.equals(aliceRaw), '원본 PNG 그대로');
     await page.click('#opts summary'); await page.fill('#opt-rows', '0'); await page.uncheck('#opt-outline');
+    assert.equal(await page.isHidden('#next'), true, '정리 전엔 다음이 없다');
     await page.click('#run'); await page.waitForSelector('#result:not([hidden])');
     samePixels((await save('#dlPng')).buf, 'sprites/alice/alice_begin_still.png', '그려 받은 원본을 정리');
+    assert.equal(await page.getAttribute('.tab[data-s="still"]', 'data-done'), 'done', '정지 ●'); assert.match(await page.textContent('#todo'), /정지 정리됐다\. 다음은 대기/, '할 일: 다음');
+    assert.equal(await page.textContent('#next'), '다음: 대기 →'); assert.equal(await page.isVisible('#next'), true);
+    /* 받기 목록 — 정지 한 줄(PNG·기록), 전부 받기는 둘을 차례로 */
+    await page.waitForSelector('#stageBox:not([hidden])');
+    assert.equal(await page.locator('#doneList li').count(), 1); assert.equal(await page.locator('#doneList [data-rec="still"]').count(), 1, '여기서 정리한 것은 기록도');
+    const dls = []; page.on('download', d => dls.push(d.suggestedFilename()));
+    await page.click('#dlAll');
+    await page.waitForFunction(() => /다 받았다/.test(document.getElementById('roomNote').textContent), null, { timeout: 10000 });
+    for (let k = 0; k < 20 && dls.length < 2; k++) await page.waitForTimeout(100);
+    assert.deepEqual(dls.sort(), ['alice_begin_still.png', 'still.json'], '전부 받기 — PNG 와 기록');
     await page.click('#draw'); await page.waitForFunction(() => /gen2\.png/.test(document.getElementById('rawName').textContent), null, { timeout: 20000 });
     assert.equal(genCalls.length, 2, '다시 → 둘째 요청, 원본 번호 2');
+    await page.click('#next');
+    assert.equal(await page.getAttribute('.tab[aria-selected="true"]', 'data-s'), 'idle', '다음 → 대기'); assert.match(await page.textContent('#todo'), /대기 — 「그린다」/);
     await page.click('.tab[data-s="walk"]');
     await page.waitForFunction(() => !document.getElementById('draw').disabled);
+    assert.equal(await page.evaluate(() => document.getElementById('setup').open || document.getElementById('byhand').open), false, '한 번 그렸으면 열쇠 칸·파일 칸이 접힌다');
+    await page.click('#setup summary');
     await page.selectOption('#model', 'gpt-image-2.5-flare'); await page.selectOption('#quality', 'low');
     await page.click('#draw'); await page.waitForFunction(() => /alice_begin_walk_gen1\.png/.test(document.getElementById('rawName').textContent), null, { timeout: 20000 });
     const c3 = genCalls[2];
@@ -147,6 +169,8 @@ const server = http.createServer((q, s) => {
     await page.reload(); await page.waitForSelector('#who:not([hidden])');
     assert.equal(await page.inputValue('#key'), 'sk-test-123', '열쇠는 이 기기에 남는다');
     assert.equal(await page.inputValue('#model'), 'gpt-image-2.5-flare'); assert.equal(await page.inputValue('#quality'), 'low', '고른 모델·품질도 남는다');
+    assert.equal(await page.evaluate(() => document.getElementById('setup').open || document.getElementById('byhand').open), false, '열쇠가 있으면 열쇠 칸·파일 칸은 접혀 있다');
+    await page.click('#setup summary');
     await page.click('#keyClear');
     assert.equal(await page.isDisabled('#draw'), true, '지우면 못 그린다'); assert.equal(await page.evaluate(() => localStorage.getItem('atelier_openai_key_v1')), null);
     checks += 4;
@@ -249,7 +273,8 @@ const server = http.createServer((q, s) => {
       await page.goto(BASE + '/dot.html?a=book&c=sunzi&s=walk'); await page.waitForSelector('#who:not([hidden])');
     }
 
-    /* 공방 바꾸기 — 포켓몬 */
+    /* 공방 바꾸기 — 포켓몬 (목록은 접혀 있으니 「바꾸기」로 연다) */
+    await openChooser();
     await page.click('.chip:has-text("포켓몬")');
     await page.waitForFunction(() => /모두 \d+명/.test(document.getElementById('more').textContent));
     assert.match(await page.textContent('#more'), /앞의 60명 · 모두 \d{3,}명/);
@@ -266,6 +291,7 @@ const server = http.createServer((q, s) => {
     assert.equal(await page.getAttribute('.tab[aria-selected="true"]', 'data-s'), 'walk');
     /* 다른 공방도 목록이 뜬다 */
     for (const [name, min] of [['신화 무기', 100], ['건담', 100], ['삼국지', 100]]) {
+      await openChooser();
       await page.click('.chip:has-text("' + name + '")');
       await page.waitForFunction(() => /모두 \d+명/.test(document.getElementById('more').textContent));
       const n = +(await page.textContent('#more')).match(/모두 (\d+)명/)[1];

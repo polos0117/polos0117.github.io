@@ -150,8 +150,27 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: bloc
 /* 무대 — 공용 재생기가 인물을 세운다. 바닥은 아래 30px */
 .sprite-room { position: relative; height: 300px; border-radius: 8px; overflow: hidden; background: linear-gradient(180deg, #1d1a24 0, #26212c calc(100% - 30px), #4a3a2a calc(100% - 30px), #3a2d20 100%); }
 .note2 { margin: 8px 0; color: var(--muted); font-size: 12.5px; word-break: keep-all; }
+/* 고른 인물 한 줄 — 목록은 접힌다 */
+.picked { display: flex; align-items: center; gap: 12px; margin: 0 0 4px; }
+.picked img { width: 48px; height: 72px; object-fit: cover; border-radius: 8px; background: #0003; }
+.picked > div { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; }
+.picked b { font: 800 16px/1.3 var(--serif); }
+.picked small { color: var(--muted); font-size: 12px; word-break: keep-all; }
+/* 진행 띠 — 상태 탭에 표시(○ ◐ ●) */
+.tab .mark { font-style: normal; margin-right: 6px; opacity: .9; }
+.tab[data-done="done"] { border-color: var(--good); }
+.tab[data-done="raw"] { border-color: var(--gold); }
+.todo { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: #d9b45a14; border: 1px solid #d9b45a55; color: var(--text); font-size: 14px; word-break: keep-all; }
+.todo b { color: var(--gold); }
+.todo button { margin-left: 8px; min-height: 32px; padding: 0 10px; border: 1px solid var(--gold); border-radius: 8px; background: transparent; color: var(--gold); cursor: pointer; font-size: 13px; font-weight: 700; }
+/* 받기 목록 */
+.done { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.done li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
+.done li b { min-width: 3em; }
+.done li code { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.done li button { min-height: 36px; padding: 0 10px; border: 1px solid #ffffff2e; border-radius: 8px; background: #ffffff08; cursor: pointer; font-size: 12.5px; }
 /* 그린다 — 열쇠·품질, 받은 그림 미리보기 */
-.gen { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.gen { margin-top: 4px; }
 .gen .fields { margin: 0 0 8px; }
 .keyrow { display: flex; gap: 8px; } .keyrow input { flex: 1 1 auto; min-width: 0; }
 .gen-out { display: grid; gap: 10px; grid-template-columns: minmax(0, auto) minmax(0, 1fr); align-items: start; margin-top: 10px; }
@@ -168,16 +187,22 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   <a class="home" href="./">공방 모음</a>
 </header>
 <main class="wrap">
-  <p class="lede">다섯 공방의 인물을 도트로. <b>① 인물을 고르고 ② 지시문을 받아 GPT 에 붙여 넣거나 열쇠를 넣고 「그린다」 ③ 받은 그림을 여기서 정리한다.</b>
-    정리는 이 브라우저 안에서만 하고 어디에도 올리지 않는다(「그린다」만 첨부와 지시문을 OpenAI 로 보낸다) — 저장소에 올리기는 세션이 검토한 뒤에 한다.</p>
+  <p class="lede">다섯 공방의 인물을 도트로. <b>① 인물을 고르고 ② 정지 → 대기 → 걷기 → 반응 차례로 「그린다」 ③ 「정리하기」 → 「다음」, 넷 다 되면 「받기」.</b>
+    위 「지금 할 일」이 다음 단추를 알려 준다. 정리는 이 브라우저 안에서만(「그린다」만 첨부와 지시문을 OpenAI 로 보낸다) — 저장소에 올리기는 세션이 검토한 뒤에 한다.</p>
 
   <section class="step" id="s1" aria-labelledby="s1h">
     <h2 id="s1h"><b>1</b>인물</h2>
+    <div class="picked" id="picked" hidden>
+      <img id="pickedImg" alt=""><div><b id="pickedName"></b><small id="pickedSub"></small></div>
+      <button class="btn" type="button" id="change">바꾸기</button>
+    </div>
+    <div id="chooser">
     <p class="note">공방을 고르면 그 공방 도감에 등록된 인물이 뜬다. 인물을 누르면 그 인물의 그림이 아래에 — 정본(얼굴·머리·색)과 의상을 짚는다.</p>
     <div class="chips scroll" id="ateliers" role="group" aria-label="공방"></div>
     <div class="find"><input type="search" id="q" placeholder="이름으로 찾기" aria-label="인물 이름으로 찾기" autocomplete="off"></div>
     <ul class="people" id="people" aria-label="인물"></ul>
     <p class="more" id="more"></p>
+    </div>
     <div class="who" id="who" hidden>
       <ul class="refs" id="refs" aria-label="그 인물의 그림"></ul>
       <div class="fields">
@@ -197,49 +222,54 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   </section>
 
   <section class="step" id="s2" aria-labelledby="s2h">
-    <h2 id="s2h"><b>2</b>지시문</h2>
-    <p class="note">상태마다 한 장씩 따로 생성한다. 정지 도트가 마음에 든 뒤에 동작(대기·걷기·반응)으로 간다 — 동작 시트는 정지 도트 6배를 첫 첨부로 붙인다.</p>
+    <h2 id="s2h"><b>2</b>그리기</h2>
+    <p class="note">정지 → 대기 → 걷기 → 반응 차례로. 정지 도트가 마음에 든 뒤에 동작으로 간다 — 동작은 정지 도트 6배를 첫 첨부로 붙인다. ○ 아직 · ◐ 원본 있음 · ● 정리됨</p>
     <div class="tabs" role="tablist" aria-label="상태" id="tabs"></div>
+    <p class="todo" id="todo" role="status"></p>
     <div class="framebar" id="frames" role="group" aria-label="걷기 4칸 — 몇째 칸 지시문" hidden></div>
     <p class="framenote" id="frameNote" role="status" hidden></p>
-    <ol class="attach" id="attach"></ol>
-    <div class="row" style="margin-bottom:10px">
-      <a class="btn" id="guide" href="dot/walk_leg_guide.png" download="walk_leg_guide.png" hidden>다리 자세 안내 받기</a>
-      <button class="btn" type="button" id="x6" hidden>정지 도트 6배 받기</button>
-    </div>
-    <textarea id="req" readonly aria-label="GPT 에 보낼 요청문"></textarea>
-    <div class="row" style="margin-top:8px"><button class="btn main" type="button" id="copy">요청문 복사</button></div>
-    <p class="status" id="s2status" role="status"></p>
     <div class="gen" id="gen">
-      <p class="note"><b>그린다</b> — 붙여 넣지 않고 여기서 바로. OpenAI API 열쇠를 넣으면 위 지시문과 첨부(정본·의상·정지 도트 6배·다리 안내·1칸 원본)가 gpt 그림 API 로 가고,
-        받은 원본이 ③ 의 원본 자리에 바로 들어간다. 열쇠는 이 기기에만 남는다. 본보기(같은 공방의 정지 도트 6배)는 손으로 붙일 때만 들어간다.</p>
-      <div class="fields">
-        <label class="wide">OpenAI API 열쇠<span class="keyrow"><input type="password" id="key" placeholder="sk-…" autocomplete="off" spellcheck="false"><button class="btn" type="button" id="keyClear">지움</button></span></label>
-        <label>모델<select id="model">
-          <option value="gpt-image-2.5-sunburst" selected>gpt-image-2.5-sunburst — 꼼꼼(기본)</option><option value="gpt-image-2.5-flare">gpt-image-2.5-flare — 빠름</option></select></label>
-        <label>품질 · 한 장 값(대략)<select id="quality">
-          <option value="low">낮음 · 약 $0.005</option><option value="medium" selected>보통 · 약 $0.01</option><option value="high">높음 · 약 $0.04</option><option value="xhigh">아주 높음 · 약 $0.08</option></select></label>
-      </div>
-      <div class="row"><button class="btn main" type="button" id="draw" disabled>그린다</button><button class="btn" type="button" id="dlGen" hidden>원본 PNG 받기</button></div>
+      <details class="opt" id="setup"><summary id="setupSum">열쇠·모델</summary>
+        <div class="fields" style="margin-top:6px">
+          <label class="wide">OpenAI API 열쇠 — 이 기기에만 남는다<span class="keyrow"><input type="password" id="key" placeholder="sk-…" autocomplete="off" spellcheck="false"><button class="btn" type="button" id="keyClear">지움</button></span></label>
+          <label>모델<select id="model">
+            <option value="gpt-image-2.5-sunburst" selected>gpt-image-2.5-sunburst — 꼼꼼(기본)</option><option value="gpt-image-2.5-flare">gpt-image-2.5-flare — 빠름</option></select></label>
+          <label>품질 · 한 장 값(대략)<select id="quality">
+            <option value="low">낮음 · 약 $0.005</option><option value="medium" selected>보통 · 약 $0.01</option><option value="high">높음 · 약 $0.04</option><option value="xhigh">아주 높음 · 약 $0.08</option></select></label>
+        </div>
+        <p class="note2">누르면 지시문과 첨부(정본·의상·정지 도트 6배·다리 안내·1칸 원본)가 gpt 그림 API 로 간다. 본보기(같은 공방의 정지 도트 6배)는 손으로 붙일 때만.</p>
+      </details>
+      <div class="row"><button class="btn main" type="button" id="draw" disabled>그린다</button><button class="btn" type="button" id="dlGen" hidden>원본 PNG 받기</button>
+        <a class="btn" id="guide" href="dot/walk_leg_guide.png" download="walk_leg_guide.png" hidden>다리 자세 안내 받기</a>
+        <button class="btn" type="button" id="x6" hidden>정지 도트 6배 받기</button></div>
       <p class="status" id="genStatus" role="status"></p>
       <div class="gen-out" id="genOut" hidden>
         <div class="checker" style="display:inline-block;padding:6px"><img id="genImg" alt="받은 원본"></div>
         <dl class="facts" id="genFacts"></dl>
       </div>
     </div>
+    <details class="opt" id="manual"><summary>지시문을 직접 쓴다 — 열쇠 없이 GPT 채팅에 붙여 넣을 때 (받은 PNG 는 ③ 「파일로 넣는다」)</summary>
+      <ol class="attach" id="attach"></ol>
+      <textarea id="req" readonly aria-label="GPT 에 보낼 요청문"></textarea>
+      <div class="row" style="margin-top:8px"><button class="btn main" type="button" id="copy">요청문 복사</button></div>
+      <p class="status" id="s2status" role="status"></p>
+    </details>
   </section>
 
   <section class="step" id="s3" aria-labelledby="s3h">
     <h2 id="s3h"><b>3</b>정리</h2>
-    <p class="note">GPT 가 준 원본 PNG 를 그대로 넣는다(자르거나 줄이지 않는다). 동작 시트는 확정한 정지 도트(정리본)도 같이 — 색을 거기서 뽑아 맞춘다.</p>
-    <div class="files">
-      <div class="drop" id="dropRaw"><b id="rawTitle">생성 원본</b><input type="file" id="raw" accept="image/png,image/*"><small id="rawName">아직 없다</small></div>
-      <div class="drop" id="dropStill"><b>정지 도트 (동작 시트만)</b><input type="file" id="stillFile" accept="image/png"><small id="stillName">아직 없다 — 여기서 정지를 정리하면 그것을 쓴다</small></div>
-    </div>
+    <p class="note">받은 원본을 격자·색으로 정리해 96×128 칸에 앉힌다. 「그린다」로 받았으면 원본은 이미 들어와 있다 — 「정리하기」만 누른다.</p>
+    <details class="opt" id="byhand"><summary>파일로 넣는다 — 원본 PNG(자르거나 줄이지 않은 것) · 동작 시트면 정지 도트 정리본도</summary>
+      <div class="files" style="margin-top:8px">
+        <div class="drop" id="dropRaw"><b id="rawTitle">생성 원본</b><input type="file" id="raw" accept="image/png,image/*"><small id="rawName">아직 없다</small></div>
+        <div class="drop" id="dropStill"><b>정지 도트 (동작 시트만)</b><input type="file" id="stillFile" accept="image/png"><small id="stillName">아직 없다 — 여기서 정지를 정리하면 그것을 쓴다</small></div>
+      </div>
+    </details>
+    <p class="note2" id="inNote"></p>
     <details class="opt" id="opts"><summary>정리 값 (기본값은 book 서재 세 인물이 쓴 값)</summary>
       <div class="fields" id="optFields"></div>
     </details>
-    <div class="row"><button class="btn main" type="button" id="run" disabled>정리하기</button><span class="status" id="runStatus" role="status"></span></div>
+    <div class="row"><button class="btn main" type="button" id="run" disabled>정리하기</button><button class="btn" type="button" id="next" hidden>다음</button><span class="status" id="runStatus" role="status"></span></div>
     <div class="result" id="result" hidden>
       <div class="stage">
         <div class="box"><h3>재생</h3><div class="floor"><canvas id="anim" width="96" height="128" aria-label="재생 미리보기"></canvas></div>
@@ -258,8 +288,10 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     <div class="box" id="stageBox" style="margin-top:14px" hidden><h3>무대 — 이번에 정리한 상태를 모아 공방에서처럼 (누르면 반응)</h3>
       <div class="sprite-room" id="room"></div>
       <p class="note2" id="roomNote"></p>
-      <textarea id="actorEntry" rows="6" readonly aria-label="sprites.json 인물 칸" style="font:12.5px/1.45 var(--mono)"></textarea>
-      <div class="row" style="margin-top:8px"><button class="btn" type="button" id="cpActor">인물 칸 복사</button></div>
+      <h3 style="margin-top:10px">받기 — 정리한 것을 모두. 받은 것을 세션에 주고 "올려 줘" 하면 그림 저장소·sprites.json 에 올린다</h3>
+      <ul class="done" id="doneList" aria-label="정리한 상태"></ul>
+      <div class="row" style="margin-top:8px"><button class="btn main" type="button" id="dlAll">전부 받기</button><button class="btn" type="button" id="cpActor">인물 칸 복사</button></div>
+      <textarea id="actorEntry" rows="6" readonly aria-label="sprites.json 인물 칸" style="font:12.5px/1.45 var(--mono);margin-top:8px"></textarea>
     </div>
   </section>
 </main>
@@ -317,7 +349,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
       var b = document.createElement('button');
       b.type = 'button'; b.className = 'chip'; b.textContent = a.name; b.style.setProperty('--c', COLORS[a.key]);
       b.setAttribute('aria-pressed', String(a.key === S.atelier));
-      b.onclick = function () { if (S.atelier === a.key) return; clearStage(); S.atelier = a.key; S.card = ''; $('q').value = ''; save(); chips(); loadAtelier(); };
+      b.onclick = function () { if (S.atelier === a.key) return; clearStage(); S.atelier = a.key; S.card = ''; $('q').value = ''; save(); chips(); chooserView(true); loadAtelier(); };
       $('ateliers').appendChild(b);
     });
   }
@@ -351,12 +383,25 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     });
     $('more').textContent = hit.length > MAX ? '앞의 ' + MAX + '명 · 모두 ' + hit.length + '명 — 이름으로 좁힌다' : hit.length ? '모두 ' + hit.length + '명' : '맞는 인물이 없다';
   }
+  /* 인물을 고르면 목록은 접히고 한 줄 요약 — 「바꾸기」로 다시 연다 */
+  function chooserView(open) {
+    var c = cur();
+    $('chooser').hidden = !!c && !open;
+    $('picked').hidden = !c || !!open;
+    if (c) {
+      var m = me(), f = c.files.filter(function (x) { return x.file === m.canon; })[0] || c.files[0];
+      $('pickedImg').src = f ? (f.thumb || f.url) : ''; $('pickedName').textContent = c.name;
+      $('pickedSub').textContent = A().name + ' · ' + (m.id || '영문 이름 없음') + ' · ' + (m.form || 'base') + (m.canon ? '' : ' · 정본을 아직 안 짚었다');
+    }
+  }
+  $('change').onclick = function () { chooserView(true); $('q').focus(); };
   function pick(key, quiet) {
     if (key !== S.card) clearStage();
     S.card = key; save();
     Array.prototype.forEach.call($('people').querySelectorAll('button'), function (b, i) { b.setAttribute('aria-pressed', String(b.lastChild.textContent === (cur() || {}).name)); });
-    var c = cur(); if (!c) return;
+    var c = cur(); if (!c) { chooserView(true); return; }
     var m = me();
+    chooserView(false);
     $('who').hidden = false;
     $('id').value = m.id; $('form').value = m.form; $('subject').value = m.subject; $('identity').value = m.identity;
     $('skirt').checked = !!m.skirt; $('sample').checked = !!m.sample;
@@ -377,7 +422,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
         var b = document.createElement('button'); b.type = 'button'; b.textContent = p[0]; b.className = p[2];
         b.setAttribute('aria-pressed', String(m[p[1]] === f.file));
         b.setAttribute('aria-label', f.file + ' 을 ' + p[0] + '으로');
-        b.onclick = function () { m[p[1]] = m[p[1]] === f.file ? '' : f.file; if (p[1] === 'canon' && !m.canon) m.canon = f.file; save(); refs(); prompt(); };
+        b.onclick = function () { m[p[1]] = m[p[1]] === f.file ? '' : f.file; if (p[1] === 'canon' && !m.canon) m.canon = f.file; save(); refs(); prompt(); chooserView(false); };
         pk.appendChild(b);
       });
       li.appendChild(im); li.appendChild(sm); li.appendChild(pk); ul.appendChild(li);
@@ -386,21 +431,31 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   ['id', 'form', 'subject', 'identity'].forEach(function (k) {
     $(k).addEventListener('input', function () {
       var m = me(); m[k] = k === 'id' ? D.slug($(k).value) || '' : $(k).value;
-      save(); prompt();
+      save(); prompt(); if (k === 'id' || k === 'form') chooserView(false);
     });
   });
   $('id').addEventListener('change', function () { $('id').value = me().id; });
   ['skirt', 'sample'].forEach(function (k) { $(k).addEventListener('change', function () { me()[k] = $(k).checked; save(); prompt(); }); });
   $('q').addEventListener('input', people);
 
-  /* ── ② 지시문 ── */
+  /* ── ② 그리기 — 진행 띠(상태 탭에 ○ ◐ ●)와 「지금 할 일」 ── */
+  var ORDER = ['still', 'idle', 'walk', 'react'];
+  /* 상태의 진행: done 정리됨(이번에) · raw 원본이 들어와 있다(지금 상태) · '' 아직 */
+  function markOf(s) {
+    if (session[s] && (s !== 'still' || session.still.made)) return 'done';
+    if (s === S.state && (sep() ? raws.some(Boolean) : !!raw && raw.forState === s)) return 'raw';
+    return '';
+  }
   function tabs() {
     $('tabs').innerHTML = '';
     Object.keys(STATE_TAB).forEach(function (s) {
-      var b = document.createElement('button');
-      b.type = 'button'; b.className = 'tab'; b.setAttribute('role', 'tab'); b.textContent = STATE_TAB[s];
-      b.setAttribute('aria-selected', String(s === S.state)); b.dataset.s = s;
-      b.onclick = function () { S.state = s; save(); tabs(); prompt(); options(); };
+      var b = document.createElement('button'), mk = markOf(s), i = document.createElement('i');
+      b.type = 'button'; b.className = 'tab'; b.setAttribute('role', 'tab');
+      i.className = 'mark'; i.textContent = mk === 'done' ? '●' : mk === 'raw' ? '◐' : '○'; i.setAttribute('aria-hidden', 'true');
+      b.appendChild(i); b.appendChild(document.createTextNode(STATE_TAB[s]));
+      b.setAttribute('aria-selected', String(s === S.state)); b.dataset.s = s; b.dataset.done = mk;
+      b.setAttribute('aria-label', STATE_TAB[s] + (mk === 'done' ? ' — 정리됨' : mk === 'raw' ? ' — 원본 있음' : ''));
+      b.onclick = function () { goState(s); };
       $('tabs').appendChild(b);
     });
     /* 걷기 4칸 — 칸마다 지시문이 다르다. 1칸을 먼저 뽑아 확정하고 2~4칸은 그것을 첨부한다 */
@@ -415,7 +470,33 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
       });
       $('frameNote').textContent = '아래는 ' + S.frame + '칸 지시문 — ' + FRAME_NOTE[S.frame - 1] + (S.frame === 1 ? '. 이 칸을 먼저 뽑아 확정한다' : '. 확정한 1칸 원본을 같이 붙인다');
     }
+    todo();
   }
+  function goState(s) { S.state = s; save(); tabs(); prompt(); options(); }
+  function nextState() { var i = ORDER.indexOf(S.state === 'walk4' ? 'walk' : S.state); return i < 0 || i >= ORDER.length - 1 ? null : ORDER[i + 1]; }
+  function allDone() { return ORDER.every(function (s) { return session[s] || (s === 'walk' && session.walk4); }); }
+  /* 지금 할 일 한 줄 — 인물·정본·열쇠·정지·원본·정리의 차례로 본다 */
+  function todo() {
+    var el = $('todo'), c = cur(), m = c && me(), s = S.state, hasKey = !!$('key').value.trim(), txt = '', btn = null;
+    el.innerHTML = '';
+    if (!c) txt = '① 에서 인물을 고른다.';
+    else if (!m.canon) txt = '① 에서 정본(얼굴·머리·색이 보이는 그림)을 짚는다.';
+    else if (!m.id) txt = '① 에서 영문 이름을 적는다 — 파일 이름이 된다.';
+    else if (allDone()) txt = '넷 다 됐다 — ③ 아래 「받기」에서 PNG·기록·인물 칸을 받아, 세션에 주고 "올려 줘" 한다.';
+    else if (s !== 'still' && !still) { txt = '정지 도트부터 — 정지를 그려 정리하면 그것이 동작의 첫 첨부가 된다.'; btn = ['정지로', function () { goState('still'); }]; }
+    else if (sep() && S.frame > 1 && !raws[0]) txt = '걷기 4칸은 1칸부터 — 1칸을 그려 확정한 뒤 2~4칸.';
+    else if (session[s] && (s !== 'still' || session.still.made)) { var nx = nextState(); txt = STATE_TAB[s] + ' 정리됐다.' + (nx ? ' 다음은 ' + STATE_TAB[nx] + '.' : ''); if (nx) btn = ['다음: ' + STATE_TAB[nx] + ' →', function () { goState(nx); }]; }
+    else if (markOf(s) === 'raw') { txt = '원본이 들어와 있다 — ③ 「정리하기」를 누른다.'; btn = ['정리로', function () { $('s3').scrollIntoView({ block: 'start' }); }]; }
+    else if (!hasKey) txt = '「그린다」를 쓰려면 열쇠·모델에 OpenAI 열쇠를 한 번 넣는다. 열쇠 없이 하려면 「지시문을 직접 쓴다」로 GPT 에 붙여 넣고, 받은 PNG 를 ③ 「파일로 넣는다」에.';
+    else txt = STATE_TAB[s] + ' — 「그린다」를 누른다(' + $('model').value.replace('gpt-image-', '') + ' · ' + $('quality').value + ').';
+    var b = document.createElement('b'); b.textContent = '지금 할 일 · '; el.appendChild(b); el.appendChild(document.createTextNode(txt));
+    if (btn) { var k = document.createElement('button'); k.type = 'button'; k.textContent = btn[0]; k.onclick = btn[1]; el.appendChild(k); }
+    /* ③ 의 「다음」 단추와 열쇠 칸 제목도 같이 */
+    var nx2 = nextState(), doneNow = session[s] && (s !== 'still' || session.still.made);
+    $('next').hidden = !(doneNow && nx2); if (nx2) $('next').textContent = '다음: ' + STATE_TAB[nx2] + ' →';
+    $('setupSum').textContent = hasKey ? '열쇠 있음 · ' + $('model').value + ' · ' + $('quality').value + ' — 바꾸기' : '열쇠·모델 — OpenAI 열쇠를 넣으면 여기서 바로 그린다';
+  }
+  $('next').onclick = function () { var nx = nextState(); if (nx) { goState(nx); $('s2').scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); } };
   function fileURL(file) { var c = cur(); var f = c && c.files.filter(function (x) { return x.file === file; })[0]; return f ? new URL(f.url, location.href).href : ''; }
   /* 지시문 재료 — 지금 고른 인물·상태·칸. gen 은 원본 번호(그린다가 올린다) */
   function reqOpts() {
@@ -461,10 +542,12 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   function keyOf() { try { return localStorage.getItem(KEY_KEY) || ''; } catch (e) { return ''; } }
   $('key').value = keyOf();
   $('key').addEventListener('input', function () { try { if ($('key').value.trim()) localStorage.setItem(KEY_KEY, $('key').value.trim()); else localStorage.removeItem(KEY_KEY); } catch (e) { /* 저장이 막혀도 이번 화면에선 쓴다 */ } drawReady(); });
-  $('keyClear').onclick = function () { $('key').value = ''; try { localStorage.removeItem(KEY_KEY); } catch (e) { /* 위와 같다 */ } drawReady(); status($('genStatus'), '열쇠를 지웠다'); };
+  $('keyClear').onclick = function () { $('key').value = ''; try { localStorage.removeItem(KEY_KEY); } catch (e) { /* 위와 같다 */ } $('setup').open = true; drawReady(); status($('genStatus'), '열쇠를 지웠다'); };
   try { if (saved.quality && D.GEN.quality[saved.quality]) $('quality').value = saved.quality; if (saved.model && D.GEN.models[saved.model]) $('model').value = saved.model; } catch (e) { /* 없으면 기본 */ }
-  $('quality').onchange = function () { saved.quality = $('quality').value; save(); };
-  $('model').onchange = function () { saved.model = $('model').value; save(); };
+  $('quality').onchange = function () { saved.quality = $('quality').value; save(); todo(); };
+  $('model').onchange = function () { saved.model = $('model').value; save(); todo(); };
+  /* 열쇠가 있으면 열쇠·모델은 접고 파일 칸도 접는다(「그린다」가 길), 없으면 둘 다 열어 둔다(붙여 넣기 길) */
+  $('setup').open = !keyOf(); $('byhand').open = !keyOf();
   /* 원본 번호 — 이 인물·상태(·칸)에서 몇 번째로 그렸나. 받을 때마다 하나 오른다(원본은 지우지 않고 gen2·gen3… 로 쌓는다) */
   function genKey() { return S.atelier + '/' + S.card + '/' + S.state + (sep() ? '/' + S.frame : ''); }
   function genNo() { return (gens[genKey()] || 0) + 1; }
@@ -484,6 +567,14 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     $('draw').disabled = drawing || !!why;
     $('draw').title = why;
     $('draw').textContent = drawing ? '그리는 중…' : gotGen && gotGen.key === genKey() ? '다시 그린다' : '그린다';
+    /* 들어와 있는 것 한 줄(파일 칸은 접혀 있다) · 진행 표시 */
+    var rn = $('rawName').textContent, sn = $('stillName').textContent;
+    $('inNote').textContent = '들어와 있는 것 — 원본: ' + rn + (S.state !== 'still' ? ' · 정지 도트: ' + sn : '');
+    Array.prototype.forEach.call($('tabs').querySelectorAll('.tab'), function (b) {
+      var mk = markOf(b.dataset.s); if (b.dataset.done === mk) return;
+      b.dataset.done = mk; b.querySelector('.mark').textContent = mk === 'done' ? '●' : mk === 'raw' ? '◐' : '○';
+    });
+    todo();
   }
   function bytesOf(url, name) {
     return fetch(url).then(function (r) { if (!r.ok) throw new Error(name + ' 을 못 받았다(' + r.status + ')'); return r.arrayBuffer(); })
@@ -523,6 +614,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
       rows.push(['다음', '③ 「정리하기」 — 마음에 안 들면 「다시 그린다」(원본 번호가 오른다)']);
       rows.forEach(function (x) { var dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = x[0]; dd.textContent = x[1]; $('genFacts').appendChild(dt); $('genFacts').appendChild(dd); });
       $('genOut').hidden = false; $('dlGen').hidden = false;
+      $('setup').open = false; $('byhand').open = false;   // 한 번 그렸으면 열쇠 칸·파일 칸은 접는다 — 단추 둘만 남게
       status($('genStatus'), '받았다 — ' + sec + '초. ③ 원본 자리에 넣었다(' + rawName + '). 원본 PNG 는 그림 저장소 raw/ 에 그대로 올린다', 'good');
       $('s3').scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
       });
@@ -599,7 +691,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     var nameEl = which === 'raw' ? $('rawName') : $('stillName');
     nameEl.textContent = '읽는 중…';
     return decodeFile(file).then(function (r) {
-      r.name = file.name;
+      r.name = file.name; r.forState = S.state;   // 어느 상태의 원본인가 — 진행 띠가 본다(다른 상태로 옮기면 ○)
       var sz = W.size(r.id);
       if (which === 'raw') { if (raw) W.free(raw.id); raw = r; r.label = file.name + ' · ' + sz[0] + '×' + sz[1]; }
       else { if (still && still.own) W.free(still.id); still = r; prompt(); keepSheet('still', r.bytes, null); }
@@ -650,7 +742,8 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
         made = { id: out.id, info: out.info, state: s, walk: walk, png: W.png(out.id) };
         if (s === 'still') { if (still && still.own) W.free(still.id); still = { id: W.decode(made.png), own: true, name: '방금 정리한 정지 도트' }; $('stillName').textContent = '방금 정리한 정지 도트를 쓴다'; prompt(); }
         show();
-        keepSheet(s, made.png, walk);
+        keepSheet(s, made.png, walk, { made: true, rec: recordOf() });
+        tabs();
         status($('runStatus'), swapped ? '두 칸이 바뀌어 있어 바꿔 넣고 정리했다 — 아래에서 보고 받는다' : '정리했다 — 아래에서 보고 받는다', 'good');
       } catch (e) { status($('runStatus'), e.message, 'bad'); }
     }, 20);
@@ -733,32 +826,60 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { status($('runStatus'), 'sprites.json 칸을 복사했다', 'good'); },
       function () { $('entry').select(); status($('runStatus'), '복사가 막혔다 — 글을 골라 두었다', 'bad'); });
   };
-  $('dlRec').onclick = function () {
-    var m = me(), n = names();
-    var srcs = D.STATES[made.state].separate ? raws : [raw];
-    Promise.all(srcs.map(function (r) { return digest('SHA-256', r.bytes); }).concat([digest('SHA-1', made.png)])).then(function (h) {
+  /* 기록 JSON — 방금 정리한 것(made)과 그 원본·인자로. 정리할 때 만들어 받기 목록에도 둔다 */
+  function recordOf() {
+    var m = me(), n = names(), md = made;
+    var srcs = (D.STATES[md.state].separate ? raws : [raw]).slice();
+    var o = { colors: opt('colors'), rows: opt('rows'), outline: opt('outline'), fixedPitch: opt('fixedPitch'), speck: opt('speck'), cell: [opt('cellW'), opt('cellH')], gridC: opt('gridC'), gridR: opt('gridR') };
+    return Promise.all(srcs.map(function (r) { return digest('SHA-256', r.bytes); }).concat([digest('SHA-1', md.png)])).then(function (h) {
       var sha1 = h.pop(), sep4 = srcs.length > 1;
-      var sheetArgs = made.state === 'still' ? D.args('still', { colors: opt('colors'), rows: opt('rows'), outline: opt('outline') })
-        : D.args(made.state, { rows: opt('rows'), fixedPitch: opt('fixedPitch'), speck: opt('speck'), cell: [opt('cellW'), opt('cellH')],
-            grid: opt('gridC') && opt('gridR') ? [opt('gridC'), opt('gridR')] : null }, D.names(m.id || 'name', m.form || 'base', 'still').cleaned);
-      var rec = D.record({ state: made.state, id: m.id || 'name', form: m.form, atelier: S.atelier, date: new Date().toISOString().slice(0, 10),
+      var sheetArgs = md.state === 'still' ? D.args('still', { colors: o.colors, rows: o.rows, outline: o.outline })
+        : D.args(md.state, { rows: o.rows, fixedPitch: o.fixedPitch, speck: o.speck, cell: o.cell, grid: o.gridC && o.gridR ? [o.gridC, o.gridR] : null }, D.names(m.id || 'name', m.form || 'base', 'still').cleaned);
+      var rec = D.record({ state: md.state, id: m.id || 'name', form: m.form, atelier: S.atelier, date: new Date().toISOString().slice(0, 10),
         rawSha256: sep4 ? h.map(function (x) { return x ? hex(x) : null; }) : h[0] ? hex(h[0]) : null, received: sep4 ? srcs.map(function (r) { return r.name; }) : null,
-        sha1: sha1 ? hex(sha1, 12) : null, args: sheetArgs, info: made.info, walk: made.walk });
-      if (!sep4) rec.generation.received_as = raw.name;
-      download(new TextEncoder().encode(JSON.stringify(rec, null, 1) + '\n'), n.record.split('/').pop(), 'application/json');
+        sha1: sha1 ? hex(sha1, 12) : null, args: sheetArgs, info: md.info, walk: md.walk });
+      if (!sep4) rec.generation.received_as = srcs[0].name;
+      return { name: n.record.split('/').pop(), bytes: new TextEncoder().encode(JSON.stringify(rec, null, 1) + '\n') };
     });
-  };
+  }
+  $('dlRec').onclick = function () { recordOf().then(function (r) { download(r.bytes, r.name, 'application/json'); }); };
 
   /* ── 무대 — 공용 재생기(sprite-actor.js)로 이번에 정리한 상태들을 모아 세운다 ── */
-  function keepSheet(state, bytes, walk) {
+  /* extra: {made: 여기서 정리한 것, rec: 기록 JSON Promise} — 파일로 넣은 정지 도트는 둘 다 없다 */
+  function keepSheet(state, bytes, walk, extra) {
     if (session[state]) URL.revokeObjectURL(session[state].url);
-    session[state] = { url: URL.createObjectURL(new Blob([bytes], { type: 'image/png' })), walk: walk };
+    var m = me();
+    session[state] = Object.assign({ url: URL.createObjectURL(new Blob([bytes], { type: 'image/png' })), walk: walk, png: bytes,
+      name: D.names(m.id || 'name', m.form || 'base', state).cleaned.split('/').pop() }, extra || {});
     stage();
   }
   function clearStage() {
     Object.keys(session).forEach(function (k) { URL.revokeObjectURL(session[k].url); });
     session = {}; if (actor) { actor.destroy(); actor = null; } $('stageBox').hidden = true;
+    gotGen = null; gens = {};
+    if (typeof tabs === 'function' && $('tabs').children.length) tabs();
   }
+  /* 받기 목록 — 이번에 정리한 상태마다 PNG·기록. 전부 받기는 차례로(브라우저가 여러 내려받기를 물을 수 있다) */
+  function doneList() {
+    var ul = $('doneList'); ul.innerHTML = '';
+    ['still', 'idle', 'walk', 'walk4', 'react'].forEach(function (k) {
+      var e = session[k]; if (!e) return;
+      var li = document.createElement('li'), b = document.createElement('b'), c = document.createElement('code');
+      b.textContent = STATE_TAB[k]; c.textContent = e.name + (e.made ? '' : ' (파일로 넣음)'); li.appendChild(b); li.appendChild(c);
+      var p = document.createElement('button'); p.type = 'button'; p.textContent = 'PNG'; p.dataset.dl = k; p.onclick = function () { download(e.png, e.name, 'image/png'); }; li.appendChild(p);
+      if (e.rec) { var r = document.createElement('button'); r.type = 'button'; r.textContent = '기록'; r.dataset.rec = k; r.onclick = function () { e.rec.then(function (x) { download(x.bytes, x.name, 'application/json'); }); }; li.appendChild(r); }
+      ul.appendChild(li);
+    });
+  }
+  $('dlAll').onclick = function () {
+    var list = ['still', 'idle', 'walk', 'walk4', 'react'].filter(function (k) { return session[k]; }), i = 0;
+    (function step() {
+      if (i >= list.length) { $('roomNote').textContent = '다 받았다 — 받은 것을 세션에 주고 "올려 줘" 한다'; return; }
+      var e = session[list[i++]];
+      download(e.png, e.name, 'image/png');
+      (e.rec ? e.rec.then(function (x) { download(x.bytes, x.name, 'application/json'); }) : Promise.resolve()).then(function () { setTimeout(step, 400); });
+    })();
+  };
   function stage() {
     if (!window.AtelierSprite || (!session.still && !session.idle)) { $('stageBox').hidden = true; return; }
     var m = me(), have = ['still', 'idle', 'walk', 'walk4', 'react'].filter(function (k) { return session[k]; });
@@ -774,6 +895,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     $('roomNote').textContent = '세운 상태: ' + have.map(function (k) { return STATE_TAB[k]; }).join(' · ') + (miss.length ? ' — 아직 없는 것: ' + miss.join(' · ') : ' — 넷 다 있다') +
       '. 공방 화면과 같은 재생기라 여기서 보는 대로 움직인다.' + (A().put ? ' 인물 칸은 ' + A().put.data + ' 의 actors 에.' : '');
     $('actorEntry').value = JSON.stringify(def, null, 1);
+    doneList();
   }
   $('cpActor').onclick = function () {
     var t = $('actorEntry').value;
@@ -781,7 +903,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
       function () { $('actorEntry').select(); $('roomNote').textContent = '복사가 막혔다 — 글을 골라 두었다'; });
   };
 
-  chips(); tabs(); prompt(); options(); loadAtelier();
+  chips(); tabs(); prompt(); options(); chooserView(true); loadAtelier();
   D.load('dot/dot.wasm?v=5').then(function (w) { W = w; ready(); }).catch(function (e) { status($('runStatus'), '정리기를 못 불러왔다 — ' + e.message, 'bad'); });
 })();
 </script>
