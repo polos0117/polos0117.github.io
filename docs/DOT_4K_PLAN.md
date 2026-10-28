@@ -242,3 +242,4 @@ target/release/dot stride alice_begin_walk.png --cell 192x256 --ms 200
 - 원본 번호: 손자·춘향 정지 gen2 · 대기 gen2 · 걷기 gen3 · 반응 gen2(앨리스는 정지 gen3 · 걷기 gen3). 기록 `records/sprites/<인물>/<상태>_4k.json`. 그림 저장소 커밋 `2f21741`.
 - 검사: book `tests/sprites-data.py`(인물 6 · 그림 24장), `tests/sprite-screen.cjs`(대기 차례는 인물의 order 를, 화소비는 dot 을 셈에 넣는다), 여기 `tests/dot.cjs`(기록 24장을 다시 정리해 화소 하나 다르지 않다 · 걷기 dy·빠르기 = sprites.json).
 - 도트 공방의 기본 크기는 그대로 보통(1024×1536) — 인물마다 크기를 기억하니 새 인물은 4K 를 고르면 된다. 옛 기록을 다시 정리하는 검사가 보통 크기에 묶여 있어 기본값은 안 바꿨다.
+- 같은 날 사용자 "공방 그림 중 마음에 드는 것 하나 골라 도트로" — **뤼팽 결말(귀환)** `img/arsene_lupin_end_literary_fantasy_f.webp` 을 골라 같은 길로 한 벌(`arsene_lupin`, 폼 `end`, 정본 하나 + 앨리스 4K 정지 6배 본보기). 정지 gen1 → 격자 16.0px, 인물 87×230, 시트 228줄. 걷기 dy `[2, 2, 2, -2, -2, -2]`, 보폭 69 → 빠르기 115, 다리가 번갈아 나왔다. 반응은 모자 들기 → 인사 → 돌아오기. 그림 저장소 `sprites/arsene_lupin/`, 기록 `records/sprites/arsene_lupin/*_4k.json`. 여기 `tests/dot.cjs` 는 기록 28장.

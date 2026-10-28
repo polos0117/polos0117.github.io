@@ -72,7 +72,7 @@ function sourceHash() {
         same++; W.free(raw); W.free(out.id);
       }
     }
-    assert.equal(same, 24, '세 인물 × (정지·대기·걷기·반응) × (처음 도트·4K)');
+    assert.equal(same, 28, '세 인물 × (정지·대기·걷기·반응) × (처음 도트·4K) + 뤼팽(귀환) 4K 넷');
     /* 걷기 v2 — 오르내림·빠르기가 book 의 sprites.json 과 같다(4K 인물은 오르내림 두 칸) */
     const book = JSON.parse(fs.readFileSync(path.join(ROOT, '..', 'book-atelier/data/sprites.json'), 'utf8'));
     for (const [who, a] of Object.entries(book.actors)) {
