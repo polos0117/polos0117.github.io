@@ -365,15 +365,16 @@
 
   /* ── 그리기 — gpt 그림 API(images/edits)에 지시문과 첨부를 보내 원본 한 장을 받는다(도트 공방의 「그린다」).
      열쇠는 부르는 쪽이 준다(화면은 이 기기의 localStorage 에만 둔다). 첨부는 차례대로 image[] — 지시문의 "attached image N" 이 그 차례다.
-     input_fidelity high — 얼굴·옷을 첨부대로 지키라는 것. background transparent + png — 지시문의 투명 바탕과 같은 말.
-     값은 한 장 1024×1536 기준 대략(2026-10): low $0.02 · medium $0.07 · high $0.25, 첨부가 있으면 조금 더 ── */
-  var GEN = { url: 'https://api.openai.com/v1/images/edits', model: 'gpt-image-1', size: '1024x1536', fidelity: 'high',
-    quality: { low: 0.02, medium: 0.07, high: 0.25 } };
+     모델(2026-10-28): gpt-image-1 은 2026-10-23 에 끝났다(1.5·mini 는 12-01). 지금은 gpt-image-2.5-sunburst(기본 — 꼼꼼) · gpt-image-2.5-flare(빠름).
+     2 세대부터 첨부는 늘 높은 충실도라 input_fidelity 를 안 보낸다(보내면 모르는 인자). background transparent + png — 지시문의 투명 바탕과 같은 말.
+     값은 토큰제라 대략(한 장 1024×1536, 첨부 빼고): low $0.005 · medium $0.01 · high $0.04 · xhigh 그 위 — 모델 둘이 같은 값 ── */
+  var GEN = { url: 'https://api.openai.com/v1/images/edits', size: '1024x1536',
+    models: { 'gpt-image-2.5-sunburst': '꼼꼼 — 기본', 'gpt-image-2.5-flare': '빠름' }, model: 'gpt-image-2.5-sunburst',
+    quality: { low: 0.005, medium: 0.01, high: 0.04, xhigh: 0.08 } };
   function genForm(o) {
     var f = new FormData();
-    f.append('model', GEN.model); f.append('prompt', o.prompt); f.append('n', '1'); f.append('size', GEN.size);
+    f.append('model', GEN.models[o.model] ? o.model : GEN.model); f.append('prompt', o.prompt); f.append('n', '1'); f.append('size', GEN.size);
     f.append('quality', GEN.quality[o.quality] ? o.quality : 'medium'); f.append('background', 'transparent'); f.append('output_format', 'png');
-    f.append('input_fidelity', GEN.fidelity);
     (o.images || []).forEach(function (im) { f.append('image[]', new Blob([im.bytes], { type: im.type || 'image/png' }), im.name || 'image.png'); });
     return f;
   }
@@ -381,6 +382,7 @@
     var m = j && j.error && j.error.message;
     if (status === 401) return '열쇠가 틀리거나 만료됐다(401)';
     if (status === 429) return '한도를 넘었다(429)' + (m ? ' — ' + m : '');
+    if (m && /does not exist|do not have access|must be verified/i.test(m)) return '이 열쇠로는 그 모델을 못 쓴다(모델이 끝났거나 조직 확인이 필요하다) — ' + m;
     if (status === 400 && m && /safety|moderation|content policy|rejected/i.test(m)) return '안전 필터에 막혔다 — ' + m;
     return (status ? status + ' ' : '') + (m || '응답을 못 받았다');
   }

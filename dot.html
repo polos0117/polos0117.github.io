@@ -21,7 +21,7 @@
   ① 인물: 공방을 고르면 그 공방의 그림 등록부(/<공방>/data/img.json — 같은 출처라 그대로 읽는다)에서 인물 목록, 고르면 그 인물의 그림들.
      정본·의상 그림을 짚고, 영문 이름·폼·생김새 한 줄을 적는다.
   ② 지시문: 상태(정지·대기·걷기·반응)마다 GPT 이미지 생성에 그대로 줄 요청문과 첨부 차례. 정지 도트 6배·다리 자세 안내 그림을 여기서 받는다.
-     「그린다」: OpenAI API 열쇠(이 기기의 localStorage 에만)를 넣으면 지시문과 첨부를 gpt 그림 API(dot.js 의 generate)에 보내 원본을 받아 ③ 에 바로 넣는다 —
+     「그린다」: OpenAI API 열쇠(이 기기의 localStorage 에만)를 넣으면 지시문과 첨부를 gpt 그림 API(dot.js 의 generate — 모델은 gpt-image-2.5 sunburst/flare)에 보내 원본을 받아 ③ 에 바로 넣는다 —
      이때만 첨부와 지시문이 OpenAI 로 간다. 마음에 안 들면 「다시」(원본 번호 gen1·gen2… 가 올라간다).
   ③ 정리: 받은 원본 PNG 를 dot/dot.wasm(rust/dot-core — book-atelier 파이썬 도구와 같은 셈, 화소 하나 다르지 않다)으로 정리해
      미리 보고 재생하고, 정리본 PNG · 기록 JSON · sprites.json 칸을 받는다. 정리는 이 브라우저 안에서만 — 올리기는 세션이 한다.
@@ -215,8 +215,10 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
         받은 원본이 ③ 의 원본 자리에 바로 들어간다. 열쇠는 이 기기에만 남는다. 본보기(같은 공방의 정지 도트 6배)는 손으로 붙일 때만 들어간다.</p>
       <div class="fields">
         <label class="wide">OpenAI API 열쇠<span class="keyrow"><input type="password" id="key" placeholder="sk-…" autocomplete="off" spellcheck="false"><button class="btn" type="button" id="keyClear">지움</button></span></label>
-        <label>품질 · 한 장 값<select id="quality">
-          <option value="low">낮음 — 빠르다 · 약 $0.02</option><option value="medium" selected>보통 · 약 $0.07</option><option value="high">높음 · 약 $0.25</option></select></label>
+        <label>모델<select id="model">
+          <option value="gpt-image-2.5-sunburst" selected>gpt-image-2.5-sunburst — 꼼꼼(기본)</option><option value="gpt-image-2.5-flare">gpt-image-2.5-flare — 빠름</option></select></label>
+        <label>품질 · 한 장 값(대략)<select id="quality">
+          <option value="low">낮음 · 약 $0.005</option><option value="medium" selected>보통 · 약 $0.01</option><option value="high">높음 · 약 $0.04</option><option value="xhigh">아주 높음 · 약 $0.08</option></select></label>
       </div>
       <div class="row"><button class="btn main" type="button" id="draw" disabled>그린다</button><button class="btn" type="button" id="dlGen" hidden>원본 PNG 받기</button></div>
       <p class="status" id="genStatus" role="status"></p>
@@ -263,7 +265,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
 </main>
 <footer>polos0117 · 도트 공방 · 정리 셈은 rust/dot-core (book-atelier 파이썬 도구와 같은 화소)</footer>
 
-<script src="dot/dot.js?v=6"></script>
+<script src="dot/dot.js?v=7"></script>
 <script src="sprite-actor.js?v=3"></script>
 <script>
 (function () {
@@ -287,7 +289,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   var session = {}, actor = null;   // 무대 — 이번에 정리한 상태마다 {url(그림), walk}
 
   function save() {
-    try { localStorage.setItem(KEY, JSON.stringify({ atelier: S.atelier, card: S.card, state: S.state, per: S.per, quality: saved.quality })); } catch (e) { /* 저장이 막혀도 화면은 돈다 */ }
+    try { localStorage.setItem(KEY, JSON.stringify({ atelier: S.atelier, card: S.card, state: S.state, per: S.per, quality: saved.quality, model: saved.model })); } catch (e) { /* 저장이 막혀도 화면은 돈다 */ }
     /* 주소도 지금 고른 것으로 — 새로 고침·공유가 같은 자리를 연다 */
     var u = new URL(location.href); u.searchParams.set('a', S.atelier); u.searchParams.set('s', S.state);
     if (S.card) u.searchParams.set('c', S.card); else u.searchParams.delete('c');
@@ -460,8 +462,9 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   $('key').value = keyOf();
   $('key').addEventListener('input', function () { try { if ($('key').value.trim()) localStorage.setItem(KEY_KEY, $('key').value.trim()); else localStorage.removeItem(KEY_KEY); } catch (e) { /* 저장이 막혀도 이번 화면에선 쓴다 */ } drawReady(); });
   $('keyClear').onclick = function () { $('key').value = ''; try { localStorage.removeItem(KEY_KEY); } catch (e) { /* 위와 같다 */ } drawReady(); status($('genStatus'), '열쇠를 지웠다'); };
-  try { if (saved.quality && D.GEN.quality[saved.quality]) $('quality').value = saved.quality; } catch (e) { /* 없으면 보통 */ }
+  try { if (saved.quality && D.GEN.quality[saved.quality]) $('quality').value = saved.quality; if (saved.model && D.GEN.models[saved.model]) $('model').value = saved.model; } catch (e) { /* 없으면 기본 */ }
   $('quality').onchange = function () { saved.quality = $('quality').value; save(); };
+  $('model').onchange = function () { saved.model = $('model').value; save(); };
   /* 원본 번호 — 이 인물·상태(·칸)에서 몇 번째로 그렸나. 받을 때마다 하나 오른다(원본은 지우지 않고 gen2·gen3… 로 쌓는다) */
   function genKey() { return S.atelier + '/' + S.card + '/' + S.state + (sep() ? '/' + S.frame : ''); }
   function genNo() { return (gens[genKey()] || 0) + 1; }
@@ -501,10 +504,10 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     var o = Object.assign(reqOpts(), { sample: false }), p = D.prompt(o), t0 = Date.now(), key = $('key').value.trim(), state = S.state, gk = genKey();
     var n = D.names(o.id, o.form, state, o.gen), rawName = (n.raws ? n.raws[S.frame - 1] : n.raw).split('/').pop();
     drawing = true; drawReady(); $('genOut').hidden = true; $('dlGen').hidden = true;
-    status($('genStatus'), '첨부 ' + p.attach.length + '장을 모아 보낸다… (' + $('quality').value + ' · 보통 10~60초)');
+    status($('genStatus'), '첨부 ' + p.attach.length + '장을 모아 보낸다… (' + $('model').value + ' · ' + $('quality').value + ' · 보통 10~60초)');
     Promise.resolve().then(function () { return attachments(o, p); }).then(function (images) {
       status($('genStatus'), 'OpenAI 가 그리는 중… 첨부 ' + images.length + '장 · ' + rawName);
-      return D.generate(key, { prompt: p.text, images: images, quality: $('quality').value });
+      return D.generate(key, { prompt: p.text, images: images, quality: $('quality').value, model: $('model').value });
     }).then(function (r) {
       gens[gk] = o.gen;
       var sec = ((Date.now() - t0) / 1000).toFixed(1);
@@ -515,7 +518,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
       if ($('genImg').src) URL.revokeObjectURL($('genImg').src);
       $('genImg').src = URL.createObjectURL(new Blob([r.bytes], { type: 'image/png' }));
       $('genFacts').innerHTML = '';
-      var rows = [['원본', rawName], ['걸린 시간', sec + '초'], ['품질', $('quality').value]];
+      var rows = [['원본', rawName], ['걸린 시간', sec + '초'], ['모델 · 품질', $('model').value + ' · ' + $('quality').value]];
       if (r.usage && r.usage.total_tokens) rows.push(['토큰', r.usage.total_tokens + (r.usage.input_tokens != null ? ' (들어간 ' + r.usage.input_tokens + ' · 나온 ' + r.usage.output_tokens + ')' : '')]);
       rows.push(['다음', '③ 「정리하기」 — 마음에 안 들면 「다시 그린다」(원본 번호가 오른다)']);
       rows.forEach(function (x) { var dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = x[0]; dd.textContent = x[1]; $('genFacts').appendChild(dt); $('genFacts').appendChild(dd); });

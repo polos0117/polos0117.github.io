@@ -118,7 +118,7 @@ const server = http.createServer((q, s) => {
     assert.equal(genCalls.length, 1, '요청 한 번');
     const c1 = genCalls[0];
     assert.equal(c1.auth, 'Bearer sk-test-123'); assert.equal(c1.url, 'https://api.openai.com/v1/images/edits');
-    assert.equal(c1.fields.model, 'gpt-image-1'); assert.equal(c1.fields.size, '1024x1536'); assert.equal(c1.fields.quality, 'medium'); assert.equal(c1.fields.background, 'transparent'); assert.equal(c1.fields.input_fidelity, 'high');
+    assert.equal(c1.fields.model, 'gpt-image-2.5-sunburst'); assert.equal(c1.fields.size, '1024x1536'); assert.equal(c1.fields.quality, 'medium'); assert.equal(c1.fields.background, 'transparent'); assert.equal(c1.fields.input_fidelity, undefined, '2 세대는 input_fidelity 없음');
     assert.deepEqual(c1.images, [canonFile, outfitFile], '첨부 = 정본·의상 그 파일');
     assert(c1.fields.prompt.startsWith('Pixel art game sprite of the SAME young woman') && c1.fields.prompt.includes('Attached image 2 shows the outfit') && !c1.fields.prompt.includes('Attached image 3'), '지시문 그대로(본보기는 빠진다)');
     assert(c1.bytes > 200000, '첨부 바이트가 실려 갔다 ' + c1.bytes);
@@ -133,10 +133,12 @@ const server = http.createServer((q, s) => {
     assert.equal(genCalls.length, 2, '다시 → 둘째 요청, 원본 번호 2');
     await page.click('.tab[data-s="walk"]');
     await page.waitForFunction(() => !document.getElementById('draw').disabled);
+    await page.selectOption('#model', 'gpt-image-2.5-flare'); await page.selectOption('#quality', 'low');
     await page.click('#draw'); await page.waitForFunction(() => /alice_begin_walk_gen1\.png/.test(document.getElementById('rawName').textContent), null, { timeout: 20000 });
     const c3 = genCalls[2];
     assert.deepEqual(c3.images, ['alice_begin_still_x6.png', 'walk_leg_guide.png', canonFile], '걷기 첨부 셋 — 정지 6배·다리 안내·정본');
     assert(c3.fields.prompt.includes('WALK CYCLE sprite sheet'), '걷기 지시문');
+    assert.equal(c3.fields.model, 'gpt-image-2.5-flare'); assert.equal(c3.fields.quality, 'low');
     genFail = 401;
     await page.click('.tab[data-s="still"]'); await page.click('#draw');
     await page.waitForFunction(() => /못 그렸다/.test(document.getElementById('genStatus').textContent), null, { timeout: 20000 });
@@ -144,6 +146,7 @@ const server = http.createServer((q, s) => {
     genFail = 0;
     await page.reload(); await page.waitForSelector('#who:not([hidden])');
     assert.equal(await page.inputValue('#key'), 'sk-test-123', '열쇠는 이 기기에 남는다');
+    assert.equal(await page.inputValue('#model'), 'gpt-image-2.5-flare'); assert.equal(await page.inputValue('#quality'), 'low', '고른 모델·품질도 남는다');
     await page.click('#keyClear');
     assert.equal(await page.isDisabled('#draw'), true, '지우면 못 그린다'); assert.equal(await page.evaluate(() => localStorage.getItem('atelier_openai_key_v1')), null);
     checks += 4;
