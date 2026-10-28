@@ -2,6 +2,7 @@
    ① ?a=book&c=alice 로 열면 앨리스가 골라져 있고 그 인물의 그림·정본이 뜬다. 영문 이름·생김새가 요청문에 들어간다.
    ② 상태 넷 — 걷기는 첨부 셋(정지 도트 6배·다리 안내·정본)과 다리 안내 받기, 동작 시트는 정지 도트 6배 받기.
    ③ 정리 — book 의 앨리스 정지 원본(gen2)·손자 걷기 원본(gen1)을 넣어 정리해 받은 PNG 가 그림 저장소의 정리본과 화소 하나 다르지 않다.
+   그린다 — OpenAI 그림 API 를 흉내 내(api.openai.com 을 가로채 앨리스 원본을 돌려준다): 열쇠 없으면 못 그린다, 첨부가 지시문 차례로 실린다, 받은 원본이 ③ 에 들어가 정리하면 같은 화소, 다시 → gen2, 걷기는 첨부 셋, 401, 열쇠는 남고 지울 수 있다.
       걷기는 빠르기·dy, sprites.json 칸, 기록 JSON. 정지를 정리하면 그것이 동작 시트의 정지 도트가 된다.
    공방 바꾸기(포켓몬 379명 → 찾기 → 피카츄 = pikachu), 새로 고쳐도 고른 값이 남는다, 344×882 · 390×844 · 844×390 · 1280×900 에서 옆으로 넘치지 않고 누르는 자리 44px.
    옆 저장소(../book-atelier · ../book-atelier-img · ../pkm-atelier …)를 같은 출처의 /<저장소>/ 로 내준다 — 실제 Pages 와 같은 꼴.
@@ -38,6 +39,17 @@ const server = http.createServer((q, s) => {
   try {
     const ctx = await br.newContext({ viewport: { width: 390, height: 844 }, acceptDownloads: true });
     await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, r => r.abort());   // 글꼴 같은 바깥 것은 받지 않는다
+    /* 「그린다」 — OpenAI 그림 API 를 흉내 낸다(뒤에 단 것이 먼저 맞는다): 요청을 적어 두고 앨리스 정지 원본(gen2)을 돌려준다. genFail 이면 그 상태로 거절 */
+    const genCalls = []; let genFail = 0;
+    const aliceRaw = fs.readFileSync(path.join(IMG, 'sprites/alice/raw/alice_begin_still_gen2.png'));
+    await ctx.route('https://api.openai.com/**', r => {
+      const q = r.request(), body = (q.postDataBuffer() || Buffer.alloc(0)).toString('latin1'), fields = {};
+      for (const m of body.matchAll(/name="([^"\[]+)"\r\n\r\n([\s\S]*?)\r\n--/g)) fields[m[1]] = m[2];
+      const images = Array.from(body.matchAll(/name="image\[\]"; filename="([^"]+)"/g), m => m[1]);
+      genCalls.push({ url: q.url(), auth: q.headers()['authorization'], fields, images, bytes: body.length });
+      if (genFail) return r.fulfill({ status: genFail, contentType: 'application/json', body: JSON.stringify({ error: { message: 'Incorrect API key provided' } }) });
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [{ b64_json: aliceRaw.toString('base64') }], usage: { total_tokens: 1234, input_tokens: 1000, output_tokens: 234 } }) });
+    });
     const page = await ctx.newPage(), errors = [];
     page.on('pageerror', e => errors.push(String(e)));
     /* 그림 404 는 옆에 받아 둔 그림 저장소가 등록부보다 늦을 때 난다(화면은 원본으로 바꿔 보인다) — 그림 말고 다른 것이 없으면 실패 */
@@ -89,6 +101,52 @@ const server = http.createServer((q, s) => {
     const big = pixels(x6.buf); assert.deepEqual([big.w, big.h], [576, 768], '6배');
     assert.equal(await page.isDisabled('#x6'), false, '정지를 정리하면 6배를 받을 수 있다');
     checks += 2;
+
+    /* 「그린다」 — 열쇠를 넣으면 지시문·첨부가 API 로 가고, 받은 원본이 ③ 에 들어가 정리하면 같은 화소. 다시 → gen2. 걷기는 첨부 셋. 401. 열쇠 남음·지움 */
+    await page.goto(BASE + '/dot.html?a=book&c=alice&s=still'); await page.waitForSelector('#who:not([hidden])');
+    await page.waitForFunction(() => !document.getElementById('run').disabled || document.getElementById('draw').title !== '정리기를 아직 싣는 중이다');
+    assert.equal(await page.isDisabled('#draw'), true, '열쇠가 없으면 못 그린다'); assert.match(await page.getAttribute('#draw', 'title'), /열쇠/);
+    await page.fill('#key', 'sk-test-123');
+    await page.waitForFunction(() => !document.getElementById('draw').disabled);
+    const perOf = () => page.evaluate(() => JSON.parse(localStorage.getItem('atelier_dot_v1')).per['book/alice']);
+    if (!(await perOf()).outfit) await page.locator('#refs li').nth(0).locator('button.o').click();   // 의상 → 첨부 둘(앞에서 짚었으면 그대로)
+    assert.equal(await page.locator('#attach li').count(), 2);
+    const canonFile = (await perOf()).canon, outfitFile = (await perOf()).outfit;
+    await page.click('#draw');
+    assert.equal(await page.textContent('#draw'), '그리는 중…');
+    await page.waitForFunction(() => /받았다/.test(document.getElementById('genStatus').textContent), null, { timeout: 20000 });
+    assert.equal(genCalls.length, 1, '요청 한 번');
+    const c1 = genCalls[0];
+    assert.equal(c1.auth, 'Bearer sk-test-123'); assert.equal(c1.url, 'https://api.openai.com/v1/images/edits');
+    assert.equal(c1.fields.model, 'gpt-image-1'); assert.equal(c1.fields.size, '1024x1536'); assert.equal(c1.fields.quality, 'medium'); assert.equal(c1.fields.background, 'transparent'); assert.equal(c1.fields.input_fidelity, 'high');
+    assert.deepEqual(c1.images, [canonFile, outfitFile], '첨부 = 정본·의상 그 파일');
+    assert(c1.fields.prompt.startsWith('Pixel art game sprite of the SAME young woman') && c1.fields.prompt.includes('Attached image 2 shows the outfit') && !c1.fields.prompt.includes('Attached image 3'), '지시문 그대로(본보기는 빠진다)');
+    assert(c1.bytes > 200000, '첨부 바이트가 실려 갔다 ' + c1.bytes);
+    assert.match(await page.textContent('#rawName'), /^alice_begin_still_gen1\.png · 1024×1536/, '③ 원본 자리에');
+    assert.equal(await page.isHidden('#genOut'), false); assert((await page.textContent('#genFacts')).includes('1234'), '토큰');
+    assert.equal(await page.textContent('#draw'), '다시 그린다');
+    const rawDl = await save('#dlGen'); assert.equal(rawDl.name, 'alice_begin_still_gen1.png'); assert(rawDl.buf.equals(aliceRaw), '원본 PNG 그대로');
+    await page.click('#opts summary'); await page.fill('#opt-rows', '0'); await page.uncheck('#opt-outline');
+    await page.click('#run'); await page.waitForSelector('#result:not([hidden])');
+    samePixels((await save('#dlPng')).buf, 'sprites/alice/alice_begin_still.png', '그려 받은 원본을 정리');
+    await page.click('#draw'); await page.waitForFunction(() => /gen2\.png/.test(document.getElementById('rawName').textContent), null, { timeout: 20000 });
+    assert.equal(genCalls.length, 2, '다시 → 둘째 요청, 원본 번호 2');
+    await page.click('.tab[data-s="walk"]');
+    await page.waitForFunction(() => !document.getElementById('draw').disabled);
+    await page.click('#draw'); await page.waitForFunction(() => /alice_begin_walk_gen1\.png/.test(document.getElementById('rawName').textContent), null, { timeout: 20000 });
+    const c3 = genCalls[2];
+    assert.deepEqual(c3.images, ['alice_begin_still_x6.png', 'walk_leg_guide.png', canonFile], '걷기 첨부 셋 — 정지 6배·다리 안내·정본');
+    assert(c3.fields.prompt.includes('WALK CYCLE sprite sheet'), '걷기 지시문');
+    genFail = 401;
+    await page.click('.tab[data-s="still"]'); await page.click('#draw');
+    await page.waitForFunction(() => /못 그렸다/.test(document.getElementById('genStatus').textContent), null, { timeout: 20000 });
+    assert.match(await page.textContent('#genStatus'), /401/); assert.equal(await page.isDisabled('#draw'), false, '틀려도 다시 누를 수 있다');
+    genFail = 0;
+    await page.reload(); await page.waitForSelector('#who:not([hidden])');
+    assert.equal(await page.inputValue('#key'), 'sk-test-123', '열쇠는 이 기기에 남는다');
+    await page.click('#keyClear');
+    assert.equal(await page.isDisabled('#draw'), true, '지우면 못 그린다'); assert.equal(await page.evaluate(() => localStorage.getItem('atelier_openai_key_v1')), null);
+    checks += 4;
 
     /* 손자 걷기(gen1) — 기본값(121줄 · 3x2 · 쪼가리 40 · 96x128) 그대로가 그때 인자 */
     await page.goto(BASE + '/dot.html?a=book&c=sunzi&s=walk');
@@ -227,6 +285,6 @@ const server = http.createServer((q, s) => {
     /* 공방 지도에서 들어오는 문 */
     await page.goto(BASE + '/'); assert.equal(await page.locator('a[href="dot.html"]').count() >= 1, true, '지도 목록 아래 「도트 공방」');
     checks++;
-    console.log('PASS 도트 공방 화면: ' + checks + '가지 · 인물 고르기·정본/의상·요청문 · 상태 넷의 첨부 · 앨리스 정지·손자 걷기를 화면에서 정리해 그림 저장소 정리본과 화소 하나 다르지 않다 · 6배·빠르기·dy·sprites.json 칸·기록 · 공방 다섯 · 새로 고침 · 네 크기');
+    console.log('PASS 도트 공방 화면: ' + checks + '가지 · 인물 고르기·정본/의상·요청문 · 상태 넷의 첨부 · 앨리스 정지·손자 걷기를 화면에서 정리해 그림 저장소 정리본과 화소 하나 다르지 않다 · 그린다(열쇠·첨부 차례·③ 으로·같은 화소·다시·걷기 셋·401·열쇠 남음/지움) · 6배·빠르기·dy·sprites.json 칸·기록 · 공방 다섯 · 새로 고침 · 네 크기');
   } finally { await br.close(); server.close(); fs.rmSync(tmp, { recursive: true, force: true }); }
 })().catch(e => { console.error(e); process.exit(1); });

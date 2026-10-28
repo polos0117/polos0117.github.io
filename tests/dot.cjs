@@ -193,6 +193,31 @@ function sourceHash() {
     }
   }
 
+  /* ── 그리기 — gpt 그림 API 요청의 꼴. fetch 를 바꿔 끼워 본다: 주소·열쇠·모델·크기·품질·투명 바탕·PNG·첨부 차례, 오류 말 ── */
+  {
+    const calls = [];
+    const reply = (status, body) => () => Promise.resolve({ ok: status === 200, status, text: () => Promise.resolve(JSON.stringify(body)) });
+    const good = (url, init) => { calls.push({ url, init }); return reply(200, { data: [{ b64_json: Buffer.from([0x89, 0x50, 0x4e, 0x47]).toString('base64') }], usage: { total_tokens: 1234, input_tokens: 1000, output_tokens: 234 } })(); };
+    const r = await D.generate('sk-x', { prompt: 'Pixel art…', images: [{ bytes: new Uint8Array([9, 9]), name: 'a.webp', type: 'image/webp' }, { bytes: new Uint8Array([1]), name: 'b.png' }], quality: 'high' }, good);
+    assert.deepEqual(Array.from(r.bytes), [0x89, 0x50, 0x4e, 0x47], '받은 b64 를 바이트로'); assert.equal(r.usage.total_tokens, 1234);
+    assert.equal(calls[0].url, D.GEN.url); assert.equal(calls[0].init.method, 'POST'); assert.equal(calls[0].init.headers.Authorization, 'Bearer sk-x');
+    const f = calls[0].init.body;
+    assert.equal(f.get('model'), 'gpt-image-1'); assert.equal(f.get('size'), '1024x1536'); assert.equal(f.get('quality'), 'high'); assert.equal(f.get('n'), '1');
+    assert.equal(f.get('background'), 'transparent'); assert.equal(f.get('output_format'), 'png'); assert.equal(f.get('input_fidelity'), 'high'); assert.equal(f.get('prompt'), 'Pixel art…');
+    const ims = f.getAll('image[]');
+    assert.deepEqual(ims.map(b => [b.name, b.type, b.size]), [['a.webp', 'image/webp', 2], ['b.png', 'image/png', 1]], '첨부가 차례대로 image[]');
+    assert.equal(D.genForm({ prompt: 'x', images: [], quality: 'bogus' }).get('quality'), 'medium', '모르는 품질은 보통');
+    assert.deepEqual(Object.keys(D.GEN.quality), ['low', 'medium', 'high']);
+    await assert.rejects(D.generate('', { prompt: 'p', images: [] }, good), /열쇠가 없다/);
+    await assert.rejects(D.generate('k', { prompt: 'p', images: [] }, reply(401, { error: { message: 'Incorrect API key' } })), /401/);
+    await assert.rejects(D.generate('k', { prompt: 'p', images: [] }, reply(429, { error: { message: 'quota' } })), /429.*quota/);
+    await assert.rejects(D.generate('k', { prompt: 'p', images: [] }, reply(400, { error: { message: 'Your request was rejected by the safety system.' } })), /안전 필터.*safety/);
+    await assert.rejects(D.generate('k', { prompt: 'p', images: [] }, reply(400, { error: { message: 'Invalid value: size' } })), /400 Invalid value/);
+    await assert.rejects(D.generate('k', { prompt: 'p', images: [] }, reply(200, { data: [] })), /그림이 없다/);
+    await assert.rejects(D.generate('k', { prompt: 'p', images: [] }, () => Promise.reject(new Error('net down'))), /못 닿았다.*net down/);
+    n += 3;
+  }
+
   /* ── 도트 재생기 복사본 — 옆에 받아 둔 다섯 공방 저장소의 lib/sprite-actor.{js,css} 가 여기 원본과 같다 ── */
   const copies = [];
   for (const repo of ['atelier', 'pkm-atelier', 'myth-atelier', 'book-atelier', 'sam-atelier']) {
@@ -227,5 +252,5 @@ function sourceHash() {
   }
   n++;
 
-  console.log('PASS 도트 공방: ' + n + '가지 · wasm 이 소스와 같다 · book 기록 ' + same + '장을 다시 정리해 화소 하나 다르지 않다(걷기 dy·빠르기까지) · 지시문·요청문·이름·기록·인물 칸 · 재생기 복사본 ' + copies.length + '곳 = 원본 · 그림 목록 ' + seen.join(' · '));
+  console.log('PASS 도트 공방: ' + n + '가지 · wasm 이 소스와 같다 · book 기록 ' + same + '장을 다시 정리해 화소 하나 다르지 않다(걷기 dy·빠르기까지) · 지시문·요청문·이름·기록·인물 칸 · 그리기 요청 꼴·오류 말 · 재생기 복사본 ' + copies.length + '곳 = 원본 · 그림 목록 ' + seen.join(' · '));
 })().catch(e => { console.error(e); process.exit(1); });

@@ -363,8 +363,49 @@
     return out.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
   }
 
-  var api = { API: API, CELL: CELL, FOOT: FOOT, STATES: STATES, CLEAN: CLEAN, SUBJECTS: SUBJECTS, ATTACH: ATTACH, STATE_NAME: STATE_NAME, ATELIERS: ATELIERS,
-    load: load, wrap: wrap, args: args, slug: slug, names: names, prompt: prompt, request: request, record: record, spriteState: spriteState, actor: actor, filesOf: filesOf, cards: cards };
+  /* ── 그리기 — gpt 그림 API(images/edits)에 지시문과 첨부를 보내 원본 한 장을 받는다(도트 공방의 「그린다」).
+     열쇠는 부르는 쪽이 준다(화면은 이 기기의 localStorage 에만 둔다). 첨부는 차례대로 image[] — 지시문의 "attached image N" 이 그 차례다.
+     input_fidelity high — 얼굴·옷을 첨부대로 지키라는 것. background transparent + png — 지시문의 투명 바탕과 같은 말.
+     값은 한 장 1024×1536 기준 대략(2026-10): low $0.02 · medium $0.07 · high $0.25, 첨부가 있으면 조금 더 ── */
+  var GEN = { url: 'https://api.openai.com/v1/images/edits', model: 'gpt-image-1', size: '1024x1536', fidelity: 'high',
+    quality: { low: 0.02, medium: 0.07, high: 0.25 } };
+  function genForm(o) {
+    var f = new FormData();
+    f.append('model', GEN.model); f.append('prompt', o.prompt); f.append('n', '1'); f.append('size', GEN.size);
+    f.append('quality', GEN.quality[o.quality] ? o.quality : 'medium'); f.append('background', 'transparent'); f.append('output_format', 'png');
+    f.append('input_fidelity', GEN.fidelity);
+    (o.images || []).forEach(function (im) { f.append('image[]', new Blob([im.bytes], { type: im.type || 'image/png' }), im.name || 'image.png'); });
+    return f;
+  }
+  function genError(status, j) {
+    var m = j && j.error && j.error.message;
+    if (status === 401) return '열쇠가 틀리거나 만료됐다(401)';
+    if (status === 429) return '한도를 넘었다(429)' + (m ? ' — ' + m : '');
+    if (status === 400 && m && /safety|moderation|content policy|rejected/i.test(m)) return '안전 필터에 막혔다 — ' + m;
+    return (status ? status + ' ' : '') + (m || '응답을 못 받았다');
+  }
+  function b64(s) {
+    var bin = typeof atob === 'function' ? atob(s) : Buffer.from(s, 'base64').toString('binary'), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  /* o: {prompt, images: [{bytes, name, type}], quality}. fetchFn 은 검사가 바꿔 끼운다 → Promise<{bytes(PNG), usage}> */
+  function generate(key, o, fetchFn) {
+    if (!key) return Promise.reject(new Error('열쇠가 없다'));
+    return (fetchFn || fetch)(GEN.url, { method: 'POST', headers: { Authorization: 'Bearer ' + key }, body: genForm(o) }).then(function (r) {
+      return r.text().then(function (t) {
+        var j = null; try { j = JSON.parse(t); } catch (e) { j = null; }
+        if (!r.ok) throw new Error(genError(r.status, j));
+        var d = j && j.data && j.data[0];
+        if (!d || !d.b64_json) throw new Error('응답에 그림이 없다');
+        return { bytes: b64(d.b64_json), usage: j.usage || null };
+      });
+    }, function (e) { throw new Error('OpenAI 에 못 닿았다 — ' + (e && e.message || e)); });
+  }
+
+  var api = { API: API, CELL: CELL, FOOT: FOOT, STATES: STATES, CLEAN: CLEAN, SUBJECTS: SUBJECTS, ATTACH: ATTACH, STATE_NAME: STATE_NAME, ATELIERS: ATELIERS, GEN: GEN,
+    load: load, wrap: wrap, args: args, slug: slug, names: names, prompt: prompt, request: request, record: record, spriteState: spriteState, actor: actor, filesOf: filesOf, cards: cards,
+    genForm: genForm, genError: genError, generate: generate };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.AtelierDot = api;
 })(typeof window !== 'undefined' ? window : this);
