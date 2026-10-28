@@ -56,7 +56,8 @@ const server = http.createServer((q, s) => {
     page.on('pageerror', e => errors.push(String(e)));
     /* 그림 404 는 옆에 받아 둔 그림 저장소가 등록부보다 늦을 때 난다(화면은 원본으로 바꿔 보인다) — 그림 말고 다른 것이 없으면 실패 */
     page.on('console', m => { if (m.type() === 'error' && !/ERR_FAILED|net::|Failed to load resource/.test(m.text())) errors.push(m.text()); });
-    page.on('response', r => { if (r.status() >= 400 && r.url().startsWith(BASE) && !/\.(webp|jpe?g|png)$/i.test(new URL(r.url()).pathname)) errors.push(r.status() + ' ' + r.url()); });
+    /* 그림 저장소 기록(records/sprites/…)의 404 는 "기록 없음" — 원본 번호를 셀 때 묻는다 */
+    page.on('response', r => { const u = new URL(r.url()).pathname; if (r.status() >= 400 && r.url().startsWith(BASE) && !/\.(webp|jpe?g|png)$/i.test(u) && !(r.status() === 404 && /\/records\/sprites\//.test(u))) errors.push(r.status() + ' ' + r.url()); });
     const save = async (btn) => { const [dl] = await Promise.all([page.waitForEvent('download'), page.click(btn)]); const f = path.join(tmp, dl.suggestedFilename()); await dl.saveAs(f); return { name: dl.suggestedFilename(), buf: fs.readFileSync(f) }; };
 
     /* ① 인물 */
@@ -71,11 +72,21 @@ const server = http.createServer((q, s) => {
     assert.equal(await page.inputValue('#id'), 'alice'); assert.equal(await page.inputValue('#form'), 'begin');
     assert.equal(await page.locator('#refs li.canon').count(), 1, '정본 하나가 처음부터 짚혀 있다');
     await page.fill('#identity', 'Short dark-brown bob with the bow on the image-left side of the head.');
+    /* 원본 번호 — 그림 저장소 기록(records/sprites/alice/still.json)에 gen1·gen2 가 있으니 gen3 부터 */
+    await page.waitForFunction(() => /alice_begin_still_gen3\.png/.test(document.getElementById('req').value), null, { timeout: 10000 });
     let req = await page.inputValue('#req');
-    assert(req.includes('alice_begin_still_gen1.png') && req.includes('bow on the image-left side') && req.includes('SAME young woman') && /book-atelier-img\/img\/alice_/.test(req), '정지 요청문');
+    assert(req.includes('alice_begin_still_gen3.png') && req.includes('bow on the image-left side') && req.includes('SAME young woman') && /book-atelier-img\/img\/alice_/.test(req), '정지 요청문');
     /* 의상 짚기 → 첨부 둘 */
     await page.locator('#refs li').nth(0).locator('button.o').click();
     assert.equal(await page.locator('#attach li').count(), 2, '정본 + 의상');
+    /* 본보기 둘 — 다른 인물(옷·색은 안 따른다) / 이 인물의 확정 도트. 하나만 고른다 */
+    await page.check('#sample'); assert.equal(await page.locator('#attach li').count(), 3, '본보기 — 다른 인물');
+    assert((await page.inputValue('#req')).includes('a finished sprite of a different character'));
+    await page.check('#sampleSelf'); assert.equal(await page.isChecked('#sample'), false, '본보기는 하나만');
+    req = await page.inputValue('#req');
+    assert(req.includes("this same character's approved sprite") && !req.includes('different character'), '같은 인물의 본보기 문장');
+    assert((await page.locator('#attach li').nth(2).textContent()).includes('이 인물의 확정 정지 도트'));
+    await page.uncheck('#sampleSelf'); assert.equal(await page.locator('#attach li').count(), 2);
     checks += 2;
 
     /* ② 상태 넷 */
@@ -83,8 +94,10 @@ const server = http.createServer((q, s) => {
     assert.equal(await page.locator('#attach li').count(), 3, '걷기 첨부 셋');
     assert.equal(await page.isVisible('#guide'), true, '다리 안내 받기');
     assert.equal(await page.isDisabled('#x6'), true, '정지 도트가 없으면 6배는 아직');
+    /* 걷기 — walk.json(gen1) 과 판 붙은 walk_v2.json(gen2) 을 다 읽어 gen3 */
+    await page.waitForFunction(() => /alice_begin_walk_gen3\.png/.test(document.getElementById('req').value), null, { timeout: 10000 });
     req = await page.inputValue('#req');
-    assert(req.includes('WALK CYCLE') && req.includes('walk_leg_guide.png') && req.includes('alice_begin_walk_gen1.png'));
+    assert(req.includes('WALK CYCLE') && req.includes('walk_leg_guide.png') && req.includes('alice_begin_walk_gen3.png'));
     await page.check('#skirt'); assert((await page.inputValue('#req')).includes('hidden by a long skirt')); await page.uncheck('#skirt');
     for (const s of ['idle', 'react']) { await page.click('.tab[data-s="' + s + '"]'); assert.equal(await page.locator('#attach li').count(), 2, s + ' 첨부 둘'); }
     const g = await page.request.get(BASE + '/dot/walk_leg_guide.png'); assert.equal(g.status(), 200);
@@ -130,11 +143,11 @@ const server = http.createServer((q, s) => {
     assert.deepEqual(c1.images, [canonFile, outfitFile], '첨부 = 정본·의상 그 파일');
     assert(c1.fields.prompt.startsWith('Pixel art game sprite of the SAME young woman') && c1.fields.prompt.includes('Attached image 2 shows the outfit') && !c1.fields.prompt.includes('Attached image 3'), '지시문 그대로(본보기는 빠진다)');
     assert(c1.bytes > 200000, '첨부 바이트가 실려 갔다 ' + c1.bytes);
-    assert.match(await page.textContent('#rawName'), /^alice_begin_still_gen1\.png · 1024×1536/, '③ 원본 자리에');
+    assert.match(await page.textContent('#rawName'), /^alice_begin_still_gen3\.png · 1024×1536/, '③ 원본 자리에(기록 다음 번호)');
     assert.equal(await page.isHidden('#genOut'), false); assert((await page.textContent('#genFacts')).includes('1234'), '토큰');
     assert.equal(await page.textContent('#draw'), '다시 그린다');
-    assert.equal(await page.getAttribute('.tab[data-s="still"]', 'data-done'), 'raw', '정지 ◐'); assert.match(await page.textContent('#todo'), /「정리하기」/, '할 일: 정리'); assert.match(await page.textContent('#inNote'), /원본: alice_begin_still_gen1\.png/);
-    const rawDl = await save('#dlGen'); assert.equal(rawDl.name, 'alice_begin_still_gen1.png'); assert(rawDl.buf.equals(aliceRaw), '원본 PNG 그대로');
+    assert.equal(await page.getAttribute('.tab[data-s="still"]', 'data-done'), 'raw', '정지 ◐'); assert.match(await page.textContent('#todo'), /「정리하기」/, '할 일: 정리'); assert.match(await page.textContent('#inNote'), /원본: alice_begin_still_gen3\.png/);
+    const rawDl = await save('#dlGen'); assert.equal(rawDl.name, 'alice_begin_still_gen3.png'); assert(rawDl.buf.equals(aliceRaw), '원본 PNG 그대로');
     await page.click('#opts summary'); await page.fill('#opt-rows', '0'); await page.uncheck('#opt-outline');
     assert.equal(await page.isHidden('#next'), true, '정리 전엔 다음이 없다');
     await page.click('#run'); await page.waitForSelector('#result:not([hidden])');
@@ -149,8 +162,13 @@ const server = http.createServer((q, s) => {
     await page.waitForFunction(() => /다 받았다/.test(document.getElementById('roomNote').textContent), null, { timeout: 10000 });
     for (let k = 0; k < 20 && dls.length < 2; k++) await page.waitForTimeout(100);
     assert.deepEqual(dls.sort(), ['alice_begin_still.png', 'still.json'], '전부 받기 — PNG 와 기록');
-    await page.click('#draw'); await page.waitForFunction(() => /gen2\.png/.test(document.getElementById('rawName').textContent), null, { timeout: 20000 });
-    assert.equal(genCalls.length, 2, '다시 → 둘째 요청, 원본 번호 2');
+    /* 다시 — 이번엔 이 인물의 확정 도트(③ 의 정지 도트 6배)를 본보기로: 첨부 셋, 같은 인물 문장 */
+    await page.check('#sampleSelf');
+    await page.click('#draw'); await page.waitForFunction(() => /gen4\.png/.test(document.getElementById('rawName').textContent), null, { timeout: 20000 });
+    assert.equal(genCalls.length, 2, '다시 → 둘째 요청, 원본 번호 하나 오른다');
+    assert.deepEqual(genCalls[1].images, [canonFile, outfitFile, 'alice_begin_still_x6.png'], '본보기 = 이 인물의 정지 도트 6배');
+    assert(genCalls[1].fields.prompt.includes("Attached image 3 is this same character's approved sprite"), '같은 인물 본보기 문장');
+    await page.uncheck('#sampleSelf');
     await page.click('#next');
     assert.equal(await page.getAttribute('.tab[aria-selected="true"]', 'data-s'), 'idle', '다음 → 대기'); assert.match(await page.textContent('#todo'), /대기 — 「그린다」/);
     await page.click('.tab[data-s="walk"]');
@@ -159,7 +177,7 @@ const server = http.createServer((q, s) => {
     await page.click('#setup summary');
     await page.selectOption('#model', 'gpt-image-2.5-flare'); await page.selectOption('#quality', 'low'); await page.selectOption('#size', '2160x3840');
     assert((await page.inputValue('#req')).includes('cell 720 x 1920'), '크기를 바꾸면 지시문의 칸도');
-    await page.click('#draw'); await page.waitForFunction(() => /alice_begin_walk_gen1\.png/.test(document.getElementById('rawName').textContent), null, { timeout: 20000 });
+    await page.click('#draw'); await page.waitForFunction(() => /alice_begin_walk_gen3\.png/.test(document.getElementById('rawName').textContent), null, { timeout: 20000 });
     const c3 = genCalls[2];
     assert.deepEqual(c3.images, ['alice_begin_still_x6.png', 'walk_leg_guide.png', canonFile], '걷기 첨부 셋 — 정지 6배·다리 안내·정본');
     assert(c3.fields.prompt.includes('WALK CYCLE sprite sheet'), '걷기 지시문');
@@ -180,8 +198,15 @@ const server = http.createServer((q, s) => {
     for (const s of ['idle', 'walk', 'react']) assert.equal(await page.getAttribute('.tab[data-s="' + s + '"]', 'data-done'), 'done', s + ' ●');
     assert.equal(await page.getAttribute('.tab[aria-selected="true"]', 'data-s'), 'idle', '끝나면 대기 탭에서 본다');
     assert.equal(await page.locator('#doneList li').count(), 4, '받기 목록 넷'); assert.match(await page.textContent('#todo'), /넷 다 됐다/);
-    assert.match(await page.textContent('#rawName'), /alice_begin_idle_gen1\.png/, '대기 탭의 제 원본');
-    await page.click('.tab[data-s="react"]'); assert.match(await page.textContent('#rawName'), /alice_begin_react_gen1\.png/, '반응 탭의 제 원본'); assert.equal(await page.isVisible('#result'), true, '제 결과도');
+    assert.match(await page.textContent('#rawName'), /alice_begin_idle_gen2\.png/, '대기 탭의 제 원본(기록 gen1 다음)');
+    await page.click('.tab[data-s="react"]'); assert.match(await page.textContent('#rawName'), /alice_begin_react_gen2\.png/, '반응 탭의 제 원본'); assert.equal(await page.isVisible('#result'), true, '제 결과도');
+    /* 원본 PNG 받기 = 그 탭의 원본(이름·바이트) — 마지막으로 받은 한 장(반응)이 아니라 */
+    for (const s of ['idle', 'walk', 'react']) {
+      await page.click('.tab[data-s="' + s + '"]');
+      const want = (await page.textContent('#rawName')).split(' · ')[0], dl = await save('#dlGen');
+      assert.equal(dl.name, want, s + ' 원본 이름'); assert.match(dl.name, new RegExp('^alice_begin_' + s + '_gen\\d+\\.png$'));
+      assert(dl.buf.equals(rawFor(s === 'idle' ? 'IDLE animation' : s === 'walk' ? 'WALK CYCLE' : 'REACT animation')), s + ' 원본 바이트');
+    }
     assert.match(await page.textContent('#facts'), /반응 · 4칸/);
     await page.click('.tab[data-s="still"]');
     await page.reload(); await page.waitForSelector('#who:not([hidden])');
@@ -192,6 +217,15 @@ const server = http.createServer((q, s) => {
     await page.click('#keyClear');
     assert.equal(await page.isDisabled('#draw'), true, '지우면 못 그린다'); assert.equal(await page.evaluate(() => localStorage.getItem('atelier_openai_key_v1')), null);
     checks += 4;
+
+    /* 기록을 못 읽으면(404 가 아닌 실패) 지금처럼 gen1 부터, 「지금 할 일」이 "원본 번호는 올릴 때 확인" */
+    await ctx.route('**/records/sprites/sunzi/still.json', r => r.fulfill({ status: 500, body: 'x' }));
+    await page.goto(BASE + '/dot.html?a=book&c=sunzi&s=still'); await page.waitForSelector('#who:not([hidden])');
+    await page.waitForFunction(() => /원본 번호는 올릴 때 확인/.test(document.getElementById('todo').textContent), null, { timeout: 10000 });
+    assert((await page.inputValue('#req')).includes('sunzi_begin_still_gen1.png'), '못 읽으면 gen1');
+    await ctx.unroute('**/records/sprites/sunzi/still.json');
+    errors.splice(0, errors.length, ...errors.filter(e => !/records\/sprites\/sunzi\/still\.json/.test(e)));
+    checks++;
 
     /* 손자 걷기(gen1) — 기본값(121줄 · 3x2 · 쪼가리 40 · 96x128) 그대로가 그때 인자 */
     await page.goto(BASE + '/dot.html?a=book&c=sunzi&s=walk');
@@ -335,7 +369,10 @@ const server = http.createServer((q, s) => {
       await page.goto(BASE + '/dot.html?a=book&c=sunzi&s=walk'); await page.waitForSelector('#who:not([hidden])');
     }
 
-    /* 공방 바꾸기 — 포켓몬 (목록은 접혀 있으니 「바꾸기」로 연다) */
+    /* 공방 바꾸기 — 포켓몬 (목록은 접혀 있으니 「바꾸기」로 연다). 옆에 그 저장소가 없으면 건너뛰고 말한다 */
+    const have = repo => fs.existsSync(path.join(SIB, repo)), skipped = [];
+    if (!have('pkm-atelier')) skipped.push('포켓몬(../pkm-atelier)');
+    else {
     await openChooser();
     await page.click('.chip:has-text("포켓몬")');
     await page.waitForFunction(() => /모두 \d+명/.test(document.getElementById('more').textContent));
@@ -351,15 +388,19 @@ const server = http.createServer((q, s) => {
     await page.reload(); await page.waitForSelector('#who:not([hidden])');
     assert.equal(await page.inputValue('#identity'), 'Yellow bob with black-tipped ear ribbons.');
     assert.equal(await page.getAttribute('.tab[aria-selected="true"]', 'data-s'), 'walk');
+    }
     /* 다른 공방도 목록이 뜬다 */
-    for (const [name, min] of [['신화 무기', 100], ['건담', 100], ['삼국지', 100]]) {
+    for (const [name, min, repo] of [['신화 무기', 100, 'myth-atelier'], ['건담', 100, 'atelier'], ['삼국지', 100, 'sam-atelier']]) {
+      if (!have(repo)) { skipped.push(name + '(../' + repo + ')'); continue; }
       await openChooser();
       await page.click('.chip:has-text("' + name + '")');
       await page.waitForFunction(() => /모두 \d+명/.test(document.getElementById('more').textContent));
       const n = +(await page.textContent('#more')).match(/모두 (\d+)명/)[1];
       assert(n >= min, name + ' ' + n);
     }
+    if (skipped.length) console.log('(옆에 저장소가 없어 공방 바꾸기 검사를 건너뜀: ' + skipped.join(' · ') + ')');
     checks += 3;
+    if (errors.length) console.log('errors:', JSON.stringify(errors).slice(0, 1500));
     assert.deepEqual(errors, []);
 
     /* 크기마다 — 옆으로 넘치지 않고 누르는 자리 44px */

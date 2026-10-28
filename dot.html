@@ -231,7 +231,8 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
           <textarea id="identity" rows="3" placeholder="Short dark-brown bob with the bow on the image-left side of the head, cream dress with navy trim and white apron, navy shoes."></textarea></label>
       </div>
       <div class="checks">
-        <label class="check"><input type="checkbox" id="sample"> 같은 공방의 다 만든 도트를 본보기로 붙인다(정지)</label>
+        <label class="check"><input type="checkbox" id="sample"> 본보기: 같은 공방의 다른 인물 도트를 붙인다(정지 — 손으로 붙일 때만)</label>
+        <label class="check"><input type="checkbox" id="sampleSelf"> 본보기: 이 인물의 확정 도트를 붙인다(정지 — ③ 의 정지 도트 6배)</label>
         <label class="check"><input type="checkbox" id="skirt"> 긴 치마·도포가 다리를 가린다(걷기)</label>
       </div>
     </div>
@@ -334,7 +335,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
 </main>
 <footer>polos0117 · 도트 공방 · 정리 셈은 rust/dot-core (book-atelier 파이썬 도구와 같은 화소)</footer>
 
-<script src="dot/dot.js?v=7"></script>
+<script src="dot/dot.js?v=8"></script>
 <script src="sprite-actor.js?v=3"></script>
 <script>
 (function () {
@@ -349,7 +350,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   var q = new URLSearchParams(location.search);
   var S = {
     atelier: q.get('a') || saved.atelier || 'book', card: q.get('c') || saved.card || '', state: q.get('s') || saved.state || 'still', frame: 1,
-    per: saved.per || {}   // 인물마다 적은 값 { '<공방>/<카드>': {id, form, subject, identity, canon, outfit, skirt, sample} }
+    per: saved.per || {}   // 인물마다 적은 값 { '<공방>/<카드>': {id, form, subject, identity, canon, outfit, skirt, sample, sampleSelf} }
   };
   if (!STATE_TAB[S.state]) S.state = 'still';
   var docs = {}, list = [], W = null, raw = null, still = null, made = null, play = null;
@@ -442,7 +443,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     chooserView(false);
     $('who').hidden = false;
     $('id').value = m.id; $('form').value = m.form; $('subject').value = m.subject; $('identity').value = m.identity;
-    $('skirt').checked = !!m.skirt; $('sample').checked = !!m.sample;
+    $('skirt').checked = !!m.skirt; $('sample').checked = !!m.sample; $('sampleSelf').checked = !!m.sampleSelf;
     refs(); prompt();
     if (!quiet) $('who').scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }
@@ -473,7 +474,15 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     });
   });
   $('id').addEventListener('change', function () { $('id').value = me().id; });
-  ['skirt', 'sample'].forEach(function (k) { $(k).addEventListener('change', function () { me()[k] = $(k).checked; save(); prompt(); }); });
+  /* 본보기 둘은 하나만 — 다른 인물(옷·색은 안 따른다) 또는 이 인물의 확정 도트 */
+  ['skirt', 'sample', 'sampleSelf'].forEach(function (k) {
+    $(k).addEventListener('change', function () {
+      var m = me(); m[k] = $(k).checked;
+      var other = k === 'sample' ? 'sampleSelf' : k === 'sampleSelf' ? 'sample' : '';
+      if (other && m[k]) { m[other] = false; $(other).checked = false; }
+      save(); prompt();
+    });
+  });
   $('q').addEventListener('input', people);
 
   /* ── ② 그리기 — 진행 띠(상태 탭에 ○ ◐ ●)와 「지금 할 일」 ── */
@@ -532,6 +541,8 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     else if (markOf(s) === 'raw') { txt = '원본이 들어와 있다 — ③ 「정리하기」를 누른다.'; btn = ['정리로', function () { $('s3').scrollIntoView({ block: 'start' }); }]; }
     else if (!hasKey) txt = '「그린다」를 쓰려면 열쇠·모델에 OpenAI 열쇠를 한 번 넣는다. 열쇠 없이 하려면 「지시문을 직접 쓴다」로 GPT 에 붙여 넣고, 받은 PNG 를 ③ 「파일로 넣는다」에.';
     else txt = STATE_TAB[s] + ' — 「그린다」를 누른다(' + $('model').value.replace('gpt-image-', '') + ' · ' + $('quality').value + ').';
+    var rg = recNow();
+    if (c && m.id && rg && rg.unknown && !allDone()) txt += ' 원본 번호는 올릴 때 확인 — 그림 저장소의 기록을 못 읽어 gen' + genNo() + ' 부터 센다.';
     var b = document.createElement('b'); b.textContent = '지금 할 일 · '; el.appendChild(b); el.appendChild(document.createTextNode(txt));
     if (btn) { var k = document.createElement('button'); k.type = 'button'; k.textContent = btn[0]; k.onclick = btn[1]; el.appendChild(k); }
     /* ③ 의 「다음」 단추와 열쇠 칸 제목도 같이 */
@@ -544,16 +555,17 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   /* 지시문 재료 — 지금 고른 인물·상태·칸. gen 은 원본 번호(그린다가 올린다) */
   function reqOpts() {
     var c = cur(), m = me(), s = S.state, id = m.id || 'name';
-    var o = { state: s, subject: m.subject, identity: m.identity, outfit: !!m.outfit && s === 'still', sample: !!m.sample && s === 'still', skirt: !!m.skirt,
+    var o = { state: s, subject: m.subject, identity: m.identity, outfit: !!m.outfit && s === 'still', sample: !!m.sample && s === 'still', sampleSelf: !!m.sampleSelf && s === 'still', skirt: !!m.skirt,
       id: id, form: m.form || 'base', name: c.name, atelierName: A().name, frame: S.frame, gen: genNo(), size: $('size').value };
     var n = D.names(id, o.form, s, o.gen);
-    o.files = { canonical: fileURL(m.canon), outfit: fileURL(m.outfit), still_x6: n.x6, leg_guide: 'walk_leg_guide.png', sample_x6: '본보기 정지 도트 6배(예: alice_begin_still_x6.png)',
+    o.files = { canonical: fileURL(m.canon), outfit: fileURL(m.outfit), still_x6: n.x6, leg_guide: 'walk_leg_guide.png', sample_x6: '본보기 정지 도트 6배(예: alice_begin_still_x6.png)', self_x6: n.x6,
       walk4_f1: n.raws ? n.raws[0].split('/').pop() : '' };
     return o;
   }
   function prompt() {
     var c = cur();
     if (!c) { $('req').value = '먼저 ① 에서 인물을 고른다.'; $('attach').innerHTML = ''; $('copy').disabled = true; drawReady(); return; }
+    loadRecGen();
     var m = me(), o = reqOpts(), s = S.state;
     $('req').value = D.request(o);
     var p = D.prompt(o);
@@ -594,7 +606,35 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   $('setup').open = !keyOf(); $('byhand').open = !keyOf();
   /* 원본 번호 — 이 인물·상태(·칸)에서 몇 번째로 그렸나. 받을 때마다 하나 오른다(원본은 지우지 않고 gen2·gen3… 로 쌓는다) */
   function genKey() { return S.atelier + '/' + S.card + '/' + S.state + (sep() ? '/' + S.frame : ''); }
-  function genNo() { return (gens[genKey()] || 0) + 1; }
+  /* 그림 저장소에 이미 있는 원본 번호 — 같은 출처 /<그림 저장소>/records/sprites/<이름>/<상태>(_v2…).json 의 원본 파일에서 가장 큰 gen.
+     { n, unknown } — 기록이 없으면(404) n 0, 못 읽으면(그 밖의 실패) unknown(지금처럼 1 부터, 「지금 할 일」이 "번호는 올릴 때 확인") */
+  var recGen = {};
+  function recKey() { var m = me(); return S.atelier + '/' + (m.id || '') + '/' + (m.form || 'base') + '/' + S.state; }
+  function recNow() { return cur() && me().id ? recGen[recKey()] : null; }
+  function loadRecGen() {
+    var c = cur(), m = c && me(), put = A().put, k;
+    if (!m || !m.id || !put) return;
+    k = recKey(); if (recGen[k]) return;
+    var id = m.id, form = m.form || 'base', state = S.state, here = { n: 0, unknown: false, loading: true };
+    recGen[k] = here;
+    /* 차례로 — <상태>.json, 그다음 _v2 · _v3 …, 처음 없는 판에서 멈춘다(없는 판을 줄줄이 묻지 않게).
+       기본 기록이 없어도 _v2 는 한 번 본다. 기본 기록을 못 읽으면(404 가 아닌 실패) unknown */
+    var paths = D.recordPaths(id, state), docs = [];
+    here.ready = (function next(i) {
+      if (i >= paths.length) return Promise.resolve(docs);
+      return fetch('/' + put.repo + '/' + paths[i], { cache: 'no-cache' }).then(function (r) {
+        if (r.status === 404) return i === 0 ? next(1) : docs;
+        if (!r.ok) throw new Error(r.status);
+        return r.json().then(function (d) { docs.push(d); return next(i + 1); });
+      }).catch(function () { if (i === 0) here.unknown = true; return docs; });
+    })(0).then(function (docs) {
+      here.n = D.recordedGen(docs, id, form, state); here.loading = false;
+      if (recGen[k] === here) prompt();
+    });
+  }
+  /* 그리기 직전 — 이 상태의 기록을 다 읽을 때까지(「한꺼번에」는 탭을 옮기자마자 그린다) */
+  function recReady() { loadRecGen(); var r = recNow(); return r && r.ready ? r.ready : Promise.resolve(); }
+  function genNo() { var r = recNow(); return Math.max(gens[genKey()] || 0, r ? r.n : 0) + 1; }
   /* 지금 상태에서 그릴 수 있나 — 열쇠·인물·정리기, 동작 시트는 정지 도트, 걷기 4칸 2~4칸은 1칸 원본 */
   function drawWhy() {
     if (!cur()) return '먼저 ① 에서 인물을 고른다';
@@ -604,6 +644,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     if (!m.canon) return '① 에서 정본을 짚는다';
     if (S.state !== 'still' && !still) return '③ 에 정지 도트(정리본)를 먼저 넣거나 정지를 먼저 그려 정리한다';
     if (sep() && S.frame > 1 && !raws[0]) return '1칸 원본을 먼저 그려(또는 ③ 에 넣어) 확정한다';
+    if (recNow() && recNow().loading) return '그림 저장소의 기록에서 원본 번호를 읽는 중이다';
     return '';
   }
   function drawReady() {
@@ -611,6 +652,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     $('draw').disabled = drawing || !!why;
     $('draw').title = why;
     $('draw').textContent = drawing ? '그리는 중…' : gotGen && gotGen.key === genKey() ? '다시 그린다' : '그린다';
+    $('dlGen').hidden = drawing || !tabRaw();
     /* 세 시트 한꺼번에 — 정지 도트가 있고 열쇠가 있으면 */
     $('drawAll').hidden = !(cur() && me().canon && $('key').value.trim() && W && still) || drawing;
     /* 들어와 있는 것 한 줄(파일 칸은 접혀 있다) · 진행 표시 */
@@ -630,15 +672,19 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   function attachments(o, p) {
     return Promise.all(p.attach.map(function (a) {
       if (a === 'canonical' || a === 'outfit') { var u = a === 'canonical' ? fileURL(me().canon) : fileURL(me().outfit); if (!u) throw new Error(D.ATTACH[a] + ' 이 없다'); return bytesOf(u, u.split('/').pop()); }
-      if (a === 'still_x6') return x6(still.id).then(function (b) { return b.arrayBuffer(); }).then(function (b) { return { bytes: new Uint8Array(b), name: names().x6, type: 'image/png' }; });
+      if (a === 'still_x6' || a === 'self_x6') return x6(still.id).then(function (b) { return b.arrayBuffer(); }).then(function (b) { return { bytes: new Uint8Array(b), name: names().x6, type: 'image/png' }; });
       if (a === 'leg_guide') return bytesOf('dot/walk_leg_guide.png', 'walk_leg_guide.png');
       if (a === 'walk4_f1') return Promise.resolve({ bytes: raws[0].bytes, name: raws[0].name, type: raws[0].png ? 'image/png' : 'image/webp' });
       throw new Error('모르는 첨부 ' + a);
     }));
   }
   /* 지금 상태(S.state) 한 장을 그려 ③ 원본 자리에 넣는다 → Promise<{bytes, name, usage, sec}>. 화면 글은 부르는 쪽이 */
-  function generateNow() {
-    var o = Object.assign(reqOpts(), { sample: false }), p = D.prompt(o), t0 = Date.now(), key = $('key').value.trim(), state = S.state, gk = genKey();
+  function generateNow() { return recReady().then(generateNow2); }
+  function generateNow2() {
+    /* 다른 인물 본보기는 파일이 없어 뺀다. 이 인물의 확정 도트는 ③ 에 정지 도트가 있을 때만 */
+    var o = Object.assign(reqOpts(), { sample: false }), p;
+    if (o.sampleSelf && !still) o.sampleSelf = false;
+    p = D.prompt(o); var t0 = Date.now(), key = $('key').value.trim(), state = S.state, gk = genKey();
     var n = D.names(o.id, o.form, state, o.gen), rawName = (n.raws ? n.raws[S.frame - 1] : n.raw).split('/').pop();
     status($('genStatus'), STATE_TAB[state] + ' — 첨부 ' + p.attach.length + '장을 모아 보낸다… (' + $('model').value + ' · ' + $('quality').value + ' · 보통 10~60초)');
     return Promise.resolve().then(function () { return attachments(o, p); }).then(function (images) {
@@ -689,7 +735,9 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
       status($('genStatus'), (done.length ? STATE_TAB[done[done.length - 1]] + ' 까지 됐고, ' : '') + STATE_TAB[S.state] + ' 에서 못 그렸다 — ' + (e && e.message || e) + '. 그 탭에서 「그린다」로 이어간다', 'bad');
     }).then(function () { drawing = false; drawReady(); });
   };
-  $('dlGen').onclick = function () { if (gotGen) download(gotGen.bytes, gotGen.name, 'image/png'); };
+  /* 원본 PNG 받기 — ③ 의 지금 탭 원본(걷기 4칸은 지금 칸). 「한꺼번에」 뒤에도 탭마다 제 원본 */
+  function tabRaw() { return sep() ? raws[S.frame - 1] : (rawBy[S.state] && rawBy[S.state].forState === S.state ? rawBy[S.state] : null); }
+  $('dlGen').onclick = function () { var r = tabRaw(); if (r) download(r.bytes, r.name, r.png ? 'image/png' : 'application/octet-stream'); };
 
   /* ── ③ 정리 ── */
   var OPT = {

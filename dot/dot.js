@@ -120,6 +120,22 @@
     return n;
   }
 
+  /* ── 원본 번호 — 그림 저장소의 기록(records/sprites/<이름>/<상태>.json, 판 붙은 <상태>_v2.json …)에 적힌 원본 파일에서 가장 큰 gen.
+     새 기록은 generation.file 또는 generation.files[].file(걷기 4칸), 앞선 book 기록은 generations[].file. 없으면 0 ── */
+  var RECORD_VERSIONS = ['', '_v2', '_v3', '_v4'];
+  function recordPaths(id, state) { return RECORD_VERSIONS.map(function (v) { return 'records/sprites/' + id + '/' + state + v + '.json'; }); }
+  function recordedGen(docs, id, form, state) {
+    var re = new RegExp('^' + id.replace(/[^a-z0-9_]/g, '') + '_' + (form || 'base').replace(/[^a-z0-9_]/g, '') + '_' + state + '(?:_[1-4])?_gen(\\d+)\\.png$'), top = 0;
+    (docs || []).forEach(function (d) {
+      if (!d || typeof d !== 'object') return;
+      var files = [], g = d.generation;
+      if (g && typeof g === 'object') { if (g.file) files.push(g.file); (g.files || []).forEach(function (f) { if (f && f.file) files.push(f.file); }); }
+      (Array.isArray(d.generations) ? d.generations : []).forEach(function (f) { if (f && f.file) files.push(f.file); });
+      files.forEach(function (f) { var m = re.exec(String(f).split('/').pop()); if (m) top = Math.max(top, +m[1]); });
+    });
+    return top;
+  }
+
   /* ── 생성 지시문 (GPT 이미지 생성에 그대로) — book-atelier docs/ATELIER_PIXEL_ART_PLAN.md 11절에서 일반화 ── */
   var SUBJECTS = {
     woman: 'young woman', man: 'young man', person: 'character', mech: 'robot mecha', creature: 'creature'
@@ -139,7 +155,9 @@
     L.push('Pixel art game sprite of the SAME ' + who + ' shown in attached image 1. Copy the face, hair, skin tone, outfit and palette from image 1.');
     if (o.outfit) L.push('Attached image 2 shows the outfit to draw — take only the clothes from it.');
     var n = o.outfit ? 3 : 2;
-    if (o.sample) L.push('Attached image ' + n + ' is a finished sprite of a different character from the same game: match its pixel size, outline, shading style and body proportions exactly, but NOT its outfit or colours.');
+    /* 본보기 — 같은 공방의 다른 인물(옷·색은 따르지 않는다) 또는 이 인물의 확정 도트(같은 인물이니 다 따른다). 둘 다면 이 인물 쪽 */
+    if (o.sampleSelf) L.push('Attached image ' + n + ' is this same character\'s approved sprite: match its pixel size, outline, shading and proportions exactly.');
+    else if (o.sample) L.push('Attached image ' + n + ' is a finished sprite of a different character from the same game: match its pixel size, outline, shading style and body proportions exactly, but NOT its outfit or colours.');
     if (o.identity) L.push(o.identity.trim());
     L.push('Do not draw any background, furniture, props or scenery from the attachments.', '');
     var C = canvasOf(o);
@@ -239,7 +257,7 @@
   function prompt(o) {
     var s = o.state || 'still', attach;
     if (s === 'still') {
-      attach = ['canonical'].concat(o.outfit ? ['outfit'] : []).concat(o.sample ? ['sample_x6'] : []);
+      attach = ['canonical'].concat(o.outfit ? ['outfit'] : []).concat(o.sampleSelf ? ['self_x6'] : o.sample ? ['sample_x6'] : []);
       return { text: stillPrompt(o), attach: attach };
     }
     if (s === 'walk') {
@@ -257,6 +275,7 @@
     canonical: '그 인물의 정본 그림',
     outfit: '입힐 옷이 보이는 그림',
     sample_x6: '같은 공방의 다 만든 정지 도트 6배 — 도트 크기·윤곽·비율 본보기(옷·색은 따르지 않는다)',
+    self_x6: '이 인물의 확정 정지 도트 6배 — 도트 크기·윤곽·그늘·비율을 그대로 따른다',
     still_x6: '그 인물의 정지 도트 6배(576×768)',
     leg_guide: '다리 자세 안내 walk_leg_guide.png (남색 = 가까운 다리, 회색 = 먼 다리, 4칸은 1칸의 거울)',
     walk4_f1: '이 걷기 4칸의 1칸 원본(먼저 뽑아 확정한 것) — 크기·자리·발 기준선 본보기'
@@ -416,7 +435,7 @@
   }
 
   var api = { API: API, CELL: CELL, FOOT: FOOT, STATES: STATES, CLEAN: CLEAN, SUBJECTS: SUBJECTS, ATTACH: ATTACH, STATE_NAME: STATE_NAME, ATELIERS: ATELIERS, GEN: GEN, CANVAS: CANVAS,
-    load: load, wrap: wrap, args: args, slug: slug, names: names, prompt: prompt, request: request, record: record, spriteState: spriteState, actor: actor, filesOf: filesOf, cards: cards,
+    load: load, wrap: wrap, args: args, slug: slug, names: names, recordPaths: recordPaths, recordedGen: recordedGen, prompt: prompt, request: request, record: record, spriteState: spriteState, actor: actor, filesOf: filesOf, cards: cards,
     genForm: genForm, genError: genError, generate: generate };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.AtelierDot = api;

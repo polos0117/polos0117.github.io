@@ -114,6 +114,22 @@ function sourceHash() {
   const st = D.prompt({ state: 'still', subject: 'woman', identity: 'Short dark-brown bob.', sample: true });
   assert.deepEqual(st.attach, ['canonical', 'sample_x6']);
   assert(st.text.includes('SAME young woman') && st.text.includes('Short dark-brown bob.') && st.text.includes('image 2 is a finished sprite') && st.text.includes('12 x 12'));
+  /* 본보기 — 이 인물의 확정 도트(같은 인물 문장, 첨부 self_x6). 둘 다 주면 이 인물 쪽 */
+  const self = D.prompt({ state: 'still', subject: 'woman', outfit: true, sampleSelf: true, sample: true });
+  assert.deepEqual(self.attach, ['canonical', 'outfit', 'self_x6']);
+  assert(self.text.includes("Attached image 3 is this same character's approved sprite: match its pixel size, outline, shading and proportions exactly.") && !self.text.includes('different character'));
+  assert(D.ATTACH.self_x6);
+  /* 원본 번호 — 그림 저장소 기록의 원본 파일에서 가장 큰 gen. 앞선 book 꼴(generations[]) · 새 꼴(generation.file) · 걷기 4칸(generation.files[]), 다른 폼·상태는 안 센다 */
+  assert.deepEqual(D.recordPaths('alice', 'walk'), ['records/sprites/alice/walk.json', 'records/sprites/alice/walk_v2.json', 'records/sprites/alice/walk_v3.json', 'records/sprites/alice/walk_v4.json']);
+  assert.equal(D.recordedGen([{ generations: [{ file: 'sprites/alice/raw/alice_begin_still_gen1.png' }, { file: 'sprites/alice/raw/alice_begin_still_gen2.png' }] }], 'alice', 'begin', 'still'), 2);
+  assert.equal(D.recordedGen([{ generation: { file: 'sprites/alice/raw/alice_begin_walk_gen1.png' } }, { generation: { file: 'sprites/alice/raw/alice_begin_walk_gen2.png' } }, null], 'alice', 'begin', 'walk'), 2, '판 붙은 기록도');
+  assert.equal(D.recordedGen([{ generation: { files: [{ file: 'sprites/sunzi/raw/sunzi_begin_walk4_1_gen3.png' }, { file: 'sprites/sunzi/raw/sunzi_begin_walk4_2_gen1.png' }] } }], 'sunzi', 'begin', 'walk4'), 3, '걷기 4칸');
+  assert.equal(D.recordedGen([{ generation: { file: 'sprites/alice/raw/alice_end_still_gen9.png' } }, { generation: { file: 'sprites/alice/raw/alice_begin_walk_gen7.png' } }], 'alice', 'begin', 'still'), 0, '다른 폼·상태는 안 센다');
+  assert.equal(D.recordedGen([], 'alice', 'begin', 'still'), 0);
+  if (fs.existsSync(path.join(IMG, 'records/sprites/alice'))) {
+    const rd = (id, s) => D.recordPaths(id, s).map(p => { try { return JSON.parse(fs.readFileSync(path.join(IMG, p), 'utf8')); } catch (e) { return null; } });
+    assert.deepEqual(['still', 'idle', 'walk', 'react'].map(s => D.recordedGen(rd('alice', s), 'alice', 'begin', s)), [2, 1, 2, 1], '앨리스 기록 — 정지 gen2 · 대기 1 · 걷기 2(walk_v2) · 반응 1');
+  }
   const wk = D.prompt({ state: 'walk', identity: 'Ink-black robe.' });
   assert.deepEqual(wk.attach, ['still_x6', 'leg_guide', 'canonical']);
   assert(wk.text.includes('3 x 2 grid (cell 341 x 768)') && wk.text.includes('MIRROR of frame 1') && wk.text.includes('NEAR leg'));
