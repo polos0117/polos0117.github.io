@@ -243,3 +243,6 @@ target/release/dot stride alice_begin_walk.png --cell 192x256 --ms 200
 - 검사: book `tests/sprites-data.py`(인물 6 · 그림 24장), `tests/sprite-screen.cjs`(대기 차례는 인물의 order 를, 화소비는 dot 을 셈에 넣는다), 여기 `tests/dot.cjs`(기록 24장을 다시 정리해 화소 하나 다르지 않다 · 걷기 dy·빠르기 = sprites.json).
 - 도트 공방의 기본 크기는 그대로 보통(1024×1536) — 인물마다 크기를 기억하니 새 인물은 4K 를 고르면 된다. 옛 기록을 다시 정리하는 검사가 보통 크기에 묶여 있어 기본값은 안 바꿨다.
 - 같은 날 사용자 "공방 그림 중 마음에 드는 것 하나 골라 도트로" — **뤼팽 결말(귀환)** `img/arsene_lupin_end_literary_fantasy_f.webp` 을 골라 같은 길로 한 벌(`arsene_lupin`, 폼 `end`, 정본 하나 + 앨리스 4K 정지 6배 본보기). 정지 gen1 → 격자 16.0px, 인물 87×230, 시트 228줄. 걷기 dy `[2, 2, 2, -2, -2, -2]`, 보폭 69 → 빠르기 115, 다리가 번갈아 나왔다. 반응은 모자 들기 → 인사 → 돌아오기. 그림 저장소 `sprites/arsene_lupin/`, 기록 `records/sprites/arsene_lupin/*_4k.json`. 여기 `tests/dot.cjs` 는 기록 28장.
+- 이어서 "삼국지는 빼고 공방별로 2개씩 더" — 다른 공방에도 같은 길이 그대로 통했다(정본 한 장 + 앨리스 4K 정지 6배를 다른-인물 본보기로, 지시문·정리 셈은 book 과 동일, 폼 `base`, 칸 192×256 · dot 0.5).
+  신화 무기 `mjolnir`(묠니르, 걷기 81)·`laevateinn`(레바테인, 99) → `myth-atelier-img/sprites/`, 포켓몬 `charizard`(리자몽, 43 — 보폭 26)·`umbreon`(블래키, 124) → `pkm-atelier-img-3/sprites/`(인물 칸에 제 base), 건담 `rx78_2`(RX-78-2 건담, 88)·`char_zaku`(샤아 전용 자쿠, 75) → `atelier/sprites/`.
+  장당 865 토큰·28~37초, 24장 중 손본 것은 묠니르 대기 2·4칸(몸과 떨어져 떠 있던 둘째 망치 — 칸에서 가장 큰 덩어리만 남김, 기록 `touched`) 하나. 각 공방의 바닥·도감은 `floor`/`actorFor` 라 자료만 넣으면 선다.
