@@ -24,6 +24,7 @@ cd rust
 cargo test -p dot-core
 cargo build --release -p dot-cli
 target/release/dot still  <생성 원본.png> <정리본.png> [색 수=24] [--rows 121] [--outline]
+target/release/dot still  <4K 원본.png> <정리본.png> 24 --pitch 10,24 --outline --cell 192x256   # 4K — 격자 찾기, 원본 격자 그대로
 target/release/dot sheet  <생성 시트.png> <정리 시트.png> --frames 6 --grid 3x2 --palette <정지 도트.png> --rows 121 --speck 40 --cell 96x128
 target/release/dot frames <정리 시트.png> <원본 1.png> … <원본 4.png> --palette <정지 도트.png> --rows 121 --speck 40 --cell 96x128   # 칸마다 따로 뽑은 걷기 4칸
 target/release/dot bob    <걷기 시트.png> [--cell 96x128] [--bob 1]        # 칸마다 dy (6칸 · 4칸)
@@ -56,14 +57,14 @@ cp target/wasm32-unknown-unknown/wasm/dot_wasm.wasm ../dot/dot.wasm
 `dot-core/src/gamma.rs` 는 손으로 고치지 않는다. 다시 만들려면 numpy 로 `v = np.arange(0, 511) / 2 / 255`, `np.where(v > .04045, ((v + .055) / 1.055) ** 2.4, v / 12.92)` 를
 `f64::from_bits(0x…)` 로 적는다(파일 맨 위 설명 그대로).
 
-## 내보내기 (`API_VERSION` 2)
+## 내보내기 (`API_VERSION` 3)
 
 | 이름 | 무엇 |
 |---|---|
 | `alloc(n) → ptr` · `dealloc(ptr, n)` | 자리 받기·돌려주기(8바이트 맞춤) |
 | `decode(ptr, n) → 번호` · `put(ptr, w, h) → 번호` · `free(번호)` | PNG 풀기 · 브라우저가 푼 RGBA 넣기 |
 | `img_w` · `img_h` · `img_ptr(번호)` · `encode(번호)` → `bytes_ptr/len` | RGBA 읽기 · PNG 싸기 |
-| `still(번호, 색 수, 줄 수, 윤곽) → 번호` | 정지 도트(줄 수 0 = 격자 찾기) |
+| `still(번호, 색 수, 줄 수, 윤곽, 칸 폭, 칸 높이, lo, hi) → 번호` | 정지 도트(줄 수 0 = 격자 찾기 — 간격 lo~hi, 0 이면 9.5~14 · 칸 0 이면 96×128, 발 기준선은 칸 높이 − 2). 3 판에서 칸·간격 범위가 붙었다(4K) |
 | `sheet(번호, 정지 도트, 칸 수, 배치 가로, 배치 세로, 줄 수, 고정 간격, lo, hi, 쪼가리, 칸 폭, 칸 높이) → 번호` | 동작 시트(0 은 주지 않음) |
 | `frames_sheet(번호들 자리, 장 수, 정지 도트, 줄 수, 고정 간격, lo, hi, 쪼가리, 칸 폭, 칸 높이) → 번호` | 칸마다 따로 뽑은 원본 여러 장 → 한 시트(번호들 = i32 를 써 넣은 자리) |
 | `bob(번호, 칸 폭, 오르내림)` · `stride(번호, 칸 폭, ms)` | 걷기 dy · 보폭과 빠르기 (6칸 · 4칸) |

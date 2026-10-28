@@ -3,7 +3,7 @@
 //!
 //! 그림은 번호로 쥔다(0 부터). 차례
 //!   1. `alloc(n)` 자리에 PNG 바이트를 써 넣고 `decode(ptr, n)` → 번호. 브라우저가 푼 RGBA 는 `put(ptr, w, h)` → 번호.
-//!   2. `still(번호, 색 수, 줄 수(0 = 격자 찾기), 윤곽)` · `sheet(번호, 정지 도트 번호, …)` · `frames_sheet(번호들 자리, 장 수, 정지 도트 번호, …)` → 정리본 번호, 옆에 `json`.
+//!   2. `still(번호, 색 수, 줄 수(0 = 격자 찾기), 윤곽, 칸 폭, 칸 높이(0 = 96×128), lo, hi(격자 찾기 간격 범위, 0 = 9.5~14))` · `sheet(번호, 정지 도트 번호, …)` · `frames_sheet(번호들 자리, 장 수, 정지 도트 번호, …)` → 정리본 번호, 옆에 `json`.
 //!      `bob(번호, 칸 폭, 오르내림)` · `stride(번호, 칸 폭, ms)` → `json`.
 //!   3. `img_w/img_h/img_ptr(번호)` 로 RGBA 를 읽거나 `encode(번호)` → `bytes_ptr/bytes_len` 의 PNG. 다 쓴 번호는 `free`.
 //!   실패하면 -1 이고 까닭은 `err_ptr/err_len`(UTF-8).
@@ -16,7 +16,7 @@ use std::cell::RefCell;
 include!(concat!(env!("OUT_DIR"), "/source_hash.rs"));
 
 /// 내보내기 꼴이 바뀌면 올린다 — dot/dot.js 가 맞춰 본다.
-pub const API_VERSION: u32 = 2;   // 2 — frames_sheet(칸마다 따로 뽑은 원본), 걷기 4칸
+pub const API_VERSION: u32 = 3;   // 2 — frames_sheet(칸마다 따로 뽑은 원본), 걷기 4칸 · 3 — still 이 칸 크기·격자 찾기 간격 범위를 받는다(4K)
 
 #[derive(Default)]
 struct State { imgs: Vec<Option<Img>>, json: String, err: String, bytes: Vec<u8> }
@@ -94,11 +94,15 @@ pub extern "C" fn put(ptr: *const u8, w: u32, h: u32) -> i32 {
 #[no_mangle] pub extern "C" fn img_h(id: i32) -> u32 { with_img(id, |i| i.h as u32).unwrap_or(0) }
 #[no_mangle] pub extern "C" fn img_ptr(id: i32) -> *const u8 { with_img(id, |i| i.px.as_ptr()).unwrap_or(std::ptr::null()) }
 
-/// 정지 도트 한 장 (sprite-grid.py). rows 0 이면 격자를 찾는다
+/// 정지 도트 한 장 (sprite-grid.py). rows 0 이면 격자를 찾는다(간격 lo~hi, 0 이면 9.5~14). 칸 0 이면 96×128
 #[no_mangle]
-pub extern "C" fn still(id: i32, colors: u32, rows: u32, outline: u32) -> i32 {
+pub extern "C" fn still(id: i32, colors: u32, rows: u32, outline: u32, cell_w: u32, cell_h: u32, lo: f64, hi: f64) -> i32 {
     let src = match get(id) { Ok(i) => i, Err(e) => return fail(e) };
-    done(dot_core::still(&src, &StillOpts { colors: colors as usize, rows: (rows > 0).then_some(rows as usize), outline: outline != 0 }))
+    done(dot_core::still(&src, &StillOpts {
+        colors: colors as usize, rows: (rows > 0).then_some(rows as usize), outline: outline != 0,
+        cell: (cell_w > 0 && cell_h > 0).then_some((cell_w as usize, cell_h as usize)),
+        pitch: (lo > 0.0 && hi > lo).then_some((lo, hi)),
+    }))
 }
 
 /// 동작 시트 (sprite-sheet.py). 0 은 "주지 않음"(grid · rows · fixed_pitch · cell)

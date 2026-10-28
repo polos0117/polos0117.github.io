@@ -404,7 +404,9 @@ fn hex(c: &[u8; 3]) -> String { format!("\"#{:02x}{:02x}{:02x}\"", c[0], c[1], c
 
 // ── 정지 도트 한 장 (sprite-grid.py) ──
 
-pub struct StillOpts { pub colors: usize, pub rows: Option<usize>, pub outline: bool }
+/// cell — 정리본 칸(폭, 높이), 발 기준선은 높이 − 2. 없으면 96×128(발 126).
+/// pitch — 격자 찾기(rows 없음)의 간격 범위(lo, hi). 없으면 9.5~14(book 정지 도트 때의 값). 4K 원본은 블록이 커서 넓힌다.
+pub struct StillOpts { pub colors: usize, pub rows: Option<usize>, pub outline: bool, pub cell: Option<(usize, usize)>, pub pitch: Option<(f64, f64)> }
 
 pub struct Out { pub img: Img, pub json: String }
 
@@ -435,7 +437,8 @@ pub fn still(src: &Img, o: &StillOpts) -> Result<Out, String> {
         pal = pal0;
         meta = format!("\"rows\": {rows}, \"pitch\": [{}, {}], \"offset\": [{}, {}]", round2(px), round2(px), round2(ox), round2(oy));
     } else {
-        let (g, gw, gh, [px, ox, _sx, py, oy, _sy]) = sample_grid(src, 9.5, 14.0);
+        let (lo, hi) = o.pitch.unwrap_or((9.5, 14.0));
+        let (g, gw, gh, [px, ox, _sx, py, oy, _sy]) = sample_grid(src, lo, hi);
         let mask: Vec<bool> = g.iter().map(|v| v[3] >= 160.0).collect();
         let bb = bbox(&mask, gw, gh).ok_or("격자가 비었다")?;
         let gs = sub(&g, gw, bb);
@@ -470,14 +473,16 @@ pub fn still(src: &Img, o: &StillOpts) -> Result<Out, String> {
         }
         m = out; idx = i2; w = w2; h = h2;
     }
-    if h > 126 || w > 96 { return Err(format!("인물이 칸(96×128, 발 기준선 126)보다 크다: {w}×{h} — 줄 수(rows)를 줄인다")); }
-    let mut cell = Img::new(96, 128);
-    let (x0, y0) = ((96 - w) / 2, 126 - h);
+    let (cw, ch) = o.cell.unwrap_or((96, 128));
+    let fy = ch - 2;
+    if h > fy || w > cw { return Err(format!("인물이 칸({cw}×{ch}, 발 기준선 {fy})보다 크다: {w}×{h} — 줄 수(rows)를 줄이거나 칸을 키운다")); }
+    let mut cell = Img::new(cw, ch);
+    let (x0, y0) = ((cw - w) / 2, fy - h);
     let mut used: Vec<[u8; 3]> = Vec::new();
     for y in 0..h {
         for x in 0..w {
             let c = pal[idx[y * w + x]];
-            let d = ((y0 + y) * 96 + x0 + x) * 4;
+            let d = ((y0 + y) * cw + x0 + x) * 4;
             cell.px[d..d + 3].copy_from_slice(&c);
             cell.px[d + 3] = if m[y * w + x] { 255 } else { 0 };
             if m[y * w + x] { used.push(c); }
@@ -485,7 +490,7 @@ pub fn still(src: &Img, o: &StillOpts) -> Result<Out, String> {
     }
     used.sort(); used.dedup();
     let meta = match bgc { Some(c) => format!("{meta}, \"background_keyed\": {}", hex(&c)), None => meta };
-    let json = format!("{{{meta}, \"sprite\": [{w}, {h}], \"cell\": [96, 128], \"cell_offset\": [{x0}, {y0}], \"foot_y\": 126, \"colours\": {}, \"palette\": [{}]}}",
+    let json = format!("{{{meta}, \"sprite\": [{w}, {h}], \"cell\": [{cw}, {ch}], \"cell_offset\": [{x0}, {y0}], \"foot_y\": {fy}, \"colours\": {}, \"palette\": [{}]}}",
         used.len(), used.iter().map(hex).collect::<Vec<_>>().join(", "));
     Ok(Out { img: cell, json })
 }

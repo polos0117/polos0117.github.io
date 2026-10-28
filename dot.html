@@ -335,7 +335,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
 </main>
 <footer>polos0117 · 도트 공방 · 정리 셈은 rust/dot-core (book-atelier 파이썬 도구와 같은 화소)</footer>
 
-<script src="dot/dot.js?v=8"></script>
+<script src="dot/dot.js?v=9"></script>
 <script src="sprite-actor.js?v=3"></script>
 <script>
 (function () {
@@ -444,6 +444,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     $('who').hidden = false;
     $('id').value = m.id; $('form').value = m.form; $('subject').value = m.subject; $('identity').value = m.identity;
     $('skirt').checked = !!m.skirt; $('sample').checked = !!m.sample; $('sampleSelf').checked = !!m.sampleSelf;
+    if (m.size && D.CANVAS[m.size] && $('size').value !== m.size) { $('size').value = m.size; options(); }
     refs(); prompt();
     if (!quiet) $('who').scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }
@@ -601,7 +602,8 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   try { if (saved.quality && D.GEN.quality[saved.quality]) $('quality').value = saved.quality; if (saved.model && D.GEN.models[saved.model]) $('model').value = saved.model; if (saved.size && D.CANVAS[saved.size]) $('size').value = saved.size; } catch (e) { /* 없으면 기본 */ }
   $('quality').onchange = function () { saved.quality = $('quality').value; save(); todo(); };
   $('model').onchange = function () { saved.model = $('model').value; save(); todo(); };
-  $('size').onchange = function () { saved.size = $('size').value; save(); prompt(); };
+  /* 크기는 인물마다 남긴다(같은 인물의 정지·시트가 크기를 섞지 않게) — 정리 값의 기본도 따라 바뀐다 */
+  $('size').onchange = function () { saved.size = $('size').value; if (cur()) me().size = $('size').value; save(); prompt(); options(); };
   /* 열쇠가 있으면 열쇠·모델은 접고 파일 칸도 접는다(「그린다」가 길), 없으면 둘 다 열어 둔다(붙여 넣기 길) */
   $('setup').open = !keyOf(); $('byhand').open = !keyOf();
   /* 원본 번호 — 이 인물·상태(·칸)에서 몇 번째로 그렸나. 받을 때마다 하나 오른다(원본은 지우지 않고 gen2·gen3… 로 쌓는다) */
@@ -741,9 +743,29 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
 
   /* ── ③ 정리 ── */
   var OPT = {
-    still: [['colors', '색 수', 24], ['rows', '줄 수 (0 = 격자 찾기)', 121], ['outline', '바깥 윤곽 한 칸', true]],
+    still: [['colors', '색 수', 24], ['rows', '줄 수 (0 = 격자 찾기)', 121], ['pitchLo', '격자 찾기 간격 최소 px (0 = 9.5)', 0], ['pitchHi', '격자 찾기 간격 최대 px (0 = 14)', 0], ['outline', '바깥 윤곽 한 칸', true], ['cellW', '칸 폭', 96], ['cellH', '칸 높이', 128]],
     sheet: [['rows', '줄 수 (정지 도트 키, 0 = 간격 찾기)', 121], ['fixedPitch', '고정 간격 px (줄 수 0 일 때)', 0], ['speck', '떨어진 쪼가리 지우기(칸 수 미만)', 40], ['cellW', '칸 폭', 96], ['cellH', '칸 높이', 128], ['gridC', '칸 배치 가로', 0], ['gridR', '칸 배치 세로', 0]]
   };
+  /* 정리 값의 기본 — 고른 크기(보통 · 4K)를 따른다(dot.js CANVAS[크기].clean). 4K 정지는 격자 찾기(간격 10~24) · 칸 192×256,
+     4K 시트 줄 수는 ③ 의 정지 도트 키(윤곽 빼고) — 정지와 같은 키로 맞춘다 */
+  function canvasClean() { return (D.CANVAS[$('size').value] || D.CANVAS[D.GEN.size]).clean; }
+  function stillRows() {
+    if (!still || !W) return 0;
+    var g = W.rgba(still.id), top = -1, bot = -1;
+    for (var y = 0; y < g.h; y++) for (var x = 0; x < g.w; x++) if (g.data[(y * g.w + x) * 4 + 3] >= 128) { if (top < 0) top = y; bot = y; break; }
+    var cc = canvasClean().still.cell;
+    return top < 0 || g.w !== cc[0] || g.h !== cc[1] ? 0 : bot - top + 1 - 2;   // 정리한 정지 도트(그 칸 크기)일 때만, 바깥 윤곽 두 칸을 뺀다
+  }
+  function cleanDefault(kind, key, v) {
+    var c = canvasClean(), k = kind === 'still' ? c.still : c.sheet;
+    if (key === 'rows') { if (k.rows === 'still') { var r = stillRows(); return r || 231; } return k.rows; }
+    if (key === 'pitchLo') return k.pitch ? k.pitch[0] : 0;
+    if (key === 'pitchHi') return k.pitch ? k.pitch[1] : 0;
+    if (key === 'cellW') return k.cell[0];
+    if (key === 'cellH') return k.cell[1];
+    if (key === 'speck' && k.speck) return k.speck;
+    return v;
+  }
   function options() {
     var kind = S.state === 'still' ? 'still' : 'sheet', box = $('optFields'), st = D.STATES[S.state];
     box.innerHTML = '';
@@ -751,6 +773,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
       var l = document.createElement('label'), v = o[2];
       if (o[0] === 'gridC') v = st.grid ? st.grid[0] : 0;
       if (o[0] === 'gridR') v = st.grid ? st.grid[1] : 0;
+      v = cleanDefault(kind, o[0], v);
       l.appendChild(document.createTextNode(o[1]));
       var i = document.createElement('input');
       if (typeof v === 'boolean') { i.type = 'checkbox'; i.checked = v; l.className = 'check'; }
@@ -769,6 +792,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     $('rawName').textContent = raws.map(function (r, i) { return (i + 1) + '칸 ' + (r ? r.label : '— 비었다'); }).join(' · ');
   }
   function opt(k) { var i = $('opt-' + k); return !i ? null : i.type === 'checkbox' ? i.checked : +i.value; }
+  function stillPitch() { var lo = opt('pitchLo'), hi = opt('pitchHi'); return !opt('rows') && lo > 0 && hi > lo ? [lo, hi] : null; }
   function ready() { $('run').disabled = !W || (sep() ? raws.some(function (r) { return !r; }) : !raw) || (S.state !== 'still' && !still); drawReady(); }
 
   function decodeFile(file) {
@@ -839,7 +863,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
         var rn = $('rawName').textContent; $('rawName').textContent = $('stillName').textContent; $('stillName').textContent = rn;
       }
     }
-    if (s === 'still') out = W.still(raw.id, { colors: opt('colors'), rows: opt('rows'), outline: opt('outline') });
+    if (s === 'still') out = W.still(raw.id, { colors: opt('colors'), rows: opt('rows'), outline: opt('outline'), cell: [opt('cellW'), opt('cellH')], pitch: stillPitch() });
     else if (sep()) out = W.framesSheet(raws.map(function (r) { return r.id; }), still.id, { rows: opt('rows'), fixedPitch: opt('fixedPitch'), speck: opt('speck'), cell: [opt('cellW'), opt('cellH')] });
     else {
       var gc = opt('gridC'), gr = opt('gridR');
@@ -847,7 +871,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
         speck: opt('speck'), cell: [opt('cellW'), opt('cellH')] });
     }
     if (madeBy[s]) W.free(madeBy[s].id);
-    made = madeBy[s] = { id: out.id, info: out.info, state: s, walk: null, png: W.png(out.id), order: null, ms: null, edits: 0 };
+    made = madeBy[s] = { id: out.id, info: out.info, state: s, walk: null, png: W.png(out.id), order: null, ms: null, edits: 0, canvas: $('size').value };
     walkNumbers();
     if (s === 'still') { if (still && still.own) W.free(still.id); still = { id: W.decode(made.png), own: true, name: '방금 정리한 정지 도트' }; $('stillName').textContent = '방금 정리한 정지 도트를 쓴다'; prompt(); }
     show();
@@ -858,7 +882,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   /* 걷기면 빠르기·dy 를 시트에서 다시 센다(손본 뒤에도) */
   function walkNumbers() {
     var s = made.state; if (s !== 'walk' && s !== 'walk4') return;
-    var b = W.bob(made.id, opt('cellW') || 96, 1), t = W.stride(made.id, opt('cellW') || 96, (made.ms || D.STATES[s].ms)[0]);
+    var b = W.bob(made.id, opt('cellW') || 96, canvasClean().bob || 1), t = W.stride(made.id, opt('cellW') || 96, (made.ms || D.STATES[s].ms)[0]);
     made.walk = { speed: t.speed, dy: b.dy, stride: t.stride };
   }
   /* 정리 결과를 무대·받기 목록에 — 재생 차례·손본 횟수까지 */
@@ -1113,14 +1137,14 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   function recordOf() {
     var m = me(), n = names(), md = made;
     var srcs = (D.STATES[md.state].separate ? raws : [raw]).slice();
-    var o = { colors: opt('colors'), rows: opt('rows'), outline: opt('outline'), fixedPitch: opt('fixedPitch'), speck: opt('speck'), cell: [opt('cellW'), opt('cellH')], gridC: opt('gridC'), gridR: opt('gridR') };
+    var o = { colors: opt('colors'), rows: opt('rows'), outline: opt('outline'), fixedPitch: opt('fixedPitch'), speck: opt('speck'), cell: [opt('cellW'), opt('cellH')], gridC: opt('gridC'), gridR: opt('gridR'), pitch: md.state === 'still' ? stillPitch() : null };
     return Promise.all(srcs.map(function (r) { return digest('SHA-256', r.bytes); }).concat([digest('SHA-1', md.png)])).then(function (h) {
       var sha1 = h.pop(), sep4 = srcs.length > 1;
-      var sheetArgs = md.state === 'still' ? D.args('still', { colors: o.colors, rows: o.rows, outline: o.outline })
+      var sheetArgs = md.state === 'still' ? D.args('still', { colors: o.colors, rows: o.rows, outline: o.outline, pitch: o.pitch, cell: o.cell })
         : D.args(md.state, { rows: o.rows, fixedPitch: o.fixedPitch, speck: o.speck, cell: o.cell, grid: o.gridC && o.gridR ? [o.gridC, o.gridR] : null }, D.names(m.id || 'name', m.form || 'base', 'still').cleaned);
       var rec = D.record({ state: md.state, id: m.id || 'name', form: m.form, atelier: S.atelier, date: new Date().toISOString().slice(0, 10),
         rawSha256: sep4 ? h.map(function (x) { return x ? hex(x) : null; }) : h[0] ? hex(h[0]) : null, received: sep4 ? srcs.map(function (r) { return r.name; }) : null,
-        sha1: sha1 ? hex(sha1, 12) : null, args: sheetArgs, info: md.info, walk: md.walk, order: md.order, ms: md.ms });
+        sha1: sha1 ? hex(sha1, 12) : null, args: sheetArgs, info: md.info, walk: md.walk, order: md.order, ms: md.ms, canvas: md.canvas, cell: o.cell });
       if (!sep4) rec.generation.received_as = srcs[0].name;
       return { name: n.record.split('/').pop(), bytes: new TextEncoder().encode(JSON.stringify(rec, null, 1) + '\n') };
     });
@@ -1171,7 +1195,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
     var m = me(), have = ['still', 'idle', 'walk', 'walk4', 'react'].filter(function (k) { return session[k]; });
     var wk = session.walk4 || session.walk;   // 걷기 4칸이 있으면 그것을 재생기의 걷기로
     var orders = {}; have.forEach(function (k) { if (session[k].order) orders[k] = { order: session[k].order, ms: session[k].ms }; });
-    var def = D.actor({ card: S.card, id: m.id || 'name', form: m.form, states: have, walk: wk && wk.walk, flip: true, base: A().put && A().put.base, orders: orders });
+    var def = D.actor({ card: S.card, id: m.id || 'name', form: m.form, states: have, walk: wk && wk.walk, flip: true, base: A().put && A().put.base, orders: orders, canvas: $('size').value });
     var view = JSON.parse(JSON.stringify(def)); delete view.base;
     have.forEach(function (k) { view.states[(D.STATES[k] && D.STATES[k].as) || k].file = session[k === 'walk' && session.walk4 ? 'walk4' : k].url; });
     if (actor) actor.destroy();
@@ -1191,7 +1215,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   };
 
   chips(); tabs(); prompt(); options(); chooserView(true); loadAtelier();
-  D.load('dot/dot.wasm?v=5').then(function (w) { W = w; ready(); }).catch(function (e) { status($('runStatus'), '정리기를 못 불러왔다 — ' + e.message, 'bad'); });
+  D.load('dot/dot.wasm?v=6').then(function (w) { W = w; ready(); }).catch(function (e) { status($('runStatus'), '정리기를 못 불러왔다 — ' + e.message, 'bad'); });
 })();
 </script>
 </body>

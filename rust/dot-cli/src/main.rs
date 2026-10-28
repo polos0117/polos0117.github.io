@@ -1,5 +1,5 @@
 //! dot — 도트 정리 명령줄. book-atelier 의 파이썬 도구(sprite-grid · sprite-sheet · sprite-bob)와 같은 인자를 받는다.
-//!   dot still <생성 원본.png> <정리본.png> [색 수=24] [--rows N] [--outline]
+//!   dot still <생성 원본.png> <정리본.png> [색 수=24] [--rows N | --pitch 9.5,14] [--outline] [--cell 96x128]   (4K: --pitch 12,20 --cell 192x256)
 //!   dot sheet <생성 시트.png> <정리 시트.png> --frames N --palette <정지 도트.png> [--pitch 9,14 | --fixed-pitch 6 | --rows 121] [--speck 6] [--cell 96x128] [--grid 3x2]
 //!   dot frames <정리 시트.png> <원본 1.png> <원본 2.png> … --palette <정지 도트.png> [--rows 121] [--speck 40] [--cell 96x128] — 칸마다 따로 뽑은 원본(걷기 4칸)
 //!   dot bob <걷기 시트.png> [--cell 96x128] [--bob 1]   (6칸 · 4칸)
@@ -48,6 +48,11 @@ fn still_opts(a: &[String], pos: &[String]) -> Result<StillOpts, String> {
         colors: pos.get(2).map(|v| v.parse().map_err(|_| format!("색 수 {v}"))).transpose()?.unwrap_or(24),
         rows: flag(a, "--rows").map(|v| v.parse().map_err(|_| format!("--rows {v}"))).transpose()?,
         outline: a.iter().any(|x| x == "--outline"),
+        cell: flag(a, "--cell").map(|v| pair(v, 'x')).transpose()?,
+        pitch: flag(a, "--pitch").map(|p| {
+            let v: Vec<f64> = p.split(',').filter_map(|x| x.parse().ok()).collect();
+            if v.len() == 2 { Ok((v[0], v[1])) } else { Err(String::from("--pitch 12,20 꼴")) }
+        }).transpose()?,
     })
 }
 

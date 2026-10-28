@@ -103,6 +103,45 @@ function sourceHash() {
     n++;
   }
 
+  /* ── 4K(2160×3840) — 정지가 칸 크기·격자 찾기 간격 범위를 받는다(API 3).
+     16px 블록으로 그린 200줄 인물: 기본(96×128 · 간격 9.5~14)이면 칸보다 크다고 던지고, 간격 10~24 · 칸 192×256 이면 원본 격자 그대로 ── */
+  {
+    const B = 16, cols = 40, rows = 200, w = 1024, hh = 3600, px = new Uint8Array(w * hh * 4);
+    const pal = [[40, 30, 35], [200, 170, 150], [30, 50, 110], [230, 225, 215], [150, 40, 45]];
+    const x0 = 192, y0 = 160;
+    for (let by = 0; by < rows; by++) for (let bx = 0; bx < cols; bx++) {
+      const c = pal[(bx === 0 || bx === cols - 1 || by === 0 || by === rows - 1) ? 0 : 1 + ((bx * 7 + by * 3) >> 3) % 4];
+      for (let y = 0; y < B; y++) for (let x = 0; x < B; x++) px.set([c[0], c[1], c[2], 255], ((y0 + by * B + y) * w + x0 + bx * B + x) * 4);
+    }
+    const raw = W.put(px, w, hh);
+    assert.throws(() => W.still(raw, { colors: 8, rows: 0, outline: true }), /칸\(96×128/, '기본 칸에는 안 든다');
+    const k = W.still(raw, { colors: 8, rows: 0, outline: true, cell: [192, 256], pitch: [10, 24] });
+    assert.deepEqual([k.info.pitch, k.info.sprite, k.info.cell, k.info.foot_y], [[16, 16], [cols + 2, rows + 2], [192, 256], 254], '원본 격자 그대로 · 칸 192×256 · 발 254');
+    assert.deepEqual(W.size(k.id), [192, 256]);
+    /* 같은 원본·같은 인자면 칸만 달라도 인물 화소는 같다 — book 앨리스 정지(gen2)를 96×128 과 192×256 칸에 */
+    if (fs.existsSync(path.join(IMG, 'sprites/alice/raw/alice_begin_still_gen2.png'))) {
+      const a = W.decode(fs.readFileSync(path.join(IMG, 'sprites/alice/raw/alice_begin_still_gen2.png')));
+      const s1 = W.still(a, { colors: 24, rows: 121, outline: true }), s2 = W.still(a, { colors: 24, rows: 121, outline: true, cell: [192, 256] });
+      const g1 = W.rgba(s1.id), g2 = W.rgba(s2.id), [ox, oy] = [s2.info.cell_offset[0] - s1.info.cell_offset[0], s2.info.cell_offset[1] - s1.info.cell_offset[1]];
+      assert.deepEqual(s1.info.sprite, s2.info.sprite); assert.deepEqual([s1.info.foot_y, s2.info.foot_y], [126, 254]);
+      let d = 0; for (let y = 0; y < 128; y++) for (let x = 0; x < 96; x++) for (let c = 0; c < 4; c++) if (g1.data[(y * 96 + x) * 4 + c] !== g2.data[((y + oy) * 192 + x + ox) * 4 + c]) d++;
+      assert.equal(d, 0, '큰 칸에 옮겨도 화소가 같다');
+      [a, s1.id, s2.id].forEach(i => W.free(i));
+    }
+    W.free(raw); W.free(k.id);
+    /* 인자 · 기록 · 인물 칸 — 기본 크기는 앞선 꼴 그대로, 4K 는 --pitch · --cell, 칸 192×256 · 발 [96, 254] */
+    assert.deepEqual(D.args('still', { rows: 0, pitch: [10, 24], cell: [192, 256] }), ['24', '--pitch', '10,24', '--outline', '--cell', '192x256']);
+    assert.deepEqual(D.args('still', { cell: [96, 128] }), ['24', '--rows', '121', '--outline'], '기본 칸은 안 적는다');
+    const c4 = D.CANVAS['2160x3840'].clean;
+    assert.deepEqual([c4.still.rows, c4.still.pitch, c4.still.cell, c4.sheet.rows, c4.sheet.speck, c4.foot, c4.bob], [0, [10, 24], [192, 256], 'still', 150, [96, 254], 2]);
+    const r4 = D.record({ state: 'still', id: 'alice', form: 'begin', canvas: '2160x3840', cell: [192, 256], args: [] });
+    assert.deepEqual([r4.canvas, r4.cell], ['2160x3840', [192, 256]]);
+    assert.deepEqual([D.record({ state: 'still', id: 'alice' }).canvas, D.record({ state: 'still', id: 'alice' }).cell], ['1024x1536', [96, 128]]);
+    const act4 = D.actor({ id: 'alice', form: 'begin', states: ['still'], canvas: '2160x3840' });
+    assert.deepEqual([act4.cell, act4.foot], [[192, 256], [96, 254]]);
+    n++;
+  }
+
   /* ── 틀린 입력은 던진다(그림은 그대로) ── */
   assert.throws(() => W.decode(new Uint8Array([1, 2, 3])), /PNG/);
   const blank = W.put(new Uint8Array(64 * 64 * 4), 64, 64);

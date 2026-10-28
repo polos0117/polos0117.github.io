@@ -218,6 +218,27 @@ const server = http.createServer((q, s) => {
     assert.equal(await page.isDisabled('#draw'), true, '지우면 못 그린다'); assert.equal(await page.evaluate(() => localStorage.getItem('atelier_openai_key_v1')), null);
     checks += 4;
 
+    /* 4K — 크기를 고르면 정리 기본값이 따라간다: 정지는 격자 찾기(간격 10~24) · 칸 192×256, 시트 줄 수는 정지 도트 키, 쪼가리 150. 크기는 인물마다 남는다 */
+    await page.goto(BASE + '/dot.html?a=book&c=alice&s=still'); await page.waitForSelector('#who:not([hidden])');
+    if (!(await page.evaluate(() => document.getElementById('setup').open))) await page.click('#setup summary');
+    await page.selectOption('#size', '2160x3840');
+    assert.deepEqual(await Promise.all(['rows', 'pitchLo', 'pitchHi', 'cellW', 'cellH'].map(k => page.inputValue('#opt-' + k))), ['0', '10', '24', '192', '256'], '4K 정지 기본값');
+    await page.setInputFiles('#raw', path.join(IMG, 'sprites/alice/raw/alice_begin_still_gen2.png'));
+    await page.waitForFunction(() => !document.getElementById('run').disabled);
+    await page.click('#run'); await page.waitForSelector('#result:not([hidden])');
+    const k4 = await save('#dlPng'), k4px = pixels(k4.buf); assert.deepEqual([k4px.w, k4px.h], [192, 256], '4K 정지 = 칸 192×256');
+    const r4 = JSON.parse((await save('#dlRec')).buf.toString('utf8'));
+    assert.deepEqual([r4.canvas, r4.cell, r4.cleaned.args], ['2160x3840', [192, 256], ['24', '--pitch', '10,24', '--outline', '--cell', '192x256']], '기록에 크기·칸·인자');
+    assert.equal(r4.cleaned.foot_y, 254);
+    await page.click('.tab[data-s="idle"]');
+    assert.deepEqual(await Promise.all(['rows', 'speck', 'cellW', 'cellH'].map(k => page.inputValue('#opt-' + k))), [String(r4.cleaned.sprite[1] - 2), '150', '192', '256'], '4K 시트 — 줄 수는 정지 도트 키');
+    await page.reload(); await page.waitForSelector('#who:not([hidden])');
+    assert.equal(await page.inputValue('#size'), '2160x3840', '크기는 인물마다 남는다');
+    if (!(await page.evaluate(() => document.getElementById('setup').open))) await page.click('#setup summary');
+    await page.selectOption('#size', '1024x1536'); await page.click('.tab[data-s="still"]');
+    assert.deepEqual(await Promise.all(['rows', 'cellW', 'cellH'].map(k => page.inputValue('#opt-' + k))), ['121', '96', '128'], '보통으로 돌리면 앞선 기본값');
+    checks++;
+
     /* 기록을 못 읽으면(404 가 아닌 실패) 지금처럼 gen1 부터, 「지금 할 일」이 "원본 번호는 올릴 때 확인" */
     await ctx.route('**/records/sprites/sunzi/still.json', r => r.fulfill({ status: 500, body: 'x' }));
     await page.goto(BASE + '/dot.html?a=book&c=sunzi&s=still'); await page.waitForSelector('#who:not([hidden])');

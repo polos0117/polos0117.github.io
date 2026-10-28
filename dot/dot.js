@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  var API = 2;   // 2 — frames_sheet(칸마다 따로 뽑은 원본) · 걷기 4칸
+  var API = 3;   // 2 — frames_sheet(칸마다 따로 뽑은 원본) · 걷기 4칸 · 3 — still 이 칸 크기·격자 찾기 간격 범위를 받는다(4K)
   var CELL = [96, 128], FOOT = [48, 126];
 
   /* 상태 — 칸 수·생성 시트의 칸 배치·재생 차례와 칸마다 시간(book 서재 세 인물이 쓰는 값) */
@@ -59,7 +59,8 @@
       /* 정지 도트 한 장 → { id, info } */
       still: function (i, o) {
         o = Object.assign({}, CLEAN.still, o || {});
-        var r = id(X.still(i, o.colors, o.rows || 0, o.outline ? 1 : 0));
+        var c = o.cell || [0, 0], pr = !o.rows && o.pitch ? o.pitch : [0, 0];
+        var r = id(X.still(i, o.colors, o.rows || 0, o.outline ? 1 : 0, c[0], c[1], pr[0], pr[1]));
         return { id: r, info: json() };
       },
       /* 동작 시트 → { id, info }. stillId 는 정지 도트(팔레트를 거기서 뽑는다) */
@@ -90,7 +91,9 @@
   function args(state, o, paletteFile) {
     if (state === 'still') {
       o = Object.assign({}, CLEAN.still, o || {});
-      return [String(o.colors)].concat(o.rows ? ['--rows', String(o.rows)] : []).concat(o.outline ? ['--outline'] : []);
+      /* 격자 찾기의 간격 범위·칸은 기본(9.5~14 · 96×128)과 다를 때만 — 앞선 기록의 인자 꼴을 그대로 두게 */
+      return [String(o.colors)].concat(o.rows ? ['--rows', String(o.rows)] : o.pitch ? ['--pitch', o.pitch.join(',')] : []).concat(o.outline ? ['--outline'] : [])
+        .concat(o.cell && (o.cell[0] !== CELL[0] || o.cell[1] !== CELL[1]) ? ['--cell', o.cell.join('x')] : []);
     }
     o = Object.assign({}, CLEAN.sheet, { frames: STATES[state].frames, grid: STATES[state].grid }, o || {});
     var a = (STATES[state].separate ? ['--separate'] : []).concat(['--frames', String(o.frames)]);
@@ -142,8 +145,12 @@
   };
   /* 캔버스 크기 — 지시문의 화소 블록(정지·단칸)·시트 칸 블록·발 기준선이 따라간다. 4K 는 같은 121줄인데 블록이 두 배라 격자·색이 깨끗하다(값은 네 배쯤) */
   var CANVAS = {
-    '1024x1536': { w: 1024, h: 1536, block: 12, sheet: 6, base: 40, name: '보통 1024×1536' },
-    '2160x3840': { w: 2160, h: 3840, block: 25, sheet: 13, base: 84, name: '4K 2160×3840 — 블록 두 배, 값 네 배쯤' }
+    '1024x1536': { w: 1024, h: 1536, block: 12, sheet: 6, base: 40, name: '보통 1024×1536',
+      clean: { still: { rows: 121, cell: [96, 128] }, sheet: { rows: 121, speck: 40, cell: [96, 128] }, foot: [48, 126], bob: 1 } },
+    /* 4K 정리(2026-10-28 시험, docs/DOT_4K_PLAN.md): 모델은 지시한 25px 가 아니라 약 16px 블록으로 그린다 — 정지는 격자 찾기(간격 10~24, 14px 로 그려도 잡힌다)로
+       원본 격자 그대로(앨리스 100×232), 칸 192×256. 시트는 정지 도트 키에 맞춘다(rows 'still' — 격자 찾기는 칸마다 키가 214~243 으로 흔들렸다), 쪼가리는 면적만큼 150 */
+    '2160x3840': { w: 2160, h: 3840, block: 25, sheet: 13, base: 84, name: '4K 2160×3840 — 원본 격자 그대로(약 230줄 · 칸 192×256), 값 2.5배쯤',
+      clean: { still: { rows: 0, pitch: [10, 24], cell: [192, 256] }, sheet: { rows: 'still', speck: 150, cell: [192, 256] }, foot: [96, 254], bob: 2 } }
   };
   var SIZE = '1024x1536';
   function canvasOf(o) { return CANVAS[o && o.size] || CANVAS[SIZE]; }
@@ -308,6 +315,9 @@
       cleaned: Object.assign({ file: n.cleaned, sha1: o.sha1 || null, tool: 'polos0117.github.io dot.html (rust/dot-core — book-atelier 파이썬 도구와 같은 셈)', args: o.args }, o.info || {})
     };
     if (o.state !== 'still') r.playback = Object.assign({ order: o.order || st.order, ms: o.ms || st.ms }, o.walk || {});
+    /* 어느 크기로 그려 어떤 칸으로 정리했나 — 4K 는 칸이 192×256 */
+    r.canvas = CANVAS[o.canvas] ? o.canvas : SIZE;
+    r.cell = (o.cell || (o.info && o.info.cell) || CELL).slice();
     r.flip = { allowed: o.flip !== false };
     return r;
   }
@@ -329,7 +339,8 @@
     /* 걷기 4칸(walk4)은 재생기의 걷기(walk) 자리로 — 둘 다 주면 뒤의 것(4칸) */
     (o.states || []).forEach(function (s) { states[(STATES[s] && STATES[s].as) || s] = spriteState({ state: s, id: o.id, form: o.form, walk: s === 'walk' || s === 'walk4' ? o.walk : null, order: ords[s] && ords[s].order, ms: ords[s] && ords[s].ms }); });
     /* card — 그 공방 그림 등록부의 열쇠(공용 재생기의 actorFor 가 이것으로 찾는다 — 도감 상세·캡슐·책 펼치기) */
-    var e = { id: o.id, form: o.form || 'base', cell: CELL.slice(), foot: FOOT.slice(), scale: 1, flip: o.flip !== false, facing: 'right', states: states };
+    var cv = (CANVAS[o.canvas] || CANVAS[SIZE]).clean;
+    var e = { id: o.id, form: o.form || 'base', cell: (o.cell || cv.sheet.cell).slice(), foot: (o.foot || cv.foot).slice(), scale: 1, flip: o.flip !== false, facing: 'right', states: states };
     if (o.card) e = Object.assign({ card: o.card }, e);
     /* base — 그림이 sprites.json 의 base 와 다른 저장소에 있을 때(포켓몬: 새 인물은 img-3) */
     if (o.base) e.base = o.base;
