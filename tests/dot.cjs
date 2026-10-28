@@ -193,6 +193,18 @@ function sourceHash() {
     }
   }
 
+  /* ── 재생 차례를 손으로 고른 것(앨리스 대기 [0,3,0,2]) — 칸·인물 칸·기록이 따라간다, 안 주면 상태 기본 ── */
+  {
+    const o = { order: [0, 3, 0, 2], ms: [700, 220, 700, 140] };
+    assert.deepEqual(D.spriteState({ state: 'idle', id: 'alice', form: 'begin', order: o.order, ms: o.ms }), { file: 'alice/alice_begin_idle.png', frames: 4, order: [0, 3, 0, 2], ms: [700, 220, 700, 140] });
+    assert.deepEqual(D.spriteState({ state: 'idle', id: 'alice', form: 'begin' }).order, D.STATES.idle.order, '안 주면 기본');
+    const a = D.actor({ id: 'alice', form: 'begin', states: ['still', 'idle', 'walk'], walk: { speed: 63, dy: [0, 0, 0, 0, 0, 0] }, orders: { idle: o } });
+    assert.deepEqual(a.states.idle.order, [0, 3, 0, 2]); assert.deepEqual(a.states.walk.order, [0, 1, 2, 3, 4, 5], '다른 상태는 기본');
+    const r = D.record({ state: 'idle', id: 'alice', form: 'begin', atelier: 'book', date: '2026-10-28', args: [], info: { hand_edits: 2 }, order: o.order, ms: o.ms });
+    assert.deepEqual([r.playback.order, r.playback.ms, r.cleaned.hand_edits], [[0, 3, 0, 2], [700, 220, 700, 140], 2], '기록의 재생·손본 횟수');
+    n++;
+  }
+
   /* ── 그리기 — gpt 그림 API 요청의 꼴. fetch 를 바꿔 끼워 본다: 주소·열쇠·모델·크기·품질·투명 바탕·PNG·첨부 차례, 오류 말 ── */
   {
     const calls = [];

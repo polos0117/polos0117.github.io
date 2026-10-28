@@ -42,13 +42,15 @@ const server = http.createServer((q, s) => {
     /* 「그린다」 — OpenAI 그림 API 를 흉내 낸다(뒤에 단 것이 먼저 맞는다): 요청을 적어 두고 앨리스 정지 원본(gen2)을 돌려준다. genFail 이면 그 상태로 거절 */
     const genCalls = []; let genFail = 0;
     const aliceRaw = fs.readFileSync(path.join(IMG, 'sprites/alice/raw/alice_begin_still_gen2.png'));
+    /* 지시문에 맞는 앨리스 원본을 돌려준다 — 대기·걷기·반응 시트는 그때 받은 gen 파일 */
+    const rawFor = prompt => fs.readFileSync(path.join(IMG, 'sprites/alice/raw/', /IDLE animation/.test(prompt) ? 'alice_begin_idle_gen1.png' : /WALK CYCLE/.test(prompt) ? 'alice_begin_walk_gen2.png' : /REACT animation/.test(prompt) ? 'alice_begin_react_gen1.png' : 'alice_begin_still_gen2.png'));
     await ctx.route('https://api.openai.com/**', r => {
       const q = r.request(), body = (q.postDataBuffer() || Buffer.alloc(0)).toString('latin1'), fields = {};
       for (const m of body.matchAll(/name="([^"\[]+)"\r\n\r\n([\s\S]*?)\r\n--/g)) fields[m[1]] = m[2];
       const images = Array.from(body.matchAll(/name="image\[\]"; filename="([^"]+)"/g), m => m[1]);
       genCalls.push({ url: q.url(), auth: q.headers()['authorization'], fields, images, bytes: body.length });
       if (genFail) return r.fulfill({ status: genFail, contentType: 'application/json', body: JSON.stringify({ error: { message: 'Incorrect API key provided' } }) });
-      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [{ b64_json: aliceRaw.toString('base64') }], usage: { total_tokens: 1234, input_tokens: 1000, output_tokens: 234 } }) });
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [{ b64_json: rawFor(fields.prompt || '').toString('base64') }], usage: { total_tokens: 1234, input_tokens: 1000, output_tokens: 234 } }) });
     });
     const page = await ctx.newPage(), errors = [];
     page.on('pageerror', e => errors.push(String(e)));
@@ -166,6 +168,19 @@ const server = http.createServer((q, s) => {
     await page.waitForFunction(() => /못 그렸다/.test(document.getElementById('genStatus').textContent), null, { timeout: 20000 });
     assert.match(await page.textContent('#genStatus'), /401/); assert.equal(await page.isDisabled('#draw'), false, '틀려도 다시 누를 수 있다');
     genFail = 0;
+    /* 세 시트 한꺼번에 — 앨리스 때처럼 대기·걷기·반응을 차례로 그려 정리까지. 탭마다 제 원본·제 결과가 남는다 */
+    assert.equal(await page.isVisible('#drawAll'), true, '정지 도트가 있으면 한꺼번에 단추');
+    await page.click('#drawAll');
+    await page.waitForFunction(() => /셋 다 받아 정리했다/.test(document.getElementById('genStatus').textContent), null, { timeout: 60000 });
+    assert.equal(genCalls.length, 7, '요청 셋 더(대기·걷기·반응)');
+    assert.deepEqual(genCalls.slice(4).map(c => c.fields.prompt.match(/IDLE animation|WALK CYCLE|REACT animation/)[0]), ['IDLE animation', 'WALK CYCLE', 'REACT animation'], '차례대로');
+    for (const s of ['idle', 'walk', 'react']) assert.equal(await page.getAttribute('.tab[data-s="' + s + '"]', 'data-done'), 'done', s + ' ●');
+    assert.equal(await page.getAttribute('.tab[aria-selected="true"]', 'data-s'), 'idle', '끝나면 대기 탭에서 본다');
+    assert.equal(await page.locator('#doneList li').count(), 4, '받기 목록 넷'); assert.match(await page.textContent('#todo'), /넷 다 됐다/);
+    assert.match(await page.textContent('#rawName'), /alice_begin_idle_gen1\.png/, '대기 탭의 제 원본');
+    await page.click('.tab[data-s="react"]'); assert.match(await page.textContent('#rawName'), /alice_begin_react_gen1\.png/, '반응 탭의 제 원본'); assert.equal(await page.isVisible('#result'), true, '제 결과도');
+    assert.match(await page.textContent('#facts'), /반응 · 4칸/);
+    await page.click('.tab[data-s="still"]');
     await page.reload(); await page.waitForSelector('#who:not([hidden])');
     assert.equal(await page.inputValue('#key'), 'sk-test-123', '열쇠는 이 기기에 남는다');
     assert.equal(await page.inputValue('#model'), 'gpt-image-2.5-flare'); assert.equal(await page.inputValue('#quality'), 'low', '고른 모델·품질도 남는다');
@@ -225,6 +240,50 @@ const server = http.createServer((q, s) => {
     await page.click('#playBtn'); assert.equal(await page.getAttribute('#playBtn', 'aria-pressed'), 'false');
     await page.click('#playBtn'); assert.equal(await page.getAttribute('#playBtn', 'aria-pressed'), 'true');
     checks += 4;
+
+    /* 칸 고르기 — 2칸을 끄면 차례에서 빠지고, 글로 0,3,0,2 를 적으면 그대로(앨리스 대기처럼). 인물 칸·기록도 따라간다 */
+    assert.equal(await page.locator('#fcells button').count(), 6, '칸 단추 여섯');
+    await page.click('#fcells button[data-frame="1"]');
+    assert.deepEqual(JSON.parse(await page.inputValue('#entry')).order, [0, 2, 3, 4, 5], '2칸이 빠진다');
+    assert.equal(await page.getAttribute('#fcells button[data-frame="1"]', 'aria-pressed'), 'false');
+    await page.fill('#orderText', '0,3,0,2'); await page.dispatchEvent('#orderText', 'change');
+    const e2 = JSON.parse(await page.inputValue('#entry'));
+    assert.deepEqual([e2.order, e2.ms.length], [[0, 3, 0, 2], 4], '글로 적은 차례');
+    assert.deepEqual(JSON.parse(await page.inputValue('#actorEntry')).states.walk.order, [0, 3, 0, 2], '인물 칸도');
+    assert.deepEqual(JSON.parse((await save('#dlRec')).buf.toString('utf8')).playback.order, [0, 3, 0, 2], '기록도');
+    await page.fill('#orderText', '9'); await page.dispatchEvent('#orderText', 'change'); assert.match(await page.textContent('#fpickStatus'), /칸 번호/, '틀린 차례는 거절');
+    await page.fill('#orderText', '0,1,2,3,4,5'); await page.dispatchEvent('#orderText', 'change');
+    assert.deepEqual(JSON.parse(await page.inputValue('#entry')).order, [0, 1, 2, 3, 4, 5], '되돌리면 기본');
+    /* 손보기 — 1~3칸을 4~6칸으로 복사, 되돌리기, 영역 두 색 맞바꾸기, 붓. 손본 것은 바로 정리본·기록에 */
+    await page.click('#fixBox summary');
+    const orig = pixels(fs.readFileSync(path.join(IMG, 'sprites/sunzi/sunzi_begin_walk.png')));
+    const frameOf = (img, k) => { const out = []; for (let y = 0; y < 128; y++) for (let x = 0; x < 96; x++) { const i = (y * img.w + k * 96 + x) * 4; out.push(img.data[i], img.data[i + 1], img.data[i + 2], img.data[i + 3]); } return out; };
+    await page.click('#halfCopy');
+    let edited = pixels((await save('#dlPng')).buf);
+    for (let k = 0; k < 3; k++) assert.deepEqual(frameOf(edited, k + 3), frameOf(orig, k), (k + 4) + '칸 = ' + (k + 1) + '칸');
+    assert.match(await page.textContent('#facts'), /손봄\s*1번/); assert.equal(JSON.parse((await save('#dlRec')).buf.toString('utf8')).cleaned.hand_edits, 1, '기록에 손본 횟수');
+    await page.click('#undo');
+    samePixels((await save('#dlPng')).buf, 'sprites/sunzi/sunzi_begin_walk.png', '되돌리면 원래 정리본');
+    const hexOf = (d, i) => '#' + [d[i], d[i + 1], d[i + 2]].map(v => ('0' + v.toString(16)).slice(-2)).join('');
+    const cols = [...new Set(Array.from({ length: orig.w * orig.h }, (_, p) => orig.data[p * 4 + 3] ? hexOf(orig.data, p * 4) : null).filter(Boolean))].sort();
+    const countIn = (img, k, h) => { let n = 0; for (let y = 0; y < 128; y++) for (let x = 0; x < 96; x++) { const i = (y * img.w + k * 96 + x) * 4; if (img.data[i + 3] && hexOf(img.data, i) === h) n++; } return n; };
+    assert.equal(await page.locator('#pal button').count(), cols.length + 1, '팔레트 = 시트의 색 + 지우개');
+    await page.click('#swA'); await page.click('#pal button[data-c="' + cols[0] + '"]'); await page.click('#swB'); await page.click('#pal button[data-c="' + cols[1] + '"]');
+    await page.click('#toolSwap');
+    const box = await page.locator('#edit').boundingBox();
+    await page.mouse.move(box.x + 1, box.y + 1); await page.mouse.down(); await page.mouse.move(box.x + box.width - 1, box.y + box.height - 1, { steps: 4 }); await page.mouse.up();
+    edited = pixels((await save('#dlPng')).buf);
+    assert.deepEqual([countIn(edited, 0, cols[0]), countIn(edited, 0, cols[1])], [countIn(orig, 0, cols[1]), countIn(orig, 0, cols[0])], '1칸 전체에서 A↔B 가 맞바뀐다');
+    assert.deepEqual(frameOf(edited, 1), frameOf(orig, 1), '다른 칸은 그대로');
+    await page.click('#undo');
+    await page.click('#toolBrush'); await page.click('#swA'); await page.click('#pal button[data-c="' + cols[2] + '"]');
+    const box2 = await page.locator('#edit').boundingBox();   // 되돌리면 「손봄」 줄이 빠져 자리가 오른다 — 화면 밖일 수 있어 요소 기준으로 누른다
+    await page.locator('#edit').click({ position: { x: box2.width / 2 + 2, y: box2.height / 2 + 2 } });   // 화소(48,64)의 한가운데
+    assert.match(await page.textContent('#editNote'), /붓 1칸/, '붓이 한 칸 찍혔다');
+    edited = pixels((await save('#dlPng')).buf);
+    assert.equal(hexOf(edited.data, (64 * edited.w + 48) * 4), cols[2], '붓 — 가운데 화소가 색 A');
+    await page.click('#undo'); samePixels((await save('#dlPng')).buf, 'sprites/sunzi/sunzi_begin_walk.png', '되돌리면 다시 원래');
+    checks += 3;
 
     /* 걷기 4칸을 칸마다 따로 — 손자 6칸 원본에서 0·2·3·5칸을 잘라 장마다 다른 자리의 초록 바탕에(따로 뽑은 것처럼), 네 장을 한 번에 넣는다 */
     {
@@ -314,6 +373,6 @@ const server = http.createServer((q, s) => {
     /* 공방 지도에서 들어오는 문 */
     await page.goto(BASE + '/'); assert.equal(await page.locator('a[href="dot.html"]').count() >= 1, true, '지도 목록 아래 「도트 공방」');
     checks++;
-    console.log('PASS 도트 공방 화면: ' + checks + '가지 · 인물 고르기·정본/의상·요청문 · 상태 넷의 첨부 · 앨리스 정지·손자 걷기를 화면에서 정리해 그림 저장소 정리본과 화소 하나 다르지 않다 · 그린다(열쇠·첨부 차례·③ 으로·같은 화소·다시·걷기 셋·401·열쇠 남음/지움) · 6배·빠르기·dy·sprites.json 칸·기록 · 공방 다섯 · 새로 고침 · 네 크기');
+    console.log('PASS 도트 공방 화면: ' + checks + '가지 · 인물 고르기·정본/의상·요청문 · 상태 넷의 첨부 · 앨리스 정지·손자 걷기를 화면에서 정리해 그림 저장소 정리본과 화소 하나 다르지 않다 · 그린다(열쇠·첨부 차례·③ 으로·같은 화소·다시·걷기 셋·401·열쇠 남음/지움) · 세 시트 한꺼번에(탭마다 제 원본·결과) · 칸 고르기(차례·ms → 칸·인물 칸·기록) · 손보기(반 주기 복사·되돌리기·두 색 맞바꾸기·붓) · 6배·빠르기·dy·sprites.json 칸·기록 · 공방 다섯 · 새로 고침 · 네 크기');
   } finally { await br.close(); server.close(); fs.rmSync(tmp, { recursive: true, force: true }); }
 })().catch(e => { console.error(e); process.exit(1); });

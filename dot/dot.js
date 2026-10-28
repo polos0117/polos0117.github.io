@@ -279,26 +279,27 @@
         : { file: n.raw, sha256: o.rawSha256 || null, by: 'gpt' },
       cleaned: Object.assign({ file: n.cleaned, sha1: o.sha1 || null, tool: 'polos0117.github.io dot.html (rust/dot-core — book-atelier 파이썬 도구와 같은 셈)', args: o.args }, o.info || {})
     };
-    if (o.state !== 'still') r.playback = Object.assign({ order: st.order, ms: st.ms }, o.walk || {});
+    if (o.state !== 'still') r.playback = Object.assign({ order: o.order || st.order, ms: o.ms || st.ms }, o.walk || {});
     r.flip = { allowed: o.flip !== false };
     return r;
   }
 
+  /* o.order·o.ms — 재생 차례를 손으로 고른 것(없으면 상태 기본). 앨리스 대기가 [0,3,0,2] 인 것처럼 */
   function spriteState(o) {
     var st = STATES[o.state], n = names(o.id, o.form, o.state, o.gen, o.version);
     var file = n.cleaned.replace(/^sprites\//, '');
     if (o.state === 'still') return { file: file, frames: 1 };
-    var e = { file: file, frames: st.frames, order: st.order.slice(), ms: st.ms.slice() };
+    var e = { file: file, frames: st.frames, order: (o.order || st.order).slice(), ms: (o.ms || st.ms).slice() };
     if (o.walk && o.walk.speed != null) e.speed = o.walk.speed;
     if (o.walk && o.walk.dy) e.dy = o.walk.dy;
     return e;
   }
 
-  /* sprites.json 의 인물 칸 하나 — 가진 상태만. walk: {speed, dy} */
+  /* sprites.json 의 인물 칸 하나 — 가진 상태만. walk: {speed, dy}. orders: {상태: {order, ms}} 손으로 고른 재생 차례 */
   function actor(o) {
-    var states = {};
+    var states = {}, ords = o.orders || {};
     /* 걷기 4칸(walk4)은 재생기의 걷기(walk) 자리로 — 둘 다 주면 뒤의 것(4칸) */
-    (o.states || []).forEach(function (s) { states[(STATES[s] && STATES[s].as) || s] = spriteState({ state: s, id: o.id, form: o.form, walk: s === 'walk' || s === 'walk4' ? o.walk : null }); });
+    (o.states || []).forEach(function (s) { states[(STATES[s] && STATES[s].as) || s] = spriteState({ state: s, id: o.id, form: o.form, walk: s === 'walk' || s === 'walk4' ? o.walk : null, order: ords[s] && ords[s].order, ms: ords[s] && ords[s].ms }); });
     /* card — 그 공방 그림 등록부의 열쇠(공용 재생기의 actorFor 가 이것으로 찾는다 — 도감 상세·캡슐·책 펼치기) */
     var e = { id: o.id, form: o.form || 'base', cell: CELL.slice(), foot: FOOT.slice(), scale: 1, flip: o.flip !== false, facing: 'right', states: states };
     if (o.card) e = Object.assign({ card: o.card }, e);
