@@ -11,20 +11,10 @@
   'use strict';
   var H = window.AtelierHubAdapters, STORE = 'atelier_hub_prompt_v1', $ = function (id) { return document.getElementById(id); };
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
-  var OUTPUTS = [{ key: 'casual', ko: '일상컷' }, { key: 'form', ko: '폼 초상' }, { key: 'open', ko: '개방·각성' }];
   var STEPS = [
     { key: 'era', ko: '시대', need: true }, { key: 'place', ko: '장소', need: true }, { key: 'act', ko: '하는 일', need: true }, { key: 'ofam', ko: '의상 계열', need: true },
     { key: 'item', ko: '옷' }, { key: 'frame', ko: '프레이밍', need: true }, { key: 'lens', ko: '렌즈', need: true }, { key: 'pose', ko: '자세' }, { key: 'orient', ko: '방향', need: true },
     { key: 'expr', ko: '표정' }, { key: 'axes', ko: '세부 강도' }];
-  /* 폼·개방 단계 — kind: pick(하나 고르기) · design · look · action · text. 모두 기본값이 있어 처음부터 지시문이 나온다 */
-  var FSTEPS = [
-    { key: 'form', ko: '폼', kind: 'pick' }, { key: 'ident', ko: '인물 기준', kind: 'pick' }, { key: 'exposure', ko: '노출', kind: 'pick' },
-    { key: 'design', ko: '설계 줄', kind: 'design' }, { key: 'look', ko: '외형', kind: 'look', create: true }, { key: 'action', ko: '연출', kind: 'action' },
-    { key: 'expr', ko: '표정', kind: 'pick', scene: true }, { key: 'pose', ko: '자세', kind: 'pick', scene: true }, { key: 'orient', ko: '방향', kind: 'pick', scene: true },
-    { key: 'frame', ko: '프레이밍', kind: 'pick', scene: true }, { key: 'lens', ko: '렌즈', kind: 'pick', scene: true }, { key: 'aspect', ko: '화면 비율', kind: 'pick', scene: true },
-    { key: 'notes', ko: '덧붙임', kind: 'text' }];
-  var OSTEPS = [{ key: 'form', ko: '폼', kind: 'pick' }, { key: 'notes', ko: '덧붙임', kind: 'text' }];
-  var ASPECTS = ['2:3', '3:2', '1:1', '9:16', '16:9'];
   var WHY = {
     unknown: '없는 값', era: '이 시대엔 없는 곳', year: '{year}년엔 없던 곳({since}년부터)', noact: '여기서 할 일이 없다', place: '이 장소에선 안 하는 일',
     outfit: '이 시대·장소에 입을 옷이 없다', act: '이 하는 일엔 안 맞는다', close: '가까운 컷에선 알아볼 데가 안 보이는 옷', banned: '이 공방 일상컷엔 안 쓴다',
@@ -47,8 +37,10 @@
 
   var A = null, D = null, S = null, CT = null, T = null, tree = null, saved = readStore();
   var st = { a: '', style: '', subject: '', out: 'casual', scene: { unlocked: [] }, card: null, open: 'a', unlock: {}, walked: {}, seen: {}, grpOpen: {} };
-  var outs = function () { return (A && A.outputs) || ['casual']; };
-  var formy = function () { return st.out === 'form' || st.out === 'open'; };
+  /* 출력 갈래 — 받침의 표(off 는 준비 중). 일상컷 밖은 카드 갈래(단계 표 prompt/steps.js) */
+  var outList = function () { return A && A.outputs ? A.outputs(S) : [{ key: 'casual', ko: '일상컷' }]; };
+  var outs = function () { return outList().filter(function (o) { return !o.off; }).map(function (o) { return o.key; }); };
+  var formy = function () { return st.out !== 'casual'; };
 
   function boot() {
     var a = q('a') || '';
@@ -87,14 +79,17 @@
     return next;
   }
   function steps() {
-    if (st.out === 'open') return OSTEPS;
-    if (st.out === 'form') return FSTEPS.filter(function (s) { return !s.create || (st.card && st.card.identityMode !== 'reference'); });
-    return STEPS;
+    return formy() ? cardSteps() : STEPS;
   }
   var keysOf = function () { return steps().map(function (s) { return s.key; }); };
   /* 단계를 처음 밟을 때는 첫 단계부터 — 시대는 트리가 기본(지금)으로 채워 두지만 건너뛰지 않는다(2026-10-29 사용자 「시대는 선택 안되고 그냥 건너뛰어지네」).
      한 칸이라도 고른 뒤(walked)에는 비어 있는 첫 칸 또는 다 골랐다 */
-  function begin() { return st.walked[st.out] ? firstOpen() : steps()[0].key; }
+  function begin() {
+    var s = steps();
+    /* 지시문이 안 나오는 카드 갈래(스킨 없는 무기 등)는 다 골랐다로 가지 않고 첫 단계 — 거기 까닭이 있다 */
+    if (formy() && s.length && !prompt()) return s[0].key;
+    return st.walked[st.out] || !s.length ? firstOpen() : s[0].key;
+  }
   function firstOpen() {
     if (formy()) return 'done';
     for (var i = 0; i < STEPS.length; i++) if (STEPS[i].need && !st.scene[STEPS[i].key]) return STEPS[i].key;
@@ -185,7 +180,7 @@
   /* 랜덤 — 트리 안에서만. 이 칸 또는 이 칸부터 끝까지 */
   function rnd(list) { return list[Math.floor(Math.random() * list.length)]; }
   function randomFrom(key, all) {
-    if (formy()) return randomForm(key, all);
+    if (formy()) return randomCard(key, all);
     var keys = STEPS.map(function (s) { return s.key; }), i = keys.indexOf(key), sc = Object.assign({}, st.scene);
     (all ? keys.slice(i) : [key]).forEach(function (k) {
       if (k === 'axes' || unl(sc, k)) return;
@@ -200,87 +195,60 @@
     save(); render();
   }
 
-  /* ── 폼·개방 ── */
-  var fscene = function () { return st.card.scenes[st.out]; };
-  function forms() {
-    var p = A.pilot(D, st.subject);
-    return A.forms(D).map(function (f) {
-      var x = A.facts(D, st.subject, f.key), pilot = st.out === 'open' ? p.open === f.key : p.form === f.key;
-      return { v: f.key, ko: f.stage + (pilot ? ' · ' + w('dex.pilot', '시범') : ''), sub: st.out === 'open' ? x.open : x.look, stage: f.stage, none: st.out === 'open' && !x.open };
-    });
+  /* ── 카드 갈래(폼·개방·초상·각성·저주·스킨) ── 단계 표는 prompt/steps.js, 여기는 그리고 누르기만 */
+  function rnd2(list) { return list[Math.floor(Math.random() * list.length)]; }
+  function cardSteps() {
+    var make = (window.AtelierHubSteps || {})[st.a];
+    if (!make || !st.card) return [];
+    return make(st.out, { A: A, D: D, S: S, w: w, subject: st.subject, g: subj(), card: st.card, rnd: rnd2 });
   }
-  function actionCategory() { return S.ACTION_CATEGORIES.filter(function (r) { return r.key === (fscene().action || {}).category; })[0]; }
-  /* 폼 단계의 고르는 칸 — [{v, ko, sub}] */
-  function fOptions(key) {
-    var c = st.card, auto = { v: '', ko: w('prompt.auto', '자동') };
-    switch (key) {
-      case 'form': return forms().filter(function (f) { return !f.none; });
-      case 'ident': return [{ v: 'create', ko: w('prompt.create', '새 인물 만들기(첫 그림)'), sub: w('prompt.create.note', '') }, { v: 'reference', ko: w('prompt.reference', '확정한 첫 그림 이어가기'), sub: w('prompt.reference.note', '') }];
-      case 'base': return A.forms(D).map(function (f) { return { v: f.key, ko: f.stage }; });
-      case 'exposure': return S.FORM_EXPOSURE_KEYS.map(function (k) { return { v: k, ko: w('prompt.exposure.' + (k || 'auto'), k || '자동'), sub: w('prompt.exposure.help.' + (k || 'auto'), '') }; });
-      case 'expr': return [auto].concat(T.exprs.map(function (r) { return { v: r[0], ko: r[1] }; }));
-      case 'pose': return [auto].concat(S.ACTION_POSES.map(function (r) { return { v: r.key, ko: r.label, sub: r.description }; }));
-      case 'orient': return [auto].concat(T.orients.map(function (r) { return { v: r[0], ko: r[1] }; }));
-      case 'frame': return [auto].concat(T.frames.map(function (r) { return { v: r[0], ko: r[1] }; }));
-      case 'lens': return [auto].concat(T.lenses.map(function (r) { return { v: r[0], ko: r[1] }; }));
-      case 'aspect': return ASPECTS.map(function (a) { return { v: a, ko: a }; });
-    }
-    return [];
-  }
-  function fValue(key) {
-    var c = st.card;
-    if (key === 'ident') return c.identityMode;
-    if (key === 'form' || key === 'exposure') return c[key];
-    return fscene()[key];
-  }
-  function fShown(key) {
-    var c = st.card, sc = fscene(), v = fValue(key);
-    switch (key) {
-      case 'form': { var f = forms().filter(function (x) { return x.v === c.form; })[0]; return f ? f.ko : c.form; }
-      case 'ident': return c.identityMode === 'reference' ? '이어가기 · ' + (A.forms(D).filter(function (f) { return f.key === c.baseForm; })[0] || {}).stage : '새 인물';
-      case 'design': return [c.identityMode !== 'reference' && (c.silhouetteOn ? '실루엣' : '실루엣 끔'), c.identityMode !== 'reference' && (c.faceDesignOn ? '얼굴' : '얼굴 끔'), c.motifs && '모티프', c.lookNote && '폼 요청'].filter(Boolean).join(' · ') || '설계표대로';
-      case 'look': { var n = Object.keys(c.params).filter(function (k) { return c.params[k]; }).length; return n ? n + '칸 고름' : '설계표대로'; }
-      case 'action': { var a = actionCategory(); return a ? a.label : w('prompt.auto', '자동'); }
-      case 'notes': { var t = st.out === 'open' ? [c.lookNote, sc.custom] : [sc.camera, sc.scene, sc.outfit, sc.custom]; var n2 = t.filter(function (x) { return x && x.trim(); }).length; return n2 ? n2 + '칸' : '없음'; }
-    }
-    var r = fOptions(key).filter(function (x) { return x.v === (v || ''); })[0];
-    return r ? r.ko : (v || w('prompt.auto', '자동'));
-  }
-  function fChoose(key, v) {
-    var c = st.card;
-    if (key === 'ident') c.identityMode = v;
-    else if (key === 'base') { c.baseForm = v; advance('ident'); save(); render(); return; }   // 기준 폼은 인물 기준 단계 안 — 고르면 다음으로
-    else if (key === 'form' || key === 'exposure') c[key] = v;
-    else fscene()[key] = v;
-    /* 새 인물 → 이어가기: 기준 폼이 없으면 고른 폼 */
-    if (key === 'ident' && v === 'reference') { if (!c.baseForm) c.baseForm = c.form; save(); render(); return; }   // 이어가기는 기준 폼을 고르고 넘어간다
-    advance(key);
+  function stepOf(k) { return steps().filter(function (s) { return s.key === k; })[0]; }
+  function partPick(stepKey, i, v) {
+    var step = stepOf(stepKey), part = step && step.parts[i];
+    if (!part || !part.set) return;
+    part.set(v);
+    if (!(part.stay && part.stay(v))) advance(stepKey);
     save(); render();
   }
-  /* 폼 랜덤 — 그 공방 lib/prompt-random.js 의 폼 칸 목록(연출 갈래·예시·조절, 표정·자세·방향·프레이밍·렌즈·비율) */
-  var FRAND = ['action', 'expr', 'pose', 'orient', 'frame', 'lens', 'aspect'];
-  function randomForm(key, all) {
-    var R = window.AtelierSceneRandom, ks = keysOf(), i = ks.indexOf(key), sc = fscene();
-    if (!R) return;
-    var todo = (all ? ks.slice(i) : [key]).filter(function (k) { return FRAND.indexOf(k) >= 0; });
-    todo.forEach(function (k) {
-      var fields = k === 'action' ? Object.keys(R.fields(sc, 'form')).filter(function (f) { return f.indexOf('action.') === 0; }) : [k];
-      fields.forEach(function (f) { var next = R.randomize(sc, 'form', f, Math.random); Object.assign(sc, next); });
-    });
+  function randomCard(key, all) {
+    var ks = keysOf(), i = ks.indexOf(key);
+    (all ? ks.slice(i) : [key]).forEach(function (k) { var s = stepOf(k); if (s && s.random) s.random(); });   // 차례대로 — 앞 단계가 바뀌면 뒤 표도 바뀐다
     st.walked[st.out] = true;
     st.open = all ? 'done' : (ks[i + 1] || 'done');
     save(); render();
   }
-  function paramsRandom() {
-    var c = st.card, designed = function (k) { return (c.faceDesignOn && Object.keys(S.FACE_PARAM).some(function (f) { return S.FACE_PARAM[f] === k; })) || (c.silhouetteOn && Object.keys(S.SIL_PARAM).some(function (f) { return S.SIL_PARAM[f] === k; })); };
-    defs().forEach(function (d) {
-      if (c.locks[d.key] || designed(d.key)) return;
-      var ch = d.options.filter(function (o) { return o[0] && o[0] !== '__custom__'; });
-      c.params[d.key] = ch.length ? rnd(ch)[0] : '';
-    });
-    save(); render();
+  function partsHTML(step) {
+    return step.parts.map(function (p, i) {
+      var at = ' data-part="' + i + '"';
+      switch (p.type) {
+        case 'note': return p.text ? '<p class="note">' + esc(p.text) + '</p>' : '';
+        case 'facts': { var rows = p.rows().filter(function (r) { return r[1]; }); return rows.length ? '<dl class="facts">' + rows.map(function (r) { return '<dt>' + esc(r[0]) + '</dt><dd>' + esc(r[1]) + '</dd>'; }).join('') + '</dl>' : ''; }
+        case 'pick': return (p.ko ? '<h4>' + esc(p.ko) + '</h4>' : '') + optButtons(p.opts().map(function (o) { return Object.assign({}, o, { attr: at, out: !!o.off }); }), p.get());
+        case 'check': return '<label class="unlock"><input type="checkbox"' + at + (p.get() ? ' checked' : '') + '> ' + esc(p.ko) + '</label>' + (p.note ? '<p class="note">' + esc(p.note).replace(/\n/g, '<br>') + '</p>' : '');
+        case 'text': return field(p.id, p.ko, p.get(), p.multi, p.help, p.ph, at);
+        case 'select': return '<label class="axis">' + esc(p.ko) + '<select data-sel="1"' + at + '>' + p.opts.map(function (o) {
+          return '<option value="' + esc(o[0]) + '"' + (o[0] === (p.get() || '') ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select>' + (p.help ? '<small>' + esc(p.help) + '</small>' : '') + '</label>';
+        case 'buttons': return '<p class="rand">' + p.items.map(function (b, j) { return '<button type="button" class="btn"' + at + ' data-btn="' + j + '">' + esc(b.ko) + '</button>'; }).join('') + '</p>';
+        case 'params': return p.groups.map(function (g, gi) {
+          /* 연 묶음은 다시 그려도 열린 채(값을 바꿀 때마다 닫혔다) */
+          var on = st.grpOpen[g.key] != null ? st.grpOpen[g.key] : gi === 0;
+          return '<details class="grp" data-grp="' + esc(g.key) + '"' + (on ? ' open' : '') + '><summary>' + esc(g.ko) + '</summary>' + (g.note ? '<p class="note">' + esc(g.note) + '</p>' : '') + g.defs.map(function (d) {
+            var v = p.get(d.key), opts = d.opts.slice();
+            if (v && !opts.some(function (o) { return o[0] === v; })) opts.push([v, v]);
+            return '<label class="axis">' + esc(d.ko) + '<select' + at + ' data-param="' + esc(d.key) + '">' + opts.map(function (o) {
+              return '<option value="' + esc(o[0]) + '"' + (o[0] === v ? ' selected' : '') + '>' + esc(o[0] === '' ? w('prompt.auto', '자동') : o[1]) + '</option>'; }).join('') + '</select>' +
+              (v === '__custom__' && p.custom ? '<input type="text"' + at + ' data-pcustom="' + esc(d.key) + '" value="' + esc(p.custom.get(d.key)) + '" aria-label="' + esc(d.ko) + ' · ' + esc(w('prompt.custom', '직접 입력')) + '" placeholder="' + esc(w('prompt.custom', '직접 입력')) + '">' : '') + '</label>';
+          }).join('') + '</details>';
+        }).join('');
+      }
+      return '';
+    }).join('');
   }
-  function defs() { return S.PARAM_DEFS.filter(function (d) { return S.IDENTITY_GROUPS.indexOf(d.group) >= 0 && S.IDENTITY_EXCLUDED.indexOf(d.key) < 0; }); }
+  function cardPanel(k) {
+    var step = stepOf(k);
+    if (!step) return '';
+    return '<h3>' + esc(step.ko) + '</h3>' + partsHTML(step) + (step.random ? '<div class="bar"><span></span>' + randomBar(k) + '</div>' : '') + (step.next ? nextBtn(k) : '');
+  }
 
   /* ── 그리기 ── */
   function chip(key, ko, val, mark) { return '<button type="button" class="hchip' + (st.open === key ? ' on' : '') + '" data-open="' + key + '"><small>' + esc(ko) + '</small> ' + esc(val) + (mark ? ' <span class="lock" title="트리 밖에서 고른 값">🔓</span>' : '') + '</button>'; }
@@ -290,12 +258,14 @@
     out.push(chip('style', '화풍', (A.styles(D, S).filter(function (x) { return x.key === st.style; })[0] || {}).ko || st.style));
     out.push(chip('subject', '대상', st.subject ? (A.subjects(D).filter(function (x) { return x.key === st.subject; })[0] || {}).ko : '—'));
     if (!st.subject) return out.join('');
-    out.push(chip('out', '출력', (OUTPUTS.filter(function (o) { return o.key === st.out; })[0] || {}).ko));
+    out.push(chip('out', '출력', (outList().filter(function (o) { return o.key === st.out; })[0] || {}).ko));
     var keys = keysOf(), at = st.open === 'done' ? keys.length : keys.indexOf(st.open), seen = st.seen[st.out];
     steps().forEach(function (s, idx) {
       /* 아직 안 온 단계는 칩을 안 띄운다. 한 번 다 골랐으면 다 띄운다 */
-      if (formy()) { if (!seen && at >= 0 && idx > at) return; out.push(chip(s.key, s.ko, fShown(s.key))); return; }
-      if (!st.seen.casual && at >= 0 && idx > at && (s.key === 'axes' || !st.scene[s.key])) return;
+      /* 단계 밖(출력·대상 고르는 중)이고 아직 다 고른 적 없으면 단계 칩은 하나도 안 띄운다 */
+      if (!seen && at < 0) return;
+      if (formy()) { if (!seen && idx > at) return; out.push(chip(s.key, s.ko, s.shown())); return; }
+      if (!seen && idx > at && (s.key === 'axes' || !st.scene[s.key])) return;
       if (s.key === 'axes') { out.push(chip('axes', s.ko, (T.axes.filter(function (a) { return a.key === 'skin_exposure'; })[0] ? '피부 노출 ' + label((T.axes.filter(function (a) { return a.key === 'skin_exposure'; })[0] || {}).options, st.scene.axes.skin_exposure) : '…'))); return; }
       out.push(chip(s.key, s.ko, shown(s.key, st.scene[s.key]), unl(st.scene, s.key)));
     });
@@ -327,13 +297,16 @@
         '<div id="subjects">' + subjectsHTML() + '</div>';
     }
     if (k === 'out') {
-      var on = outs();
-      return '<h3>출력 갈래</h3><p class="note">' + (on.length > 1 ? '일상컷은 트리대로, 폼 초상·개방은 설계표의 폼대로 — 옛 생성기와 같은 지시문이다.' : '이 공방은 아직 일상컷만 — 폼·개방은 다음 단계에서 연다.') + '</p><div class="opts">' +
-        OUTPUTS.map(function (o) { var ok = on.indexOf(o.key) >= 0; return '<button type="button" class="opt" data-out-mode="' + o.key + '"' + (ok ? '' : ' disabled') + ' aria-pressed="' + (st.out === o.key) + '"><b>' + esc(o.ko) + '</b>' + (ok ? '' : '<span>준비 중</span>') + '</button>'; }).join('') + '</div>';
+      var list = outList(), any = list.some(function (o) { return o.off; });
+      return '<h3>출력 갈래</h3><p class="note">일상컷은 트리대로, 나머지는 그 공방 설계대로 — 옛 생성기와 같은 지시문이다.' + (any ? ' 준비 중인 갈래는 다음 단계에서 연다.' : '') + '</p><div class="opts">' +
+        list.map(function (o) { return '<button type="button" class="opt" data-out-mode="' + o.key + '"' + (o.off ? ' disabled' : '') + ' aria-pressed="' + (st.out === o.key) + '"><b>' + esc(o.ko) + '</b>' + (o.off ? '<span>준비 중</span>' : o.note ? '<span>' + esc(o.note) + '</span>' : '') + '</button>'; }).join('') + '</div>';
     }
-    if (k === 'done') return '<h3>다 골랐다</h3><p class="note">칩을 누르면 그 단계로 돌아간다. 아래 지시문을 복사해 쓴다.' + (formy() ? ' 랜덤은 연출부터 화면 비율까지만 — 폼·인물 기준·외형은 그대로.' : '') + '</p>' +
-      '<span class="rand"><button type="button" class="btn" data-rand-all="' + steps()[0].key + '">처음부터 다 랜덤</button></span>';
-    if (formy()) return formPanel(k);
+    if (k === 'done') {
+      var ss = steps(), canRand = !formy() || ss.some(function (x) { return x.random; });
+      return '<h3>다 골랐다</h3><p class="note">칩을 누르면 그 단계로 돌아간다. 아래 지시문을 복사해 쓴다.' + (formy() && canRand ? ' 랜덤은 랜덤 단추가 있는 단계만 — 나머지는 그대로.' : '') + '</p>' +
+        (canRand && ss.length ? '<span class="rand"><button type="button" class="btn" data-rand-all="' + ss[0].key + '">처음부터 다 랜덤</button></span>' : '');
+    }
+    if (formy()) return cardPanel(k);
     if (k === 'axes') {
       return '<h3>세부 강도</h3><p class="note">전체 강도·피부 노출은 일상컷 고정값(가장 강함·많이)으로 맞춰 두었다.</p>' + T.axes.map(function (ax) {
         return '<label class="axis">' + esc(ax.ko) + '<select data-axis="' + ax.key + '"><option value="">자동</option>' + ax.options.map(function (o) {
@@ -348,85 +321,12 @@
       '<div class="bar"><label class="unlock"><input type="checkbox" id="unlock" ' + (st.unlock[k] ? 'checked' : '') + '> 해방 — 트리 밖 선택지도 보기(' + outTree(k).length + ')</label>' + randomBar(k) + '</div>' +
       (out.length ? '<p class="note">흐린 것은 이 길에서 빠진 값이다. 고르면 🔓 가 붙고 기록에 남는다 — 트리가 그 칸을 고치지 않는다.</p>' + optButtons(out, st.scene[k]) : '');
   }
-  function field(id, labelText, value, multi, help, ph) {
-    return '<label class="axis" for="f-' + id + '">' + esc(labelText) + (multi ? '<textarea id="f-' + id + '" data-field="' + id + '" rows="3" placeholder="' + esc(ph || '') + '">' + esc(value || '') + '</textarea>' :
-      '<input type="text" id="f-' + id + '" data-field="' + id + '" value="' + esc(value || '') + '" placeholder="' + esc(ph || '') + '">') + (help ? '<small>' + esc(help) + '</small>' : '') + '</label>';
+  function field(id, labelText, value, multi, help, ph, at) {
+    at = at || '';
+    return '<label class="axis" for="f-' + id + '">' + esc(labelText) + (multi ? '<textarea id="f-' + id + '" data-field="' + id + '"' + at + ' rows="3" placeholder="' + esc(ph || '') + '">' + esc(value || '') + '</textarea>' :
+      '<input type="text" id="f-' + id + '" data-field="' + id + '"' + at + ' value="' + esc(value || '') + '" placeholder="' + esc(ph || '') + '">') + (help ? '<small>' + esc(help) + '</small>' : '') + '</label>';
   }
   function nextBtn(k) { var ks = keysOf(), n = ks[ks.indexOf(k) + 1]; return '<p><button type="button" class="btn" data-next="' + k + '">' + (n && !st.seen[st.out] ? '다음' : '다 골랐다') + '</button></p>'; }
-  function factsHTML() {
-    var x = A.facts(D, st.subject, st.card.form), g = subj() || {};
-    var rows = st.out === 'open' ? [[w(A.key + '.open', '개방'), x.open]] :
-      [[w(A.key + '.look', '모습'), x.look], [w(A.key + '.pose', '자세'), x.pose], [w(A.key + '.setting', '배경'), x.setting], [w('prompt.role', '역할'), x.role]];
-    rows.unshift([w(A.key + '.persona', '한 줄 인격'), g.persona]);
-    return '<dl class="facts">' + rows.filter(function (r) { return r[1]; }).map(function (r) { return '<dt>' + esc(r[0]) + '</dt><dd>' + esc(r[1]) + '</dd>'; }).join('') + '</dl>';
-  }
-  function formPanel(k) {
-    var step = steps().filter(function (s) { return s.key === k; })[0], c = st.card, sc = fscene();
-    if (!step) return '';
-    var head = '<h3>' + esc(step.ko) + '</h3>';
-    if (k === 'form') {
-      var all = forms(), none = all.filter(function (f) { return f.none; });
-      return head + '<p class="note">' + esc(w(st.out === 'open' ? 'prompt.open.note' : (c.identityMode === 'reference' ? 'prompt.reference.note' : 'prompt.create.note'), '')) + '</p>' +
-        optButtons(fOptions('form'), c.form) +
-        (none.length ? optButtons(none.map(function (f) { return { v: f.v, ko: f.stage, why: '이 폼엔 개방 장면이 없다', out: true, off: true }; }), '') : '') + factsHTML();
-    }
-    if (k === 'ident') {
-      return head + optButtons(fOptions('ident'), c.identityMode) +
-        (c.identityMode === 'reference' ? '<h4>' + esc(w('prompt.base', '첨부할 확정 그림')) + '</h4>' + optButtons(fOptions('base').map(function (x) { return Object.assign(x, { attr: ' data-base="1"' }); }), c.baseForm) +
-          '<p class="note">' + esc(w('prompt.anchor.note', '')) + '</p>' : '') + nextBtn(k);
-    }
-    if (step.kind === 'pick') {
-      var cur = fValue(k);
-      return head + (k === 'exposure' ? '' : '') + optButtons(fOptions(k), cur || '') +
-        (FRAND.indexOf(k) >= 0 ? '<div class="bar"><span></span>' + randomBar(k) + '</div>' : '');
-    }
-    if (k === 'design') {
-      var create = c.identityMode !== 'reference', g = subj() || {};
-      var list = function (o, pre) { return Object.keys(o || {}).filter(function (x) { return o[x]; }).map(function (x) { return esc(w(A.key + '.' + pre + '.' + x, x)) + ' · ' + esc(((S.VOCAB_EN || {})[x] || {})[o[x]] || o[x]); }); };
-      return head + (create ? '<p class="note">새 인물(첫 그림)에만 실리는 줄 — 끄면 그 묶음을 빼고, 외형에서 직접 고른 항목이 그 묶음을 이긴다.</p>' +
-        '<label class="unlock"><input type="checkbox" data-toggle="silhouetteOn"' + (c.silhouetteOn ? ' checked' : '') + '> ' + esc(w('prompt.sil.use', '실루엣 싣기')) + '</label>' +
-        (c.silhouetteOn ? '<p class="note">' + list(g.silhouette, 'sil').join('<br>') + '</p>' : '') +
-        '<label class="unlock"><input type="checkbox" data-toggle="faceDesignOn"' + (c.faceDesignOn ? ' checked' : '') + '> ' + esc(w('prompt.face.use', '얼굴 설계 싣기')) + '</label>' +
-        (c.faceDesignOn ? '<p class="note">' + list(g.face, 'face').join('<br>') + '</p>' : '') : '<p class="note">이어가기 — 얼굴·머리·체형은 첨부한 그림이 쥔다.</p>') +
-        field('motifs', w('prompt.motifs', '모티프'), c.motifs, false, w('prompt.help.motifs.form', ''), w('prompt.motifs.ph', '')) +
-        field('lookNote', w('prompt.override', '폼 세부 요청'), c.lookNote, false, '', w('prompt.override.ph', '')) + nextBtn(k);
-    }
-    if (k === 'look') {
-      var groups = S.IDENTITY_GROUPS;
-      return head + '<p class="note">' + esc(w('prompt.appearance.note', '자동 항목은 설계표와 모델이 정한다.')) + '</p>' +
-        '<p class="rand"><button type="button" class="btn" data-act="params-random">' + esc(w('prompt.random', '외형 무작위')) + '</button><button type="button" class="btn" data-act="params-reset">' + esc(w('prompt.reset', '외형 초기화')) + '</button></p>' +
-        groups.map(function (gk, gi) {
-          /* 연 묶음은 다시 그려도 열린 채(값을 바꿀 때마다 닫혔다) */
-          var on = st.grpOpen[gk] != null ? st.grpOpen[gk] : gi === 0;
-          return '<details class="grp" data-grp="' + esc(gk) + '"' + (on ? ' open' : '') + '><summary>' + esc(w('prompt.group.' + gk, gk)) + '</summary>' + defs().filter(function (d) { return d.group === gk; }).map(function (d) {
-            var v = c.params[d.key] || '', opts = d.options.filter(function (o) { return o[0] !== '__custom__'; });
-            if (v && !opts.some(function (o) { return o[0] === v; })) opts = opts.concat([[v, v]]);
-            return '<label class="axis">' + esc(d.ko) + '<select data-param="' + esc(d.key) + '">' + opts.map(function (o) {
-              return '<option value="' + esc(o[0]) + '"' + (o[0] === v ? ' selected' : '') + '>' + esc(o[0] === '' ? w('prompt.auto', '자동') : o[1]) + '</option>'; }).join('') + '</select></label>';
-          }).join('') + '</details>';
-        }).join('') + nextBtn(k);
-    }
-    if (k === 'action') {
-      var a = sc.action || {}, cat = actionCategory(), sel = function (key, labelText, rows, help) {
-        return '<label class="axis">' + esc(labelText) + '<select data-action="' + key + '"><option value="">' + esc(w('prompt.auto', '자동')) + '</option>' + rows.map(function (r) {
-          return '<option value="' + esc(r.key) + '"' + (a[key] === r.key ? ' selected' : '') + '>' + esc(r.label) + '</option>'; }).join('') + '</select>' + (help ? '<small>' + esc(help) + '</small>' : '') + '</label>';
-      };
-      return head + '<p class="note">' + esc(w('prompt.action.category.help', '')) + '</p>' +
-        sel('category', w('prompt.action.category', '연출 갈래'), S.ACTION_CATEGORIES, cat && cat.description) +
-        (cat ? sel('example', w('prompt.action.example', '연출 장면 예시'), cat.examples, ((cat.examples.filter(function (r) { return r.key === a.example; })[0]) || {}).description) : '') +
-        S.ACTION_CONTROLS.map(function (ctl) { return sel(ctl.key, ctl.label, ctl.options, ((ctl.options.filter(function (r) { return r.key === a[ctl.key]; })[0]) || {}).description || ctl.description); }).join('') +
-        '<div class="bar"><span></span>' + randomBar(k) + '</div>' + nextBtn(k);
-    }
-    if (k === 'notes') {
-      if (st.out === 'open') return head + field('lookNote', w('prompt.open.override', '명장면 세부 요청'), c.lookNote, true, '', w('prompt.open.override.ph', '')) +
-        field('custom', w('prompt.extra', '추가 연출 요청'), sc.custom, true, w('prompt.help.custom', '')) + nextBtn(k);
-      return head + field('camera', w('prompt.camera', '카메라·구도 추가 지시'), sc.camera, false, w('prompt.help.camera', '')) +
-        field('scene', w('prompt.scene', '장소·상황'), sc.scene, true, w('prompt.help.scene', '')) +
-        field('outfit', w('prompt.outfit', '의상·소품'), sc.outfit, true, w('prompt.help.outfit', '')) +
-        field('custom', w('prompt.extra', '추가 연출 요청'), sc.custom, true, w('prompt.help.custom', '')) + nextBtn(k);
-    }
-    return head;
-  }
   function randomBar(k) { return '<span class="rand"><button type="button" class="btn" data-rand="' + k + '">이 칸 랜덤</button><button type="button" class="btn" data-rand-all="' + k + '">여기부터 다 랜덤</button></span>'; }
   function subjectsHTML() {
     var f = (st.find || '').trim().toLowerCase(), list = A.subjects(D).filter(function (x) { return !f || (x.ko + ' ' + x.sub).toLowerCase().indexOf(f) >= 0; });
@@ -437,7 +337,7 @@
   function prompt() {
     if (!A || !D || !st.subject) return '';
     try {
-      if (formy()) return st.card ? A.buildForm(window, D, st.subject, st.style, st.out, st.card) : '';
+      if (formy()) return st.card ? A.buildCard(window, D, st.subject, st.style, st.out, st.card) : '';
       if (firstOpen() !== 'done') return '';
       return A.build(window, D, st.subject, st.style, st.scene);
     } catch (e) { return '(지시문을 못 지었다 — ' + e.message + ')'; }
@@ -452,6 +352,8 @@
   function render() {
     if (st.open === 'done') st.seen[st.out] = true;   /* 한 번 다 골랐으면 그 뒤 고침은 다 골랐다로 돌아온다(advance) */
     var was = st.shown; st.shown = st.open;
+    /* 다시 그리기 전에 연 묶음을 읽어 둔다 — toggle 사건은 늦게 와서, 묶음을 열자마자 값을 바꾸면 닫힌 채 다시 그려졌다 */
+    [].forEach.call(document.querySelectorAll('details[data-grp]'), function (d) { st.grpOpen[d.dataset.grp] = d.open; });
     $('chips').innerHTML = chipsHTML();
     $('panel').innerHTML = panelHTML();
     /* 단계가 바뀌었는데 새 단계 윗머리가 화면 위로 가 있으면(긴 대상 목록 끝에서 골랐을 때) 그 단계로 올린다 */
@@ -468,18 +370,17 @@
     if (b.dataset.rand) { randomFrom(b.dataset.rand, false); return; }
     if (b.dataset.randAll) { randomFrom(b.dataset.randAll, true); return; }
     if (b.dataset.next) { advance(b.dataset.next); save(); render(); return; }
-    if (b.dataset.act === 'params-random') { paramsRandom(); return; }
-    if (b.dataset.act === 'params-reset') { st.card.params = {}; save(); render(); return; }
+    if (b.dataset.btn != null) { var bs = stepOf(st.open), bp = bs && bs.parts[+b.dataset.part]; if (bp) bp.items[+b.dataset.btn].run(); save(); render(); return; }
     if (b.dataset.pick != null) {
       if (st.open === 'style') { st.style = b.dataset.pick; st.open = st.subject ? begin() : 'subject'; save(); render(); return; }
-      if (formy()) { fChoose(b.dataset.base ? 'base' : st.open, b.dataset.pick); return; }
+      if (formy()) { partPick(st.open, +b.dataset.part, b.dataset.pick); return; }
       choose(st.open, b.dataset.pick, !!b.dataset.out); return;
     }
     if (b.id === 'copy') { navigator.clipboard && navigator.clipboard.writeText($('prompt').value).then(function () { $('copied').textContent = '복사했다'; }, function () { $('prompt').select(); $('copied').textContent = '자동 복사가 안 된다 — 글을 골라 두었다'; }); return; }
     if (b.id === 'record') {
       var rec = { version: 1, hub: 'polos0117.github.io/prompt.html', atelier: st.a, subject: st.subject, style: st.style, mode: st.out,
         at: new Date().toISOString(), prompt: $('prompt').value };
-      if (formy()) { rec.card = st.card; rec.form = st.card.form; } else { rec.scene = st.scene; rec.unlocked = st.scene.unlocked || []; }
+      if (formy()) { rec.card = st.card; if (st.card.form) rec.form = st.card.form; } else { rec.scene = st.scene; rec.unlocked = st.scene.unlocked || []; }
       $('record-out').hidden = false; $('record-text').value = JSON.stringify(rec, null, 1); return;
     }
   });
@@ -487,21 +388,27 @@
     var t = e.target;
     if (t.id === 'unlock') { st.unlock[st.open] = t.checked; render(); return; }
     if (t.dataset.axis) { st.scene.axes = Object.assign({}, st.scene.axes); if (t.value) st.scene.axes[t.dataset.axis] = t.value; else delete st.scene.axes[t.dataset.axis]; save(); render(); return; }
-    if (t.dataset.toggle) { st.card[t.dataset.toggle] = t.checked; save(); render(); return; }
-    if (t.dataset.param) { st.card.params[t.dataset.param] = t.value; if (!t.value) delete st.card.params[t.dataset.param]; save(); render(); return; }
-    if (t.dataset.action) {
-      var a = Object.assign({}, fscene().action); a[t.dataset.action] = t.value;
-      if (t.dataset.action === 'category') a.example = '';
-      fscene().action = a; save(); render(); return;
+    /* 카드 갈래 조각 — 고르개·켜고 끄기·외형 */
+    if (t.dataset.part != null && formy()) {
+      var ps = stepOf(st.open), pp = ps && ps.parts[+t.dataset.part];
+      if (!pp) return;
+      if (t.dataset.param) pp.set(t.dataset.param, t.value);
+      else if (t.dataset.pcustom) return;   // 직접 입력 글은 input 에서
+      else if (pp.type === 'check') pp.set(t.checked);
+      else if (pp.type === 'select') pp.set(t.value);
+      else return;
+      save(); render();
     }
   });
-  document.addEventListener('toggle', function (e) { var d = e.target; if (d.dataset && d.dataset.grp) st.grpOpen[d.dataset.grp] = d.open; }, true);
+  document.addEventListener('toggle', function (e) { var d = e.target; if (d.dataset && d.dataset.grp && d.isConnected) st.grpOpen[d.dataset.grp] = d.open; }, true);
   document.addEventListener('input', function (e) {
     var t = e.target;
     if (t.id === 'find') { st.find = t.value; $('subjects').innerHTML = subjectsHTML(); return; }
     /* 글 칸 — 다시 그리지 않고(쓰는 자리 유지) 값과 지시문·칩만 */
-    if (t.dataset.field) {
-      if (['motifs', 'lookNote'].indexOf(t.dataset.field) >= 0) st.card[t.dataset.field] = t.value; else fscene()[t.dataset.field] = t.value;
+    if (t.dataset.part != null && formy() && (t.dataset.field || t.dataset.pcustom)) {
+      var ps = stepOf(st.open), pp = ps && ps.parts[+t.dataset.part];
+      if (!pp) return;
+      if (t.dataset.pcustom) pp.custom.set(t.dataset.pcustom, t.value); else pp.set(t.value);
       save(); $('chips').innerHTML = chipsHTML(); renderOut();
     }
   });

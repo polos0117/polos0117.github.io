@@ -38,9 +38,20 @@ const FORM_CASES = [
     scenes: { form: { expr: 'focused', pose: 'low_guard', orient: 'front_3q', frame: 'full_body', lens: 'natural50', aspect: '3:2', camera: '눈높이', scene: '', outfit: '', custom: '', action: { category: 'melee', example: 'melee_counter', timing: 'windup', power: 'subtle' } } } } },
   { a: 'game', subject: 'pacman', mode: 'form', card: { form: 'ending', identityMode: 'reference', baseForm: 'title', exposure: 'bold', motifs: '', lookNote: '', scenes: { form: { expr: 'soft_smile', pose: '', orient: 'side', frame: 'three_quarter', lens: '', aspect: '2:3' } } } },
   { a: 'book', subject: 'kosmos', mode: 'form', card: { form: 'begin', identityMode: 'create', exposure: '', faceDesignOn: false, params: { 'skin tone': 'pale' }, scenes: { form: { expr: 'calm', action: { category: 'ready', example: 'ready_guard' } } } } },
-  { a: 'book', subject: 'kosmos', mode: 'open', card: { form: 'end', lookNote: '빛줄기가 둘레로 쏟아진다', scenes: { open: { custom: '바람이 세다' } } } }
+  { a: 'book', subject: 'kosmos', mode: 'open', card: { form: 'end', lookNote: '빛줄기가 둘레로 쏟아진다', scenes: { open: { custom: '바람이 세다' } } } },
+  /* 신화 무기(3단계) — 무기마다 카드 하나, 갈래끼리 같이 쓴다 */
+  { a: 'myth', subject: '티르핑', mode: 'portrait', card: { design: 'cloth', extras: { myth: true, silhouette: true }, action: 'draw', scene: 'stormy cliff at dusk',
+    params: { age: '30s', hairColor: '__custom__', hairColor_custom: 'ash pink', body: 'athletic' } } },
+  { a: 'myth', subject: '티르핑', mode: 'awaken', card: { scene: 'thunder', params: { age: '30s' } } },
+  { a: 'myth', subject: '묠니르', mode: 'cursed', card: {} },
+  { a: 'myth', subject: '티르핑', mode: 'skin', card: { skin: 'frost', skinState: 'cursed', scene: 'snowfield' } }
 ];
-const oldStore = { game: ['game_prompt_v1', 'game'], book: ['book_prompt_v1', 'book'] };
+/* 옛 생성기 — 저장 열쇠·꼴·주소 */
+const OLD = {
+  game: (c) => ['/game-atelier/prompt.html?game=' + c.subject + '&mode=' + c.mode, ['game_prompt_v1', { last: c.subject, cards: { [c.subject]: { ...c.card, mode: c.mode } } }]],
+  book: (c) => ['/book-atelier/prompt.html?book=' + c.subject + '&mode=' + c.mode, ['book_prompt_v1', { last: c.subject, cards: { [c.subject]: { ...c.card, mode: c.mode } } }]],
+  myth: (c, style) => ['/myth-atelier/prompt.html', ['myth_prompt_v1', { __card: c.subject, [c.subject]: { ...c.card, output: c.mode, style } }]]
+};
 
 (async () => {
   await new Promise(r => server.listen(PORT, '127.0.0.1', r));
@@ -92,8 +103,8 @@ const oldStore = { game: ['game_prompt_v1', 'game'], book: ['book_prompt_v1', 'b
       if (c.card.motifs) assert(got.includes(c.card.motifs), '모티프가 지시문에');
       await hub.ctx.close();
       if (!esm) continue;
-      const [key, q] = oldStore[c.a];
-      const old = await open('/' + c.a + '-atelier/prompt.html?' + q + '=' + c.subject + '&mode=' + c.mode, [key, { last: c.subject, cards: { [c.subject]: { ...c.card, mode: c.mode } } }]);
+      const [url, store] = OLD[c.a](c, 'game_keyart');
+      const old = await open(url, store);
       await old.page.waitForFunction(() => (document.getElementById('prompt-output') || {}).value?.length > 200, null, { timeout: 20000 });
       assert.equal(got, await old.page.locator('#prompt-output').inputValue(), c.a + ' ' + c.mode + ' ' + c.card.form + ' — 허브와 옛 생성기의 지시문이 다르다');
       await old.ctx.close(); checks++;
@@ -171,15 +182,15 @@ const oldStore = { game: ['game_prompt_v1', 'game'], book: ['book_prompt_v1', 'b
       assert((await p.locator('#prompt').inputValue()).length > 200, '폼은 처음부터 지시문(기본값)');
       await p.click('[data-pick="middle"]'); assert.equal(await now(), 'ident');
       await p.click('[data-pick="reference"]'); assert.equal(await now(), 'ident', '이어가기는 기준 폼을 고른다');
-      await p.click('[data-base][data-pick="title"]'); assert.equal(await now(), 'exposure');
+      await p.click('[data-part="1"][data-pick="title"]'); assert.equal(await now(), 'exposure');
       await p.click('[data-pick="low"]'); assert.equal(await now(), 'design');
-      assert.equal(await p.locator('[data-toggle]').count(), 0, '이어가기엔 실루엣·얼굴 줄이 없다');
+      assert.equal(await p.locator('input[type="checkbox"][data-part]').count(), 0, '이어가기엔 실루엣·얼굴 줄이 없다');
       await p.fill('[data-field="lookNote"]', '소매를 짧게');
       assert.equal(await p.locator('[data-field="lookNote"]').evaluate(e => e === document.activeElement), true, '쓰는 동안 칸이 그대로');
       assert((await p.locator('#prompt').inputValue()).includes('FORM NOTE: 소매를 짧게'), '폼 요청이 지시문에');
       await p.click('[data-next="design"]'); assert.equal(await now(), 'action', '이어가기는 외형을 건너뛴다');
-      await p.selectOption('[data-action="category"]', 'melee');
-      assert(await p.locator('[data-action="example"]').count(), '갈래를 고르면 예시가 열린다');
+      await p.selectOption('select[data-sel][data-part="1"]', 'melee');
+      assert.equal(await p.locator('select[data-sel]').count(), 2 + (await p.evaluate(() => window.AtelierSpec.ACTION_CONTROLS.length)), '갈래를 고르면 예시가 열린다');
       await p.click('[data-rand-all="action"]'); assert.equal(await now(), 'done');
       const sc = await p.evaluate(() => window.AtelierHubPrompt.state().card.scenes.form);
       assert(sc.action.category && sc.expr && sc.frame && sc.aspect, '연출부터 다 랜덤');
@@ -209,6 +220,41 @@ const oldStore = { game: ['game_prompt_v1', 'game'], book: ['book_prompt_v1', 'b
       assert.equal(await k.page.locator('[data-out-mode="form"]').isDisabled(), true, '포켓몬 폼은 아직'); await k.ctx.close();
     }
 
+    /* ②-3 신화 무기 — 액션 한 장(설계 언어·붙일 문단·자세·외형·장면 메모) · 각성 · 스킨(스킨·상태) */
+    {
+      const m = await open('/prompt.html?a=myth&s=' + encodeURIComponent('티르핑')), p = m.page, now = () => p.evaluate(() => window.AtelierHubPrompt.state().open);
+      await p.waitForSelector('[data-open="out"]'); await p.click('[data-open="out"]');
+      assert.equal(await p.locator('[data-out-mode]').count(), 5, '출력 다섯(옛 생성기 차례)');
+      await p.click('[data-out-mode="portrait"]'); assert.equal(await now(), 'design');
+      await p.click('[data-pick="cloth"]'); assert.equal(await now(), 'design', '설계 언어를 골라도 붙일 문단이 남았다');
+      await p.locator('input[type="checkbox"][data-part]').nth(2).check();
+      await p.click('[data-next="design"]'); assert.equal(await now(), 'posture');
+      await p.click('[data-pick="draw"]'); assert.equal(await now(), 'look');
+      await p.click('[data-grp="hair"] summary'); await p.selectOption('[data-param="hairColor"]', '__custom__');
+      await p.fill('[data-pcustom="hairColor"]', 'ash pink');
+      assert((await p.locator('#prompt').inputValue()).includes('ash pink'), '직접 입력이 지시문에');
+      await p.click('[data-next="look"]'); assert.equal(await now(), 'notes');
+      await p.fill('[data-field="scene"]', 'stormy cliff');
+      const t = await p.locator('#prompt').inputValue();
+      assert(t.includes('SCENE NOTE: stormy cliff') && t.includes('POSTURE:') && /cloth/.test(t), '초상 지시문');
+      await p.click('[data-next="notes"]'); assert.equal(await now(), 'done');
+      /* 각성 — 장면 메모만, 같은 카드(메모가 남는다) */
+      await p.click('[data-open="out"]'); await p.click('[data-out-mode="awaken"]');
+      assert.equal(await p.locator('[data-field="scene"]').inputValue(), 'stormy cliff', '갈래끼리 같은 카드');
+      assert(!(await p.locator('#prompt').inputValue()).includes('POSTURE:'), '각성엔 자세가 없다');
+      /* 스킨 — 스킨·상태 */
+      await p.click('[data-open="out"]'); await p.click('[data-out-mode="skin"]'); assert.equal(await now(), 'skin');
+      await p.click('[data-pick="frost"]'); assert.equal(await now(), 'sstate');
+      await p.click('[data-pick="cursed"]');
+      assert((await p.locator('#prompt').inputValue()).includes('SKIN NOTE'), '스킨 저주 지시문');
+      /* 스킨 없는 무기 — 알리고 지시문은 없다 */
+      await p.click('[data-open="subject"]'); await p.fill('#find', '묠니르'); await p.click('[data-subject="묠니르"]');
+      await p.click('[data-out-mode="skin"]');
+      assert.match(await p.locator('#panel').textContent(), /스킨이 없다/); assert.equal(await p.locator('#out').isHidden(), true, '스킨 없는 무기는 지시문 없음');
+      assert.deepEqual(m.errors, [], '신화 오류 없음');
+      await m.ctx.close(); checks += 6;
+    }
+
     /* ③ 화면 크기 */
     for (const vp of [{ width: 344, height: 882 }, { width: 390, height: 844 }, { width: 1280, height: 900 }]) {
       const v = await open('/prompt.html?a=pkm&s=' + encodeURIComponent('피카츄'), null, vp);
@@ -219,14 +265,18 @@ const oldStore = { game: ['game_prompt_v1', 'game'], book: ['book_prompt_v1', 'b
       assert.deepEqual(m.small, [], vp.width + ' 44px 안 되는 자리');
       assert.deepEqual(v.errors, []);
       await v.ctx.close(); checks++;
-      /* 게임 폼 외형(긴 고르개) — 옆으로 넘치지 않는다 */
-      const f = await open('/prompt.html?a=game&s=pacman&o=form', ['atelier_hub_prompt_v1', { last: 'game', by: { game: { subject: 'pacman', out: 'form', walked: { form: true } } } }], vp);
-      await f.page.waitForSelector('[data-open="look"]'); await f.page.click('[data-open="look"]');
-      await f.page.evaluate(() => document.querySelectorAll('details.grp').forEach(d => { d.open = true; }));
-      const fm = await f.page.evaluate(() => ({ over: document.documentElement.scrollWidth - innerWidth, wide: [...document.querySelectorAll('.axis select')].filter(e => e.getBoundingClientRect().right > e.closest('.panel').getBoundingClientRect().right + 0.5).length }));
-      assert(fm.over <= 0 && !fm.wide, vp.width + ' 외형 고르개가 넘친다 ' + JSON.stringify(fm));
-      await f.ctx.close();
+      /* 카드 갈래 외형(긴 고르개) — 게임 폼 · 신화 초상, 옆으로 넘치지 않는다 */
+      for (const [a, sj, o] of [['game', 'pacman', 'form'], ['myth', '티르핑', 'portrait']]) {
+        const f = await open('/prompt.html?a=' + a + '&s=' + encodeURIComponent(sj) + '&o=' + o, ['atelier_hub_prompt_v1', { last: a, by: { [a]: { subject: sj, out: o, walked: { [o]: true } } } }], vp);
+        await f.page.waitForSelector('[data-open="look"]'); await f.page.click('[data-open="look"]');
+        await f.page.evaluate(() => document.querySelectorAll('details.grp').forEach(d => { d.open = true; }));
+        const fm = await f.page.evaluate(() => ({ over: document.documentElement.scrollWidth - innerWidth, wide: [...document.querySelectorAll('.axis select')].filter(e => e.getBoundingClientRect().right > e.closest('.panel').getBoundingClientRect().right + 0.5).length,
+          small: [...document.querySelectorAll('#panel button, #panel select, #panel summary')].filter(e => e.offsetParent && e.getBoundingClientRect().height < 43.5).length }));
+        assert(fm.over <= 0 && !fm.wide && !fm.small, vp.width + ' ' + a + ' 외형 고르개 ' + JSON.stringify(fm));
+        assert.deepEqual(f.errors, []);
+        await f.ctx.close();
+      }
     }
-    console.log('PASS 통합 생성기: 옛 생성기와 같은 글(일상컷·폼·개방) · 게임 폼·개방 단계(이어가기 기준 폼·외형·연출 랜덤·기록·새로 고침) · 포켓몬 처음부터(공방·기본 화풍·대상·출력·단계·칩·해방 까닭·🔓 기록·앞 바꾸면 뒤 열기·랜덤·새로 고침) · 화면 셋 — ' + checks + '가지');
+    console.log('PASS 통합 생성기: 옛 생성기와 같은 글(일상컷·폼·개방·신화 초상·각성·저주·스킨) · 게임 폼·개방 단계(이어가기 기준 폼·외형·연출 랜덤·기록·새로 고침) · 신화 단계(설계·문단·자세·외형 직접 입력·메모·각성·스킨·스킨 없는 무기) · 포켓몬 처음부터(공방·기본 화풍·대상·출력·단계·칩·해방 까닭·🔓 기록·앞 바꾸면 뒤 열기·랜덤·새로 고침) · 화면 셋 — ' + checks + '가지');
   } finally { await br.close(); server.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

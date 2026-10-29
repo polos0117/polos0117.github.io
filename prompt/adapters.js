@@ -7,10 +7,11 @@
      subject(d, key) → 트리가 보는 대상(장소의 해 거르기 — game 의 facts.year·era, pkm 의 gen)
      tables(S) → 선택지 표 {frames, lenses, poses, orients, exprs, axes:[{key, ko, options:[[값, 이름]]}]}
      build(w, d, key, style, scene) → 일상컷 지시문. w 는 그 공방 파일을 실은 창(window·node 의 맥락)
-     outputs — 여는 출력 갈래(없으면 일상컷만). 폼·개방을 여는 받침(game·book, 2단계 2026-10-29)은 더:
-       forms(d) → [{key, stage}] · pilot(d, key) → {form, open}(폼 열쇠) · facts(d, key, 폼) → {look, pose, setting, role, open}
-       card(d, key, S, saved) → 폼·개방 카드(옛 생성기 저장값 꼴 — 없는 폼·값은 기본으로)
-       buildForm(w, d, key, style, 'form'|'open', card) → 지시문(옛 생성기 lib/prompt-ui.js 와 같은 입력) */
+     outputs(S) → [{key, ko, note, off}] 출력 갈래(off 는 준비 중). 'casual' 은 일상컷 트리, 나머지는 카드 갈래 — 단계 표는 prompt/steps.js.
+     카드 갈래를 여는 받침(2단계 game·book 폼·개방, 3단계 myth 초상·각성·저주·스킨)은 더:
+       card(d, key, S, saved) → 카드(옛 생성기 저장값 꼴 — 없는 값은 기본으로). 갈래끼리 같이 쓴다(옛 생성기도 대상마다 하나)
+       buildCard(w, d, key, style, 갈래, card) → 지시문(옛 생성기와 같은 입력)
+     game·book 은 또 forms(d) → [{key, stage}] · pilot(d, key) → {form, open}(폼 열쇠) · facts(d, key, 폼) → {look, pose, setting, role, open} */
 (function (root) {
   'use strict';
   var FIXED = { overall_intensity: 'strong', skin_exposure: 'bold' };   /* 일상컷 고정값 — 네 공방 생성기가 처음부터 잠그는 값 */
@@ -39,7 +40,8 @@
   function designAdapter(key, repo, ko, subjectKey, list, extra) {
     var stageOf = function (d, fk) { var m = d.design.vocab.form_key; return Object.keys(m).filter(function (s) { return m[s] === fk; })[0] || ''; };
     return {
-      key: key, repo: repo, ko: ko, outputs: ['casual', 'form', 'open'],
+      key: key, repo: repo, ko: ko,
+      outputs: function () { return [{ key: 'casual', ko: '일상컷' }, { key: 'form', ko: '폼 초상' }, { key: 'open', ko: '개방·각성' }]; },
       /* 낱말(lib/words.js)은 폼 단계 이름을 옛 생성기와 같게 쓰려고, 랜덤(lib/prompt-random.js)은 폼 장면 칸 목록 */
       libs: ['lib/words.js', 'lib/prompt-spec.js', 'lib/casual-tree.js', 'lib/prompt-' + key + '.js', 'lib/prompt-random.js'],
       data: { design: 'data/' + key + '-design.json', style: 'data/style.json', tree: 'data/casual-tree.json' },
@@ -71,7 +73,7 @@
         ['form', 'open'].forEach(function (m) { var sc = Object.assign(formBlank(), obj(obj(x.scenes)[m])); sc.action = Object.assign({}, obj(sc.action)); c.scenes[m] = sc; });
         return c;
       },
-      buildForm: function (w, d, k, style, mode, card) {
+      buildCard: function (w, d, k, style, mode, card) {
         var S = w.AtelierSpec, P = w.AtelierPrompt, g = this.subject(d, k);
         if (!g || ['form', 'open'].indexOf(mode) < 0) return '';
         if (!d.style.styles[style]) style = this.defaultStyle(d);
@@ -105,7 +107,27 @@
     book: designAdapter('book', 'book-atelier', '책', 'book', 'books', function () { return {}; }),
     myth: {
       key: 'myth', repo: 'myth-atelier', ko: '신화 무기',
-      libs: ['lib/prompt-spec.js', 'lib/casual-tree.js', 'lib/prompt-myth.js'],
+      /* 낱말(lib/words.js) — 단계 이름을 옛 생성기와 같게 */
+      libs: ['lib/words.js', 'lib/prompt-spec.js', 'lib/casual-tree.js', 'lib/prompt-myth.js'],
+      /* 옛 생성기 출력 고르개 차례(S.OUTPUTS) 그대로 — 액션 한 장 · 각성 · 저주 · 일상컷 · 스킨 */
+      outputs: function (S) { return Object.keys(S.OUTPUTS).map(function (k) { return { key: k, ko: S.OUTPUTS[k].name, note: S.OUTPUTS[k].note }; }); },
+      /* 옛 생성기 DEFAULT 의 일상컷 밖 몫 — 무기마다 하나, 갈래끼리 같이 쓴다 */
+      card: function (d, k, S, saved) {
+        var x = obj(saved), c = { action: '', scene: '', params: {}, design: 'mecha', extras: {}, skin: '', skinState: 'base' };
+        Object.keys(c).forEach(function (f) { if (x[f] !== undefined) c[f] = x[f]; });
+        ['action', 'scene', 'skin', 'skinState', 'design'].forEach(function (f) { if (typeof c[f] !== 'string') c[f] = ''; });
+        if (!c.design) c.design = 'mecha';
+        if (!c.skinState) c.skinState = 'base';
+        c.params = Object.assign({}, obj(c.params)); c.extras = Object.assign({}, obj(c.extras));
+        return c;
+      },
+      buildCard: function (w, d, k, style, out, card) {
+        var S = w.AtelierSpec;
+        if (!S.OUTPUTS[out] || out === 'casual') return '';
+        /* 옛 생성기: {...DEFAULT(), ...store[무기], card} — 일상컷 칸은 이 갈래들에 안 쓰인다 */
+        var st = Object.assign({ style: S.DEFAULT_STYLE, output: 'portrait', action: '', casualIndex: 1, scene: '', params: {} }, this.card(d, k, S, card), { card: k, style: style, output: out });
+        return w.AtelierPrompt.build(st, { cards: d.cards.cards, group: d.group, skills: d.skill.skills, tree: d.tree });
+      },
       data: { cards: 'data/card.json', group: 'data/group.json', skill: 'data/skill.json', tree: 'data/casual-tree.json' },
       subjects: function (d) { return d.cards.cards.map(function (c) { return { key: c.name, ko: c.name, sub: c.en }; }); },
       styles: function (d, S) { return S.STYLES.map(function (r) { return { key: r[0], ko: r[1] }; }); },
@@ -124,6 +146,7 @@
     },
     pkm: {
       key: 'pkm', repo: 'pkm-atelier', ko: '포켓몬',
+      outputs: function () { return [{ key: 'casual', ko: '일상컷' }, { key: 'form', ko: '폼 초상', off: true }, { key: 'open', ko: '개방·각성', off: true }]; },
       libs: ['lib/prompt-spec.js', 'lib/casual-tree.js', 'lib/prompt-anthro.js', 'lib/prompt-lifestyle.js'],
       data: { cards: 'data/card.json', tree: 'data/casual-tree.json' },
       subjects: function (d) { return d.cards.cards.character.map(function (c) { return { key: c.name, ko: c.name, sub: String(c.no).padStart(4, '0') + ' · ' + c.en }; }); },

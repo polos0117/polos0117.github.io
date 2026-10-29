@@ -15,7 +15,7 @@
 <!--
   통합 생성기 — 네 공방(게임·책·신화 무기·포켓몬)의 그림 지시문을 한 화면에서(2026-10-29, 사용자). README 「통합 생성기」.
   공방을 고르면 그 공방의 표·조립 코드(/<공방>/lib/…, 같은 출처라 그대로 싣는다)로 다시 열고, 화풍은 그 공방 기본으로 맞춘다.
-  일상컷은 트리(/<공방>/data/casual-tree.json) 차례대로 고르고, 단계마다 해방(트리 밖도 보기)·랜덤(트리 안). 폼 초상·개방(game·book)은 설계표의 폼대로. 옛 생성기는 그대로 둔다.
+  일상컷은 트리(/<공방>/data/casual-tree.json) 차례대로 고르고, 단계마다 해방(트리 밖도 보기)·랜덤(트리 안). 폼 초상·개방(game·book)·초상·각성·저주·스킨(myth)은 그 공방 설계대로 — 단계 표는 prompt/steps.js. 옛 생성기는 그대로 둔다.
   지시문은 그 공방 조립 코드가 짓는다(prompt/adapters.js — 옛 생성기와 같은 입력, tests/prompt-parity.cjs). 고른 값은 이 기기에만(atelier_hub_prompt_v1).
 -->
 <style>
@@ -117,7 +117,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
     <div id="record-out" hidden><textarea id="record-text" readonly aria-label="기록"></textarea></div>
   </section>
 </main>
-<script src="prompt/adapters.js?v=2"></script>
-<script src="prompt/hub.js?v=4"></script>
+<script src="prompt/adapters.js?v=3"></script>
+<script src="prompt/steps.js?v=1"></script>
+<script src="prompt/hub.js?v=5"></script>
 </body>
 </html>
