@@ -61,6 +61,31 @@ API(`window.AtelierFavorites`): `has(a, file)` · `toggle(칸)` → 담겼으면
 각 공방의 도감 상세에는 지금 보이는 그림의 하트(「즐겨찾기」, `aria-pressed`)와 담은 수 「즐겨찾기 n」(→ `/favorites.html`)이 있다.
 검사: `CHROMIUM_PATH=<chrome> NODE_PATH=<playwright 가 있는 node_modules> node tests/favorites-screen.cjs` — favorites.js 동작, 지도 색 = 칩 색, 거르기·크게 보기·빼기·감상 모드·빈 자리·저장 막힘, 지도의 「즐겨찾기 n」, 다섯 크기(344×882 · 390×844 · 844×390 · 690×829 · 1280×900). `FAV_PORT` 로 자리를 바꾸고, `SHOT_DIR` 을 주면 화면을 찍는다.
 
+## 통합 생성기 — 네 공방 그림 지시문을 한 곳에서
+
+`prompt.html` — 공방 지도 "모든 공방" 목록 아래 「통합 생성기」에서 들어간다(2026-10-29). 공방(게임·책·신화 무기·포켓몬) → 화풍 → 대상 → 출력 갈래 → 갈래의 단계를 차례로 고른다.
+옛 공방 생성기(`/<공방>/prompt.html`)는 그대로 둔다.
+
+- **지시문은 늘 그 공방의 조립 코드가 짓는다.** 공방을 고르면 `?a=` 로 다시 열어 그 공방의 `lib/…`(같은 출처 `/<저장소>/lib/…`)와 자료(`/<저장소>/data/…`)를 싣는다 — 공방마다 같은 이름(`window.AtelierSpec` …)을 쓰는 코드라 한 창에 둘을 싣지 않는다.
+  무엇을 싣고 어떤 입력을 넘기는지는 `prompt/adapters.js`(받침 하나 = 공방 하나: `libs` · `data` · `subjects` · `styles` · `defaultStyle` · `subject` · `tables` · `build`). 화면과 단계는 `prompt/hub.js`.
+- **화풍**은 그 공방 기본으로 맞춰 두고 바꿀 수 있다(book 은 기본이 비어 있어 첫 화풍 — 계획기와 같게).
+- **일상컷 단계**: 시대 → 장소 → 하는 일 → 의상 계열 → 옷 → 프레이밍 → 렌즈 → 자세 → 방향 → 표정 → 세부 강도. 선택지는 그 공방 트리(`data/casual-tree.json` · `lib/casual-tree.js`)가 거른 것만.
+  고른 단계는 위 칩 한 줄로 접히고 누르면 그 단계로 돌아간다. 앞을 바꾸면 맞지 않게 된 뒤 칸만 비워 그 단계를 다시 연다. 다 고른 뒤 고치면 「다 골랐다」 로 돌아온다.
+  전체 강도·피부 노출은 일상컷 고정값(가장 강함·많이 — 네 공방 생성기와 같다).
+- **해방**: 단계마다 켜면 트리 밖 선택지가 흐리게 뜨고 빠진 까닭이 붙는다(`CT.why` — 이 시대엔 없는 곳, 이 하는 일의 자세 계열에 없다, 이 공방 일상컷엔 안 쓴다 …).
+  고르면 칩과 선택지에 🔓, 지시문 위에 「트리 밖에서 고른 칸」, 기록 JSON 의 `unlocked` 에 남고, 트리가 그 칸을 고치지 않는다(`CT.unlocked`).
+- **랜덤**은 늘 트리 안에서만 — 「이 칸 랜덤」 · 「여기부터 다 랜덤」. 해방한 칸은 건드리지 않는다.
+- **기록 JSON**: `{version, hub, atelier, subject, style, mode, scene, unlocked, at, prompt}`. 공방 기록(`records/…-ui.json`)의 꼴과는 다르다 — 공방 도구로 올릴 때는 그 공방 생성기에서 내보낸다.
+- 출력 갈래는 지금 일상컷만. 다음 단계: ② game·book 폼·개방 → ③ 신화 무기 출력들 → ④ 포켓몬 폼·개방.
+
+| 열쇠 | 값 |
+|---|---|
+| `atelier_hub_prompt_v1` | `{last, by: {<공방>: {style, subject, scene}}}` — 이 기기에만 |
+
+검사: `node tests/prompt-parity.cjs` — 브라우저 없이: game·book 은 대상 모두 × 장면 셋이 그 공방 계획기 `record()`(생성기 「기록 내보내기」)와 같은 글, 네 공방 대상 모두·트리 안 랜덤 스물(트리가 고칠 데 없다)·화풍마다.
+`CHROMIUM_PATH=<chrome> NODE_PATH=<playwright 가 있는 node_modules> ESM_DIR=<preact·htm 이 있는 node_modules> node tests/prompt-screen.cjs` — 네 공방 옛 생성기 화면과 글자 하나 다르지 않다(ESM_DIR 이 없고 바깥이 막히면 건너뛰고 말한다),
+포켓몬 처음부터(기본 화풍·대상·출력·단계·칩·해방 까닭 「안 쓴다」·🔓 기록·앞 바꾸면 뒤 열기·랜덤·새로 고침), 세 크기(344×882 · 390×844 · 1280×900). 옆에 네 공방 저장소가 있어야 한다. `HUB_PORT` 로 자리를 바꾼다.
+
 ## 도트 공방 — 여섯 공방이 같이 쓰는 도트 인물 만들기
 
 `dot.html` — 공방 지도 "모든 공방" 목록 아래 「도트 공방」에서 들어간다. 그림은 GPT 가 그리고, 나머지는 여기서 한다.

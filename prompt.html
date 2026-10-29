@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>통합 생성기</title>
+<meta name="description" content="게임·책·신화 무기·포켓몬 공방의 그림 지시문을 한 곳에서 — 공방 → 화풍 → 대상 → 출력 → 단계별로 고른다.">
+<meta name="theme-color" content="#0f0e12">
+<link rel="icon" href="icon-192.png">
+<link rel="manifest" href="app.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&display=swap">
+<!--
+  통합 생성기 — 네 공방(게임·책·신화 무기·포켓몬)의 그림 지시문을 한 화면에서(2026-10-29, 사용자). README 「통합 생성기」.
+  공방을 고르면 그 공방의 표·조립 코드(/<공방>/lib/…, 같은 출처라 그대로 싣는다)로 다시 열고, 화풍은 그 공방 기본으로 맞춘다.
+  1단계는 일상컷 — 트리(/<공방>/data/casual-tree.json) 차례대로 고르고, 단계마다 해방(트리 밖도 보기)·랜덤(트리 안). 옛 생성기는 그대로 둔다.
+  지시문은 그 공방 조립 코드가 짓는다(prompt/adapters.js — 옛 생성기와 같은 입력, tests/prompt-parity.cjs). 고른 값은 이 기기에만(atelier_hub_prompt_v1).
+-->
+<style>
+:root {
+  --bg: #0b0a0e; --card: #18161d; --card2: #201d26; --line: #ffffff1a; --text: #f1ece2; --muted: #a8a09a; --gold: #d9b45a; --bad: #ff8f80; --good: #9fd6a4;
+  --serif: 'Noto Serif KR', 'Apple Myungjo', 'Nanum Myeongjo', Georgia, serif;
+  --sans: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  --mono: ui-monospace, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 15px/1.55 var(--sans); overflow-x: hidden; min-height: 100vh; min-height: 100dvh;
+  background-image: radial-gradient(90% 50% at 50% -10%, #1b1726 0%, transparent 70%); background-repeat: no-repeat; }
+a { color: var(--gold); }
+button, input, select, textarea { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: calc(16px + env(safe-area-inset-top)) 16px 8px; max-width: 1100px; margin: 0 auto; }
+.head h1 { margin: 0; font: 900 clamp(24px, 3.6vw, 36px)/1.1 var(--serif); letter-spacing: -.02em;
+  background: linear-gradient(180deg, #fff 30%, var(--gold) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.head h1 small { display: block; margin-bottom: 6px; -webkit-text-fill-color: var(--gold); color: var(--gold); font: 700 11px/1 var(--serif); letter-spacing: .4em; }
+.home { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid #ffffff33; border-radius: 99px; background: #000b;
+  color: var(--text); text-decoration: none; font: 600 13px/1 var(--sans); white-space: nowrap; }
+.home:hover, .home:focus-visible { border-color: var(--gold); color: var(--gold); }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px calc(40px + env(safe-area-inset-bottom)); }
+.lede { margin: 2px 0 14px; color: var(--muted); font-size: 13px; word-break: keep-all; }
+#status { min-height: 1.4em; margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+
+/* 고른 단계 — 칩 한 줄. 누르면 그 단계로 */
+.hchips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.hchip { display: inline-flex; align-items: baseline; gap: 6px; min-height: 44px; padding: 8px 12px; border: 1px solid #ffffff2b; border-radius: 12px;
+  background: #ffffff08; cursor: pointer; font: 600 13px/1.3 var(--sans); text-align: left; max-width: 100%; }
+.hchip small { color: var(--muted); font-weight: 500; font-size: 11px; }
+.hchip.on { border-color: var(--gold); background: #d9b45a1f; }
+.hchip .lock { font-size: 12px; }
+
+.panel { margin: 0 0 18px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.panel h3 { margin: 0 0 6px; font: 800 18px/1.3 var(--serif); }
+.panel h4 { margin: 12px 0 6px; color: var(--gold); font: 700 13px/1.3 var(--sans); }
+.panel .note { margin: 0 0 10px; color: var(--muted); font-size: 13px; word-break: keep-all; }
+.opts { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.opts.people { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); max-height: 420px; overflow-y: auto; overscroll-behavior: contain; }
+.opt { display: grid; gap: 2px; align-content: start; min-height: 44px; padding: 10px 12px; border: 1px solid #ffffff22; border-radius: 10px; background: #ffffff06;
+  cursor: pointer; text-align: left; text-decoration: none; color: var(--text); word-break: keep-all; }
+.opt b { font-weight: 700; font-size: 14px; }
+.opt b i { font-style: normal; color: var(--muted); font-weight: 500; font-size: 12px; }
+.opt span { color: var(--muted); font-size: 12px; line-height: 1.35; }
+.opt[aria-pressed="true"] { border-color: var(--gold); background: #d9b45a1f; }
+.opt:disabled { opacity: .45; cursor: default; }
+.opt.out { opacity: .55; border-style: dashed; }
+.opt.out .why { color: var(--bad); }
+.opt.out[aria-pressed="true"] { opacity: 1; }
+.bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 12px 0 0; }
+.unlock { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: var(--muted); font-size: 13px; }
+.unlock input { width: 20px; height: 20px; }
+.rand { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.btn { min-height: 44px; padding: 0 14px; border: 1px solid #ffffff33; border-radius: 99px; background: #000b; cursor: pointer; font: 600 13px/1 var(--sans); }
+.btn:hover { border-color: var(--gold); color: var(--gold); }
+.find input { width: 100%; min-height: 44px; padding: 8px 12px; border: 1px solid #ffffff2e; border-radius: 10px; background: #0f0e13; margin: 0 0 8px; }
+.axis { display: grid; gap: 4px; margin: 0 0 10px; font-size: 13px; color: var(--muted); }
+.axis select { min-height: 44px; padding: 8px 12px; border: 1px solid #ffffff2e; border-radius: 10px; background: #0f0e13; color: var(--text); }
+
+.result { padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--card2); }
+.result h3 { margin: 0 0 6px; font: 800 18px/1.3 var(--serif); }
+.result textarea { width: 100%; min-height: 260px; padding: 10px 12px; border: 1px solid #ffffff2e; border-radius: 10px; background: #0f0e13; font: 13px/1.5 var(--mono); resize: vertical; }
+.result .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 8px; }
+.result .row small { color: var(--muted); }
+#unlocked-note { color: var(--bad); font-size: 13px; }
+@media (max-width: 600px) { .opts { grid-template-columns: 1fr 1fr; } .opts.people { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+<header class="head">
+  <h1><small>ATELIER · 통합</small>통합 생성기</h1>
+  <a class="home" href="./">공방 지도</a>
+</header>
+<main class="wrap">
+  <p class="lede">공방을 고르면 그 공방의 화풍·대상·트리로 이어진다. 고른 단계는 위 칩으로 접히고, 누르면 그 단계로 돌아간다. 옛 공방 생성기는 그대로 있다.</p>
+  <p id="status" role="status"></p>
+  <nav class="hchips" id="chips" aria-label="고른 단계"></nav>
+  <section class="panel" id="panel" aria-live="polite"></section>
+  <section class="result" id="out" hidden>
+    <div class="row"><h3>지시문</h3><small id="count"></small></div>
+    <p id="unlocked-note"></p>
+    <textarea id="prompt" readonly aria-label="지시문"></textarea>
+    <div class="row"><button type="button" class="btn" id="copy">복사</button><button type="button" class="btn" id="record">기록 JSON</button><small id="copied" role="status"></small></div>
+    <div id="record-out" hidden><textarea id="record-text" readonly aria-label="기록"></textarea></div>
+  </section>
+</main>
+<script src="prompt/adapters.js?v=1"></script>
+<script src="prompt/hub.js?v=1"></script>
+</body>
+</html>
