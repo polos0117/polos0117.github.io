@@ -149,7 +149,8 @@ const OLD = {
     assert.match(await p.locator('[data-pick="back"][data-out]').textContent(), /안 쓴다/, '해방 — 까닭');
     await p.click('[data-pick="front"]');
     await p.click('[data-pick=""]');   // 표정 자동
-    await p.click('[data-open="done"]');
+    await p.click('[data-next="axes"]'); assert.equal(await p.evaluate(() => window.AtelierHubPrompt.state().open), 'notes', '세부 강도 뒤 덧붙임');
+    await p.click('[data-next="notes"]');
     const t1 = await p.locator('#prompt').inputValue();
     assert(t1.includes('Place: a city park') || t1.includes('Place:'), '지시문');
     assert(!(await p.locator('#unlocked-note').textContent()), '해방한 칸 없음');
@@ -286,6 +287,53 @@ const OLD = {
       await m.ctx.close(); checks += 6;
     }
 
+    /* ②-4 일상컷 계획기 주소(pkm tools/casual-plan.cjs) — 옛 생성기와 같은 주소 꼴을 허브가 받는다 */
+    {
+      const CP = require(path.join(SIB, 'pkm-atelier/lib/casual-plan.js'));
+      const cut = { era: 'now', place: 'water_pool', act: 'sunbed', ofam: 'swimwear', item: 'classic_bikini', expr: 'confident', pose: '', orient: 'side', frame: 'three_quarter', lens: 'portrait85', aspect: '2:3',
+        axes: { overall_intensity: 'strong', skin_exposure: 'bold', action_level: 'mostly posed', source_influence: 'subtle', separates_preference: 'balanced' } };
+      const query = CP.generatorQuery('피카츄', cut);
+      const g = await open('/prompt.html?a=pkm&' + query), p = g.page;
+      await p.waitForFunction(() => document.getElementById('prompt').value.length > 200, null, { timeout: 15000 });
+      const st = await p.evaluate(() => { const s = window.AtelierHubPrompt.state(); return { out: s.out, open: s.open, subject: s.subject, scene: s.scene, url: location.search }; });
+      assert.equal(st.out, 'casual'); assert.equal(st.subject, '피카츄'); assert.equal(st.open, 'notes', '계획 컷은 덧붙임부터');
+      for (const k of ['era', 'place', 'act', 'ofam', 'item', 'orient', 'frame', 'lens', 'expr']) assert.equal(st.scene[k], cut[k], '계획 값 ' + k);
+      assert(st.scene.planned.includes('place') && st.scene.planned.includes('pose'), '계획 칸 표시');
+      assert(!/casual=|mech=/.test(st.url), '받은 뒤 주소에서 지운다');
+      assert.match(await p.locator('#status').textContent(), /계획기 값으로 \d+칸/);
+      assert.equal(await p.locator('.hchip[data-open="place"] .lock').count(), 1, '칩에 📌');
+      const hubText = await p.locator('#prompt').inputValue();
+      if (esm) {
+        const old = await open('/pkm-atelier/prompt.html?' + query, null);
+        await old.page.waitForFunction(() => (document.getElementById('prompt-output') || {}).value?.length > 200, null, { timeout: 20000 });
+        assert.equal(hubText, await old.page.locator('#prompt-output').inputValue(), '계획기 주소 — 허브와 옛 생성기의 지시문이 다르다');
+        await old.ctx.close(); checks++;
+      }
+      /* 덧붙임 — 계획의 옷·장면 첫머리를 쓴다 */
+      await p.fill('[data-cfield="outfit"]', 'a white string bikini with a sheer sarong');
+      assert((await p.locator('#prompt').inputValue()).includes('Outfit: a white string bikini with a sheer sarong'), '덧붙임 옷이 지시문에');
+      await p.click('[data-next="notes"]'); assert.equal(await p.evaluate(() => window.AtelierHubPrompt.state().open), 'done');
+      /* 처음부터 다 랜덤 — 계획 칸은 그대로 */
+      await p.click('[data-rand-all="era"]');
+      const after = await p.evaluate(() => window.AtelierHubPrompt.state().scene);
+      for (const k of ['era', 'place', 'act', 'ofam', 'item', 'orient', 'frame', 'lens', 'expr']) assert.equal(after[k], cut[k], '랜덤이 계획 칸을 안 바꾼다 ' + k);
+      /* 계획 칸 풀기 → 랜덤이 바꿀 수 있다. 손으로 고친 칸은 계획 표시가 빠진다 */
+      await p.click('[data-act="unplan"]');
+      assert.equal(await p.locator('.hchip .lock').count(), 0, '계획 칸 풀기');
+      /* 새로 고쳐도 계획 값이 남는다(주소에서 지웠으니 다시 덮지 않는다) */
+      await p.reload(); await p.waitForSelector('[data-open="place"]');
+      assert.equal(await p.evaluate(() => window.AtelierHubPrompt.state().scene.outfit), 'a white string bikini with a sheer sarong');
+      assert.deepEqual(g.errors, [], '계획 주소 오류 없음');
+      await g.ctx.close();
+      /* 트리에 안 맞는 계획 값 — 비우고 알린다(옛 생성기와 같다) */
+      const b = await open('/prompt.html?a=pkm&' + CP.generatorQuery('피카츄', { ...cut, act: 'flying', orient: 'back' }));
+      await b.page.waitForSelector('[data-open]');
+      await b.page.waitForFunction(() => /비운 칸/.test(document.getElementById('status').textContent), null, { timeout: 15000 });
+      assert.match(await b.page.locator('#status').textContent(), /act/);
+      assert.equal(await b.page.evaluate(() => window.AtelierHubPrompt.state().open), 'act', '비운 칸부터 다시 연다');
+      await b.ctx.close(); checks += 9;
+    }
+
     /* ③ 화면 크기 */
     for (const vp of [{ width: 344, height: 882 }, { width: 390, height: 844 }, { width: 1280, height: 900 }]) {
       const v = await open('/prompt.html?a=pkm&s=' + encodeURIComponent('피카츄'), null, vp);
@@ -308,6 +356,6 @@ const OLD = {
         await f.ctx.close();
       }
     }
-    console.log('PASS 통합 생성기: 옛 생성기와 같은 글(일상컷·폼·개방·신화 초상·각성·저주·스킨·포켓몬 액션·폭주) · 게임 폼·개방 단계(이어가기 기준 폼·외형·연출 랜덤·기록·새로 고침) · 신화 단계(설계·문단·자세·외형 직접 입력·메모·각성·스킨·스킨 없는 무기) · 포켓몬 액션·폭주 단계(원작 특징·머리 직접 입력·이어가기·기준 장갑) · 포켓몬 처음부터(공방·기본 화풍·대상·출력·단계·칩·해방 까닭·🔓 기록·앞 바꾸면 뒤 열기·랜덤·새로 고침) · 화면 셋 — ' + checks + '가지');
+    console.log('PASS 통합 생성기: 옛 생성기와 같은 글(일상컷·폼·개방·신화 초상·각성·저주·스킨·포켓몬 액션·폭주) · 게임 폼·개방 단계(이어가기 기준 폼·외형·연출 랜덤·기록·새로 고침) · 신화 단계(설계·문단·자세·외형 직접 입력·메모·각성·스킨·스킨 없는 무기) · 포켓몬 액션·폭주 단계(원작 특징·머리 직접 입력·이어가기·기준 장갑) · 일상컷 계획기 주소(채우기·📌·주소 지우기·덧붙임·랜덤이 안 바꿈·풀기·새로 고침·틀린 값) · 포켓몬 처음부터(공방·기본 화풍·대상·출력·단계·칩·해방 까닭·🔓 기록·앞 바꾸면 뒤 열기·랜덤·새로 고침) · 화면 셋 — ' + checks + '가지');
   } finally { await br.close(); server.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

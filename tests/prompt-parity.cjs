@@ -37,7 +37,9 @@ for (const [k, subjectKey] of [['game', 'source_influence'], ['book', 'source_in
   const scenes = [
     { era: 'now', place: 'street_park', act: 'stroll', ofam: 'everyday', item: '', frame: 'waist_up', lens: 'portrait85', orient: 'front_3q', pose: '', expr: 'calm' },
     { era: 'now', place: 'street_cafe', act: 'read_book', ofam: 'everyday', item: '', frame: 'three_quarter', lens: 'natural50', orient: 'side', pose: '', expr: '' },
-    { era: 'now', place: 'water_pool', act: 'poolside', ofam: 'swimwear', item: '', frame: 'full_body', lens: 'natural50', orient: 'front', pose: '', expr: 'confident' }
+    { era: 'now', place: 'water_pool', act: 'poolside', ofam: 'swimwear', item: '', frame: 'full_body', lens: 'natural50', orient: 'front', pose: '', expr: 'confident' },
+    /* 덧붙임 글 칸(옷 직접 쓰기·장소·상황·추가 요청) — 계획기 컷은 여기에 옷·장면 첫머리를 쓴다 */
+    { era: 'now', place: 'street_park', act: 'stroll', ofam: 'everyday', item: '', frame: 'full_body', lens: 'natural50', orient: 'front', pose: '', expr: '', outfit: 'a cropped denim jacket over a ribbed tank top', scene: 'late afternoon, wet pavement', custom: 'soft rim light' }
   ].map(sc => ({ ...B.CT.repair(B.d.tree, sc, null, B.a.tables(B.S).close), axes: { ...AXES, [subjectKey]: 'subtle' } }));
   let n = 0;
   for (const s of B.a.subjects(B.d)) for (const sc of scenes) {

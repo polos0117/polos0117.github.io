@@ -12,6 +12,7 @@
        card(d, key, S, saved) → 카드(옛 생성기 저장값 꼴 — 없는 값은 기본으로). 갈래끼리 같이 쓴다(옛 생성기도 대상마다 하나)
        buildCard(w, d, key, style, 갈래, card) → 지시문(옛 생성기와 같은 입력)
      game·book 은 또 forms(d) → [{key, stage}] · pilot(d, key) → {form, open}(폼 열쇠) · facts(d, key, 폼) → {look, pose, setting, role, open}
+     casualTexts — 일상컷 덧붙임 글 칸(없으면 옷·장소·추가 요청). planFrom(w, d, raw, 대상) — 일상컷 계획기 주소를 받는 공방(pkm)만.
      lazy({이름: 자료 파일}) — 카드 갈래에 들어갈 때만 받는 큰 자료(pkm 원작 외형·종별 얼굴, 2MB 넘게). 없으면 null(옛 생성기도 못 받으면 없이 짓는다) */
 (function (root) {
   'use strict';
@@ -108,6 +109,7 @@
     book: designAdapter('book', 'book-atelier', '책', 'book', 'books', function () { return {}; }),
     myth: {
       key: 'myth', repo: 'myth-atelier', ko: '신화 무기',
+      casualTexts: ['outfit', 'scene'],   // 옛 생성기 일상컷 글 칸은 옷·장면 둘
       /* 낱말(lib/words.js) — 단계 이름을 옛 생성기와 같게 */
       libs: ['lib/words.js', 'lib/prompt-spec.js', 'lib/casual-tree.js', 'lib/prompt-myth.js'],
       /* 옛 생성기 출력 고르개 차례(S.OUTPUTS) 그대로 — 액션 한 장 · 각성 · 저주 · 일상컷 · 스킨 */
@@ -151,7 +153,9 @@
       outputs: function (S, w) { return [{ key: 'casual', ko: '일상컷' }, { key: 'action', ko: w ? w('prompt.action', '액션') : '액션', note: w ? w('prompt.action.note', '') : '' },
         { key: 'open', ko: (w ? w('form.overdrive', '폭주') : '폭주') + ' · 개방', note: w ? w('prompt.overdrive.note', '') : '' }]; },
       /* 낱말(lib/words.js) — 단계 이름을 옛 생성기와 같게, 랜덤(lib/prompt-random.js) — 액션 장면 칸 목록 */
-      libs: ['lib/words.js', 'lib/prompt-spec.js', 'lib/casual-tree.js', 'lib/prompt-anthro.js', 'lib/prompt-lifestyle.js', 'lib/prompt-random.js'],
+      libs: ['lib/words.js', 'lib/prompt-spec.js', 'lib/casual-tree.js', 'lib/prompt-anthro.js', 'lib/prompt-lifestyle.js', 'lib/prompt-random.js', 'lib/casual-plan.js'],
+      /* 일상컷 계획기 주소(tools/casual-plan.cjs — ?mech=&casual=)를 받는다. 옛 생성기 lib/prompt-ui.js planned 와 같은 몫: 트리 위의 값만 {scene, locks, bad} */
+      planFrom: function (w, d, raw, c) { var CP = w.AtelierCasualPlan; return CP && c ? CP.fromQuery(w.AtelierSpec, raw, d.tree, { gen: c.gen }) : null; },
       data: { cards: 'data/card.json', tree: 'data/casual-tree.json' },
       lazy: { appearance: 'data/source-appearance.json', faces: 'data/face-design.json' },
       FORMS: ['light', 'heavy', 'mobility'],

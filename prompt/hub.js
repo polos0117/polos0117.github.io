@@ -14,7 +14,9 @@
   var STEPS = [
     { key: 'era', ko: '시대', need: true }, { key: 'place', ko: '장소', need: true }, { key: 'act', ko: '하는 일', need: true }, { key: 'ofam', ko: '의상 계열', need: true },
     { key: 'item', ko: '옷' }, { key: 'frame', ko: '프레이밍', need: true }, { key: 'lens', ko: '렌즈', need: true }, { key: 'pose', ko: '자세' }, { key: 'orient', ko: '방향', need: true },
-    { key: 'expr', ko: '표정' }, { key: 'axes', ko: '세부 강도' }];
+    { key: 'expr', ko: '표정' }, { key: 'axes', ko: '세부 강도' }, { key: 'notes', ko: '덧붙임' }];
+  /* 일상컷 덧붙임 — 옛 생성기의 글 칸(계획기 컷은 여기에 계획의 옷 종류·드러내는 방식·장면 첫머리를 쓴다). 받침 casualTexts 가 공방마다 고른다 */
+  var CTEXT = { outfit: ['prompt.tree.outfit', '옷 직접 쓰기', 'prompt.help.tree.outfit'], scene: ['prompt.scene', '장소·상황', 'prompt.help.scene'], custom: ['prompt.extra', '추가 요청', 'prompt.help.custom'] };
   var WHY = {
     unknown: '없는 값', era: '이 시대엔 없는 곳', year: '{year}년엔 없던 곳({since}년부터)', noact: '여기서 할 일이 없다', place: '이 장소에선 안 하는 일',
     outfit: '이 시대·장소에 입을 옷이 없다', act: '이 하는 일엔 안 맞는다', close: '가까운 컷에선 알아볼 데가 안 보이는 옷', banned: '이 공방 일상컷엔 안 쓴다',
@@ -55,7 +57,9 @@
       S = window.AtelierSpec; CT = window.AtelierCasualTree; T = A.tables(S); tree = D.tree;
       var mine = (saved.by || {})[a] || {};
       st.style = mine.style && A.styles(D, S).some(function (x) { return x.key === mine.style; }) ? mine.style : A.defaultStyle(D, S);
-      st.subject = q('s') && A.subject(D, q('s')) ? q('s') : (mine.subject && A.subject(D, mine.subject) ? mine.subject : '');
+      /* 대상 — ?s=, 또는 옛 pkm 생성기 주소 꼴(?mech=, 일상컷 계획기가 내는 주소) */
+      var qs = q('s') || q('mech');
+      st.subject = qs && A.subject(D, qs) ? qs : (mine.subject && A.subject(D, mine.subject) ? mine.subject : '');
       st.scene = Object.assign({ unlocked: [] }, mine.scene || {});
       st.scene.axes = Object.assign({}, H.FIXED, st.scene.axes || {});
       st.scene = repair(st.scene);
@@ -65,10 +69,29 @@
       loadCard();
       st.open = !st.subject ? 'subject' : begin();
       $('status').textContent = '';
+      takePlan();
       render();
     }).catch(function (e) { $('status').textContent = '읽지 못했다 — ' + e.message; });
   }
   function subj() { return st.subject ? A.subject(D, st.subject) : null; }
+  /* 일상컷 계획기(pkm tools/casual-plan.cjs)의 주소 — ?a=pkm&mech=<카드>&casual=<선택값>. 옛 생성기처럼 값을 채우고 계획 칸(planned)은 랜덤이 안 바꾼다.
+     장면·옷 글 칸은 새 컷이라 비운다(계획의 옷 종류·드러내는 방식대로 덧붙임에 쓴다). 한 번 받으면 주소에서 지운다(save) — 새로 고침이 손본 값을 덮지 않게 */
+  function takePlan() {
+    var raw = q('casual');
+    if (!raw || !st.subject || !A.planFrom) return;
+    var got = A.planFrom(window, D, raw, subj());
+    if (!got) { $('status').textContent = '계획기 주소를 못 읽었다 — tools/casual-plan.cjs 로 다시 낸다.'; save(); return; }
+    st.out = 'casual';
+    st.scene = Object.assign({}, st.scene, got.scene, { scene: '', outfit: '', camera: '', custom: '', preset: '', unlocked: [], axes: Object.assign({}, got.scene.axes) });
+    st.scene.planned = Object.keys(got.locks).filter(function (k) { return k.indexOf('axes.') !== 0 && k !== 'aspect'; });
+    st.walked.casual = true;
+    st.open = firstOpen();
+    if (st.open === 'done') st.open = 'notes';   // 계획 컷은 덧붙임(옷·장면 첫머리)을 쓰고 끝낸다
+    $('status').textContent = '일상컷 계획기 값으로 ' + Object.keys(got.locks).length + '칸 채웠다 — 계획 칸(📌)은 랜덤이 안 바꾼다. 덧붙임에 계획의 옷 종류·드러내는 방식·장면 첫머리를 쓴다.' +
+      (got.bad.length ? ' 트리에 안 맞아 비운 칸: ' + got.bad.join(', ') + ' — tools/casual-plan.cjs 로 다시 정한다.' : '');
+    save();
+  }
+  var planned = function (sc, k) { return (sc.planned || []).indexOf(k) >= 0; };
   /* 큰 자료(A.lazy)는 카드 갈래에 들어갈 때 한 번만 받는다 — 못 받으면 null(옛 생성기처럼 없이 짓는다) */
   var lazyState = '';
   function needLazy() {
@@ -117,7 +140,7 @@
     if (st.card && st.subject) cards[st.subject] = st.card;
     saved.by[st.a] = { style: st.style, subject: st.subject, out: st.out, scene: st.scene, walked: st.walked, cards: cards };
     writeStore(saved);
-    try { var u = new URLSearchParams(location.search); u.set('a', st.a); if (st.subject) u.set('s', st.subject); u.set('o', st.out); history.replaceState(null, '', location.pathname + '?' + u + location.hash); } catch (e) { /* 주소만 못 바꿨다 */ }
+    try { var u = new URLSearchParams(location.search); u.set('a', st.a); if (st.subject) u.set('s', st.subject); u.set('o', st.out); u.delete('casual'); u.delete('mech'); history.replaceState(null, '', location.pathname + '?' + u + location.hash); } catch (e) { /* 주소만 못 바꿨다 */ }
   }
   /* 다음 단계 — 다 고른 뒤 칩으로 돌아와 고친 것이면 비게 된 칸 또는 다 골랐다로 */
   function advance(key) {
@@ -188,6 +211,7 @@
   function choose(key, v, out) {
     var sc = Object.assign({}, st.scene), un = (sc.unlocked || []).filter(function (k) { return k !== key; });
     sc[key] = v; if (out && v) un.push(key); sc.unlocked = un;
+    if (planned(sc, key)) sc.planned = sc.planned.filter(function (k) { return k !== key; });   // 손으로 바꾼 칸은 계획 칸이 아니다
     if (['era', 'place', 'act', 'ofam', 'item'].indexOf(key) >= 0) sc.preset = '';
     st.scene = repair(sc);
     advance(key);
@@ -199,7 +223,7 @@
     if (formy()) return randomCard(key, all);
     var keys = STEPS.map(function (s) { return s.key; }), i = keys.indexOf(key), sc = Object.assign({}, st.scene);
     (all ? keys.slice(i) : [key]).forEach(function (k) {
-      if (k === 'axes' || unl(sc, k)) return;
+      if (k === 'axes' || k === 'notes' || unl(sc, k) || planned(sc, k)) return;
       st.scene = sc; var opts = inTree(k).map(function (x) { return x.v; }).filter(function (v) { return v !== sc[k]; });
       var nonEmpty = opts.filter(Boolean); if (nonEmpty.length) opts = nonEmpty;
       if (!opts.length) return;
@@ -267,7 +291,7 @@
   }
 
   /* ── 그리기 ── */
-  function chip(key, ko, val, mark) { return '<button type="button" class="hchip' + (st.open === key ? ' on' : '') + '" data-open="' + key + '"><small>' + esc(ko) + '</small> ' + esc(val) + (mark ? ' <span class="lock" title="트리 밖에서 고른 값">🔓</span>' : '') + '</button>'; }
+  function chip(key, ko, val, mark, plan) { return '<button type="button" class="hchip' + (st.open === key ? ' on' : '') + '" data-open="' + key + '"><small>' + esc(ko) + '</small> ' + esc(val) + (mark ? ' <span class="lock" title="트리 밖에서 고른 값">🔓</span>' : '') + (plan ? ' <span class="lock" title="계획기 값 — 랜덤이 안 바꾼다">📌</span>' : '') + '</button>'; }
   function chipsHTML() {
     var out = [chip('a', '공방', A ? A.ko : '—')];
     if (!A || !D) return out.join('');
@@ -283,7 +307,8 @@
       if (formy()) { if (!seen && idx > at) return; out.push(chip(s.key, s.ko, s.shown())); return; }
       if (!seen && idx > at && (s.key === 'axes' || !st.scene[s.key])) return;
       if (s.key === 'axes') { out.push(chip('axes', s.ko, (T.axes.filter(function (a) { return a.key === 'skin_exposure'; })[0] ? '피부 노출 ' + label((T.axes.filter(function (a) { return a.key === 'skin_exposure'; })[0] || {}).options, st.scene.axes.skin_exposure) : '…'))); return; }
-      out.push(chip(s.key, s.ko, shown(s.key, st.scene[s.key]), unl(st.scene, s.key)));
+      if (s.key === 'notes') { var n = casualTexts().filter(function (f) { return (st.scene[f] || '').trim(); }).length; out.push(chip('notes', s.ko, n ? n + '칸' : '없음')); return; }
+      out.push(chip(s.key, s.ko, shown(s.key, st.scene[s.key]), unl(st.scene, s.key), planned(st.scene, s.key)));
     });
     return out.join('');
   }
@@ -319,15 +344,21 @@
     }
     if (k === 'done') {
       var ss = steps(), canRand = !formy() || ss.some(function (x) { return x.random; });
-      return '<h3>다 골랐다</h3><p class="note">칩을 누르면 그 단계로 돌아간다. 아래 지시문을 복사해 쓴다.' + (formy() && canRand ? ' 랜덤은 랜덤 단추가 있는 단계만 — 나머지는 그대로.' : '') + '</p>' +
-        (canRand && ss.length ? '<span class="rand"><button type="button" class="btn" data-rand-all="' + ss[0].key + '">처음부터 다 랜덤</button></span>' : '');
+      var plan = !formy() && (st.scene.planned || []).length;
+      return '<h3>다 골랐다</h3><p class="note">칩을 누르면 그 단계로 돌아간다. 아래 지시문을 복사해 쓴다.' + (formy() && canRand ? ' 랜덤은 랜덤 단추가 있는 단계만 — 나머지는 그대로.' : '') +
+        (plan ? ' 📌 계획기 칸 ' + plan + '개는 랜덤이 안 바꾼다.' : '') + '</p>' +
+        (canRand && ss.length ? '<span class="rand"><button type="button" class="btn" data-rand-all="' + ss[0].key + '">처음부터 다 랜덤</button>' + (plan ? '<button type="button" class="btn" data-act="unplan">계획 칸 풀기</button>' : '') + '</span>' : '');
     }
     if (formy()) return cardPanel(k);
     if (k === 'axes') {
       return '<h3>세부 강도</h3><p class="note">전체 강도·피부 노출은 일상컷 고정값(가장 강함·많이)으로 맞춰 두었다.</p>' + T.axes.map(function (ax) {
         return '<label class="axis">' + esc(ax.ko) + '<select data-axis="' + ax.key + '"><option value="">자동</option>' + ax.options.map(function (o) {
           return '<option value="' + esc(o[0]) + '"' + (st.scene.axes[ax.key] === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select></label>';
-      }).join('') + '<p><button type="button" class="btn" data-open="done">다 골랐다</button></p>';
+      }).join('') + nextBtn('axes');
+    }
+    if (k === 'notes') {
+      return '<h3>덧붙임</h3><p class="note">비워도 된다 — 트리의 옷·장소가 지시문을 짓는다. 쓰면 그 글이 더해진다(옷은 트리 옷을 대신한다).</p>' +
+        casualTexts().map(function (f) { var t = CTEXT[f]; return field('c-' + f, w(t[0], t[1]), st.scene[f], true, w(t[2], ''), '', ' data-cfield="' + f + '"'); }).join('') + nextBtn('notes');
     }
     var step = STEPS.filter(function (s) { return s.key === k; })[0];
     if (!step) return '';
@@ -337,6 +368,7 @@
       '<div class="bar"><label class="unlock"><input type="checkbox" id="unlock" ' + (st.unlock[k] ? 'checked' : '') + '> 해방 — 트리 밖 선택지도 보기(' + outTree(k).length + ')</label>' + randomBar(k) + '</div>' +
       (out.length ? '<p class="note">흐린 것은 이 길에서 빠진 값이다. 고르면 🔓 가 붙고 기록에 남는다 — 트리가 그 칸을 고치지 않는다.</p>' + optButtons(out, st.scene[k]) : '');
   }
+  function casualTexts() { return (A && A.casualTexts) || ['outfit', 'scene', 'custom']; }
   function field(id, labelText, value, multi, help, ph, at) {
     at = at || '';
     return '<label class="axis" for="f-' + id + '">' + esc(labelText) + (multi ? '<textarea id="f-' + id + '" data-field="' + id + '"' + at + ' rows="3" placeholder="' + esc(ph || '') + '">' + esc(value || '') + '</textarea>' :
@@ -387,6 +419,7 @@
     if (b.dataset.rand) { randomFrom(b.dataset.rand, false); return; }
     if (b.dataset.randAll) { randomFrom(b.dataset.randAll, true); return; }
     if (b.dataset.next) { advance(b.dataset.next); save(); render(); return; }
+    if (b.dataset.act === 'unplan') { st.scene.planned = []; save(); render(); return; }
     if (b.dataset.btn != null) { var bs = stepOf(st.open), bp = bs && bs.parts[+b.dataset.part]; if (bp) bp.items[+b.dataset.btn].run(); save(); render(); return; }
     if (b.dataset.pick != null) {
       if (st.open === 'style') { st.style = b.dataset.pick; st.open = st.subject ? begin() : 'subject'; save(); render(); return; }
@@ -397,7 +430,7 @@
     if (b.id === 'record') {
       var rec = { version: 1, hub: 'polos0117.github.io/prompt.html', atelier: st.a, subject: st.subject, style: st.style, mode: st.out,
         at: new Date().toISOString(), prompt: $('prompt').value };
-      if (formy()) { rec.card = st.card; if (st.card.form) rec.form = st.card.form; } else { rec.scene = st.scene; rec.unlocked = st.scene.unlocked || []; }
+      if (formy()) { rec.card = st.card; if (st.card.form) rec.form = st.card.form; } else { rec.scene = st.scene; rec.unlocked = st.scene.unlocked || []; if ((st.scene.planned || []).length) rec.planned = st.scene.planned; }
       $('record-out').hidden = false; $('record-text').value = JSON.stringify(rec, null, 1); return;
     }
   });
@@ -421,6 +454,7 @@
   document.addEventListener('input', function (e) {
     var t = e.target;
     if (t.id === 'find') { st.find = t.value; $('subjects').innerHTML = subjectsHTML(); return; }
+    if (t.dataset.cfield && !formy()) { st.scene[t.dataset.cfield] = t.value; save(); $('chips').innerHTML = chipsHTML(); renderOut(); return; }
     /* 글 칸 — 다시 그리지 않고(쓰는 자리 유지) 값과 지시문·칩만 */
     if (t.dataset.part != null && formy() && (t.dataset.field || t.dataset.pcustom)) {
       var ps = stepOf(st.open), pp = ps && ps.parts[+t.dataset.part];
