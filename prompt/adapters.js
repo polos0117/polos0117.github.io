@@ -6,7 +6,11 @@
      subjects(d) → [{key, ko, sub}] · styles(d, S) → [{key, ko}] · defaultStyle(d, S)
      subject(d, key) → 트리가 보는 대상(장소의 해 거르기 — game 의 facts.year·era, pkm 의 gen)
      tables(S) → 선택지 표 {frames, lenses, poses, orients, exprs, axes:[{key, ko, options:[[값, 이름]]}]}
-     build(w, d, key, style, scene) → 일상컷 지시문. w 는 그 공방 파일을 실은 창(window·node 의 맥락) */
+     build(w, d, key, style, scene) → 일상컷 지시문. w 는 그 공방 파일을 실은 창(window·node 의 맥락)
+     outputs — 여는 출력 갈래(없으면 일상컷만). 폼·개방을 여는 받침(game·book, 2단계 2026-10-29)은 더:
+       forms(d) → [{key, stage}] · pilot(d, key) → {form, open}(폼 열쇠) · facts(d, key, 폼) → {look, pose, setting, role, open}
+       card(d, key, S, saved) → 폼·개방 카드(옛 생성기 저장값 꼴 — 없는 폼·값은 기본으로)
+       buildForm(w, d, key, style, 'form'|'open', card) → 지시문(옛 생성기 lib/prompt-ui.js 와 같은 입력) */
 (function (root) {
   'use strict';
   var FIXED = { overall_intensity: 'strong', skin_exposure: 'bold' };   /* 일상컷 고정값 — 네 공방 생성기가 처음부터 잠그는 값 */
@@ -21,6 +25,9 @@
   };
   /* 장면 → 공방 생성기 저장값의 일상컷 칸(빈 칸은 자동) */
   var blank = function () { return { expr: '', pose: '', orient: '', scene: '', outfit: '', frame: '', lens: '', camera: '', custom: '', aspect: '2:3', axes: {}, action: {}, randomLocks: {} }; };
+  /* 폼·개방 장면 칸 — 옛 생성기 blankScene 의 폼 몫 */
+  var formBlank = function () { return { expr: '', pose: '', orient: '', scene: '', outfit: '', frame: '', lens: '', camera: '', custom: '', aspect: '2:3', action: {} }; };
+  var obj = function (x) { return x && typeof x === 'object' && !Array.isArray(x) ? x : {}; };
   var casualOf = function (scene) {
     var sc = Object.assign(blank(), scene || {});
     sc.axes = Object.assign({}, FIXED, (scene || {}).axes || {});
@@ -30,9 +37,11 @@
   };
   /* game·book — 설계표의 편(권), 화풍 판(style.json), 시범 폼. 생성기 「기록 내보내기」 와 같은 상태(tools/casual-plan.cjs record) */
   function designAdapter(key, repo, ko, subjectKey, list, extra) {
+    var stageOf = function (d, fk) { var m = d.design.vocab.form_key; return Object.keys(m).filter(function (s) { return m[s] === fk; })[0] || ''; };
     return {
-      key: key, repo: repo, ko: ko,
-      libs: ['lib/prompt-spec.js', 'lib/casual-tree.js', 'lib/prompt-' + key + '.js'],
+      key: key, repo: repo, ko: ko, outputs: ['casual', 'form', 'open'],
+      /* 낱말(lib/words.js)은 폼 단계 이름을 옛 생성기와 같게 쓰려고, 랜덤(lib/prompt-random.js)은 폼 장면 칸 목록 */
+      libs: ['lib/words.js', 'lib/prompt-spec.js', 'lib/casual-tree.js', 'lib/prompt-' + key + '.js', 'lib/prompt-random.js'],
       data: { design: 'data/' + key + '-design.json', style: 'data/style.json', tree: 'data/casual-tree.json' },
       subjects: function (d) { return d.design[list].map(function (g) { return { key: g.key, ko: g.title, sub: g.title_en || g.author || '' }; }); },
       styles: function (d) { return Object.keys(d.style.styles).map(function (k) { return { key: k, ko: d.style.styles[k].name }; }); },
@@ -40,6 +49,41 @@
       defaultStyle: function (d) { return d.style.default && d.style.styles[d.style.default] ? d.style.default : Object.keys(d.style.styles)[0]; },
       subject: function (d, k) { return d.design[list].filter(function (g) { return g.key === k; })[0] || null; },
       tables: tablesStd,
+      forms: function (d) { var m = d.design.vocab.form_key; return Object.keys(m).map(function (s) { return { key: m[s], stage: s }; }); },
+      pilot: function (d, k) { var g = this.subject(d, k), p = obj(g && g.pilot), m = d.design.vocab.form_key; return { form: m[p.form] || '', open: m[p.open] || '' }; },
+      facts: function (d, k, fk) {
+        var g = this.subject(d, k) || {}, s = stageOf(d, fk), f = obj(obj(g.forms)[s]), o = obj(obj(g.opens)[s]);
+        return { stage: s, look: f.look || '', pose: f.pose || '', setting: f.setting || '', role: f.role || '', open: o.scene || '' };
+      },
+      /* 옛 생성기 normalize 의 폼 몫 — 처음 여는 대상은 시범 폼에서 */
+      card: function (d, k, S, saved) {
+        var x = obj(saved), keys = this.forms(d).map(function (f) { return f.key; }), first = this.pilot(d, k).form || keys[0];
+        var c = { form: first, identityMode: 'create', baseForm: first, exposure: S.FORM_EXPOSURE_DEFAULT, motifs: '', lookNote: '', faceDesignOn: true, silhouetteOn: true, params: {}, locks: {} };
+        Object.keys(c).forEach(function (f) { if (x[f] !== undefined) c[f] = x[f]; });
+        if (keys.indexOf(c.form) < 0) c.form = first;
+        if (keys.indexOf(c.baseForm) < 0) c.baseForm = first;
+        if (['create', 'reference'].indexOf(c.identityMode) < 0) c.identityMode = 'create';
+        if (S.FORM_EXPOSURE_KEYS.indexOf(c.exposure) < 0) c.exposure = S.FORM_EXPOSURE_DEFAULT;
+        ['motifs', 'lookNote'].forEach(function (f) { if (typeof c[f] !== 'string') c[f] = ''; });
+        ['faceDesignOn', 'silhouetteOn'].forEach(function (f) { if (typeof c[f] !== 'boolean') c[f] = true; });
+        c.params = Object.assign({}, obj(c.params)); c.locks = Object.assign({}, obj(c.locks));
+        c.scenes = {};
+        ['form', 'open'].forEach(function (m) { var sc = Object.assign(formBlank(), obj(obj(x.scenes)[m])); sc.action = Object.assign({}, obj(sc.action)); c.scenes[m] = sc; });
+        return c;
+      },
+      buildForm: function (w, d, k, style, mode, card) {
+        var S = w.AtelierSpec, P = w.AtelierPrompt, g = this.subject(d, k);
+        if (!g || ['form', 'open'].indexOf(mode) < 0) return '';
+        if (!d.style.styles[style]) style = this.defaultStyle(d);
+        var st = d.style.styles[style], ver = st.versions.filter(function (v) { return v.v === st.current; })[0];
+        var c = this.card(d, k, S, card), scene = c.scenes[mode];
+        /* 옛 생성기 lib/prompt-ui.js 의 result — {...카드, ...장면, 대상, 트리, 폼, 기준 폼, 화풍 글, …}. 첨부 화풍 그림은 허브에선 안 쓴다 */
+        var input = Object.assign({}, c, { style: style, version: st.current, mode: mode, casualN: 1, attachStyleRef: false }, scene, { tree: d.tree, stage: stageOf(d, c.form), baseStage: stageOf(d, c.baseForm),
+          styleText: ver.text, styleCheck: ver.check || '', styleRef: false, outputMode: mode, identityMode: mode !== 'form' || c.identityMode === 'reference' ? 'reference' : 'create',
+          params: Object.keys(c.params).map(function (p) { return [p, c.params[p]]; }) }, extra(ver));
+        input[subjectKey] = g;
+        return P.buildPrompt(input);
+      },
       build: function (w, d, k, style, scene) {
         var S = w.AtelierSpec, P = w.AtelierPrompt, g = this.subject(d, k);
         if (!g) return '';
@@ -98,7 +142,7 @@
     }
   };
   /* 대상 → 트리가 보는 것(장소의 해 거르기). pkm 은 세대 — 카드 그대로 넘기면 gen 을 읽는다 */
-  var api = { ORDER: ['game', 'book', 'myth', 'pkm'], FIXED: FIXED, all: A, get: function (k) { return A[k] || null; } };
+  var api = { ORDER: ['game', 'book', 'myth', 'pkm'], FIXED: FIXED, formBlank: formBlank, all: A, get: function (k) { return A[k] || null; } };
   root.AtelierHubAdapters = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

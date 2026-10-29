@@ -77,15 +77,19 @@ API(`window.AtelierFavorites`): `has(a, file)` · `toggle(칸)` → 담겼으면
 - **해방**: 단계마다 켜면 트리 밖 선택지가 흐리게 뜨고 빠진 까닭이 붙는다(`CT.why` — 이 시대엔 없는 곳, 이 하는 일의 자세 계열에 없다, 이 공방 일상컷엔 안 쓴다 …).
   고르면 칩과 선택지에 🔓, 지시문 위에 「트리 밖에서 고른 칸」, 기록 JSON 의 `unlocked` 에 남고, 트리가 그 칸을 고치지 않는다(`CT.unlocked`).
 - **랜덤**은 늘 트리 안에서만 — 「이 칸 랜덤」 · 「여기부터 다 랜덤」. 해방한 칸은 건드리지 않는다.
-- **기록 JSON**: `{version, hub, atelier, subject, style, mode, scene, unlocked, at, prompt}`. 공방 기록(`records/…-ui.json`)의 꼴과는 다르다 — 공방 도구로 올릴 때는 그 공방 생성기에서 내보낸다.
-- 출력 갈래는 지금 일상컷만. 다음 단계: ② game·book 폼·개방 → ③ 신화 무기 출력들 → ④ 포켓몬 폼·개방.
+- **기록 JSON**: `{version, hub, atelier, subject, style, mode, at, prompt}` + 일상컷은 `scene, unlocked`, 폼·개방은 `card, form`. 공방 기록(`records/…-ui.json`)의 꼴과는 다르다 — 공방 도구로 올릴 때는 그 공방 생성기에서 내보낸다.
+- **폼 초상·개방(2단계, game·book)**: 폼(시범 표시, 설계표의 모습·자세·배경) → 인물 기준(새 인물 · 첫 그림 이어가기 — 이어가기면 첨부할 기준 폼까지) → 노출 → 설계 줄(새 인물만 실루엣·얼굴 묶음 켜고 끄기, 모티프, 폼 세부 요청) →
+  외형(새 인물만 — 묶음별 고르개, 외형 무작위·초기화) → 연출(갈래·예시·조절) → 표정 → 자세 → 방향 → 프레이밍 → 렌즈 → 화면 비율 → 덧붙임(카메라·장소·의상·추가 요청).
+  개방은 폼(개방 장면이 있는 것만, 없는 폼은 흐리게 까닭) → 덧붙임(명장면 세부 요청·추가 요청). 모두 기본값이 있어 처음부터 지시문이 나오고, 랜덤은 그 공방 `lib/prompt-random.js` 의 폼 칸(연출~비율)만.
+  값은 대상마다 옛 생성기 저장값의 카드 꼴(`prompt/adapters.js` `card`)로 두고, 지시문도 옛 생성기와 같은 입력으로 짓는다(`buildForm`). 화풍 참고 그림 첨부·판 고르기는 허브에 없다(늘 지금 판, 글만).
+- 출력 갈래 — 일상컷은 네 공방, 폼·개방은 game·book. 다음 단계: ③ 신화 무기 출력들 → ④ 포켓몬 폼·개방.
 
 | 열쇠 | 값 |
 |---|---|
-| `atelier_hub_prompt_v1` | `{last, by: {<공방>: {style, subject, scene}}}` — 이 기기에만 |
+| `atelier_hub_prompt_v1` | `{last, by: {<공방>: {style, subject, out, scene, walked: {<갈래>: 참}, cards: {<대상>: 폼·개방 카드}}}}` — 이 기기에만 |
 
-검사: `node tests/prompt-parity.cjs` — 브라우저 없이: game·book 은 대상 모두 × 장면 셋이 그 공방 계획기 `record()`(생성기 「기록 내보내기」)와 같은 글, 네 공방 대상 모두·트리 안 랜덤 스물(트리가 고칠 데 없다)·화풍마다.
-`CHROMIUM_PATH=<chrome> NODE_PATH=<playwright 가 있는 node_modules> ESM_DIR=<preact·htm 이 있는 node_modules> node tests/prompt-screen.cjs` — 네 공방 옛 생성기 화면과 글자 하나 다르지 않다(ESM_DIR 이 없고 바깥이 막히면 건너뛰고 말한다),
+검사: `node tests/prompt-parity.cjs` — 브라우저 없이: game·book 은 대상 모두 × 장면 셋이 그 공방 계획기 `record()`(생성기 「기록 내보내기」)와 같은 글, 네 공방 대상 모두·트리 안 랜덤 스물(트리가 고칠 데 없다)·화풍마다, game·book 폼·개방(대상·폼·인물 기준·노출 모두, 엉망인 저장값, 랜덤 장면).
+`CHROMIUM_PATH=<chrome> NODE_PATH=<playwright 가 있는 node_modules> ESM_DIR=<preact·htm 이 있는 node_modules> node tests/prompt-screen.cjs` — 네 공방 일상컷과 game·book 폼·개방 넷이 옛 생성기 화면과 글자 하나 다르지 않다(ESM_DIR 이 없고 바깥이 막히면 건너뛰고 말한다), 게임 폼·개방 단계(이어가기 기준 폼·외형·연출 랜덤·기록·새로 고침),
 포켓몬 처음부터(기본 화풍·대상·출력·단계·칩·해방 까닭 「안 쓴다」·🔓 기록·앞 바꾸면 뒤 열기·랜덤·새로 고침), 세 크기(344×882 · 390×844 · 1280×900). 옆에 네 공방 저장소가 있어야 한다. `HUB_PORT` 로 자리를 바꾼다.
 
 ## 도트 공방 — 여섯 공방이 같이 쓰는 도트 인물 만들기

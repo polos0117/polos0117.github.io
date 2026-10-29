@@ -1,6 +1,7 @@
 /* 통합 생성기 받침(prompt/adapters.js) — 브라우저 없이.
    ① game·book: 허브가 지은 일상컷 지시문 = 그 공방 계획기의 record()(생성기 「기록 내보내기」 와 같은 상태) — 대상 모두 × 트리 안 장면 셋.
    ② 네 공방: 대상 모두가 기본 화풍으로 지어진다(SCENE 줄) · 트리 안 랜덤 장면 스물이 트리가 고칠 데 없이 지어진다 · 화풍마다 한 번.
+   ③ game·book 폼 초상·개방: 대상·폼·인물 기준·노출 모두, 개방 장면마다, 엉망인 저장값 바로잡기, 랜덤 장면.
    옛 생성기 화면과 글자 하나 다르지 않은지는 tests/prompt-screen.cjs(브라우저)가 본다.
    옆 저장소(../game-atelier · ../book-atelier · ../myth-atelier · ../pkm-atelier)가 있어야 한다. Run: node tests/prompt-parity.cjs */
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm'), path = require('node:path');
@@ -65,4 +66,25 @@ for (const k of H.ORDER) {
   console.log('  ' + k + ': 대상 ' + subs.length + ' · 랜덤 20 · 화풍 ' + a.styles(d, S).length + ' (기본 ' + def + ')');
   checks++;
 }
-console.log('PASS 통합 생성기 받침: game·book 계획기와 같은 글 · 네 공방 대상·랜덤·화풍 — ' + checks + '가지');
+/* ③ 폼 초상·개방(game·book) — 대상 모두 × 폼 모두 × 새 인물·이어가기 × 노출 넷, 개방은 개방 장면이 있는 폼마다. 랜덤 연출·외형 열 */
+for (const k of H.ORDER.filter(x => (H.get(x).outputs || []).includes('form'))) {
+  const B = boot(k), { a, d, S, w } = B, def = a.defaultStyle(d, S), R = w.AtelierSceneRandom;
+  let n = 0;
+  for (const s of a.subjects(d)) for (const f of a.forms(d)) {
+    for (const identityMode of ['create', 'reference']) for (const exposure of S.FORM_EXPOSURE_KEYS) {
+      const t = a.buildForm(w, d, s.key, def, 'form', { form: f.key, identityMode, baseForm: a.forms(d)[0].key, exposure });
+      assert(t.length > 200 && t.includes(a.facts(d, s.key, f.key).look.slice(0, 10)), k + ' ' + s.key + ' ' + f.key + ' 폼 지시문에 설계표 모습'); n++;
+    }
+    if (a.facts(d, s.key, f.key).open) { assert(/OPEN/.test(a.buildForm(w, d, s.key, def, 'open', { form: f.key })), k + ' 개방'); n++; }
+  }
+  /* 저장값이 엉망이어도 기본으로(없는 폼·갈래·노출) */
+  const s0 = a.subjects(d)[0].key, bad = a.card(d, s0, S, { form: 'nope', identityMode: 'x', exposure: 'huge', params: 'no', scenes: { form: 3 } });
+  assert(a.forms(d).some(f => f.key === bad.form) && bad.identityMode === 'create' && bad.exposure === S.FORM_EXPOSURE_DEFAULT && typeof bad.params === 'object', k + ' 카드 바로잡기');
+  for (let i = 0; i < 10; i++) {
+    const c = a.card(d, s0, S, null); c.scenes.form = R.randomize({ ...c.scenes.form, randomLocks: {} }, 'form', null, Math.random);
+    assert(a.buildForm(w, d, s0, def, 'form', c).length > 200, k + ' 랜덤 장면');
+  }
+  console.log('  ' + k + ': 폼·개방 지시문 ' + n + ' · 카드 바로잡기 · 랜덤 장면 10');
+  checks++;
+}
+console.log('PASS 통합 생성기 받침: game·book 계획기와 같은 글 · 네 공방 대상·랜덤·화풍 · game·book 폼·개방 — ' + checks + '가지');
