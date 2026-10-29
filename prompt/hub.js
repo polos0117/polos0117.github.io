@@ -38,7 +38,13 @@
   function getJSON(u) { return fetch(u, { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); }); }
 
   var A = null, D = null, S = null, CT = null, T = null, tree = null, saved = readStore();
-  var st = { a: '', style: '', subject: '', out: 'casual', scene: { unlocked: [] }, card: null, open: 'a', unlock: {}, walked: {}, seen: {}, grpOpen: {} };
+  var st = { a: '', style: '', subject: '', out: 'casual', scene: { unlocked: [] }, card: null, open: 'a', unlock: {}, walked: {}, seen: {}, grpOpen: {}, menu: false };
+  /* 폰(폭 ≤ 768) — docs/PROMPT_MOBILE_PLAN.md ①: 칩 레일 한 줄 + 아래 고정 막대(#hbar). PC 는 판 밑 단추 그대로. 폭이 바뀌면 다시 그린다 */
+  var mq = window.matchMedia ? window.matchMedia('(max-width: 768px)') : null;
+  var mobile = function () { return !!(mq && mq.matches); };
+  if (mq && mq.addEventListener) mq.addEventListener('change', function () { render(); });
+  /* 칩 글은 폰에선 한국어 머리만 — 「over shoulder — 뒤돌아보기」 → 「뒤돌아보기」 */
+  var shortLabel = function (v) { v = String(v == null ? '' : v); var i = v.indexOf(' — '); return mobile() && i > 0 ? v.slice(i + 3) : v; };
   /* 출력 갈래 — 받침의 표(off 는 준비 중). 일상컷 밖은 카드 갈래(단계 표 prompt/steps.js) */
   var outList = function () { return A && A.outputs ? A.outputs(S, w) : [{ key: 'casual', ko: '일상컷' }]; };
   var outs = function () { return outList().filter(function (o) { return !o.off; }).map(function (o) { return o.key; }); };
@@ -288,11 +294,14 @@
   function cardPanel(k) {
     var step = stepOf(k);
     if (!step) return '';
+    if (mobile()) return '<h3>' + esc(step.ko) + '</h3>' + partsHTML(step);   // 단추는 아래 막대에
     return '<h3>' + esc(step.ko) + '</h3>' + partsHTML(step) + (step.random ? '<div class="bar"><span></span>' + randomBar(k) + '</div>' : (skipBtn() ? '<div class="bar"><span></span><span class="rand">' + skipBtn() + '</span></div>' : '')) + (step.next ? nextBtn(k) : '');
   }
 
   /* ── 그리기 ── */
-  function chip(key, ko, val, mark, plan) { return '<button type="button" class="hchip' + (st.open === key ? ' on' : '') + '" data-open="' + key + '"><small>' + esc(ko) + '</small> ' + esc(val) + (mark ? ' <span class="lock" title="트리 밖에서 고른 값">🔓</span>' : '') + (plan ? ' <span class="lock" title="계획기 값 — 랜덤이 안 바꾼다">📌</span>' : '') + '</button>'; }
+  function chip(key, ko, val, mark, plan) { return '<button type="button" class="hchip' + (st.open === key ? ' on' : '') + '" data-open="' + key + '"><small>' + esc(ko) + '</small> ' + esc(shortLabel(val)) + (mark ? ' <span class="lock" title="트리 밖에서 고른 값">🔓</span>' : '') + (plan ? ' <span class="lock" title="계획기 값 — 랜덤이 안 바꾼다">📌</span>' : '') + '</button>'; }
+  /* 폰 — 아직 안 온 다음 한 칸을 미리(▸, 누를 수 없다 · data-open 이 아니다) */
+  function chipNext(key, ko) { return mobile() ? '<span class="hchip next" data-next-chip="' + key + '" aria-hidden="true"><small>' + esc(ko) + '</small> ▸</span>' : ''; }
   function chipsHTML() {
     var out = [chip('a', '공방', A ? A.ko : '—')];
     if (!A || !D) return out.join('');
@@ -305,8 +314,8 @@
       /* 아직 안 온 단계는 칩을 안 띄운다. 한 번 다 골랐으면 다 띄운다 */
       /* 단계 밖(출력·대상 고르는 중)이고 아직 다 고른 적 없으면 단계 칩은 하나도 안 띄운다 */
       if (!seen && at < 0) return;
-      if (formy()) { if (!seen && idx > at) return; out.push(chip(s.key, s.ko, s.shown())); return; }
-      if (!seen && idx > at && (s.key === 'axes' || !st.scene[s.key])) return;
+      if (formy()) { if (!seen && idx > at) { if (idx === at + 1) out.push(chipNext(s.key, s.ko)); return; } out.push(chip(s.key, s.ko, s.shown())); return; }
+      if (!seen && idx > at && (s.key === 'axes' || !st.scene[s.key])) { if (idx === at + 1) out.push(chipNext(s.key, s.ko)); return; }
       if (s.key === 'axes') { out.push(chip('axes', s.ko, (T.axes.filter(function (a) { return a.key === 'skin_exposure'; })[0] ? '피부 노출 ' + label((T.axes.filter(function (a) { return a.key === 'skin_exposure'; })[0] || {}).options, st.scene.axes.skin_exposure) : '…'))); return; }
       if (s.key === 'notes') { var n = casualTexts().filter(function (f) { return (st.scene[f] || '').trim(); }).length; out.push(chip('notes', s.ko, n ? n + '칸' : '없음')); return; }
       out.push(chip(s.key, s.ko, shown(s.key, st.scene[s.key]), unl(st.scene, s.key), planned(st.scene, s.key)));
@@ -348,7 +357,8 @@
       var plan = !formy() && (st.scene.planned || []).length;
       return '<h3>다 골랐다</h3><p class="note">칩을 누르면 그 단계로 돌아간다. 아래 지시문을 복사해 쓴다.' + (formy() && canRand ? ' 랜덤은 랜덤 단추가 있는 단계만 — 나머지는 그대로.' : '') +
         (plan ? ' 📌 계획기 칸 ' + plan + '개는 랜덤이 안 바꾼다.' : '') + '</p>' +
-        (canRand && ss.length ? '<span class="rand"><button type="button" class="btn" data-rand-all="' + ss[0].key + '">처음부터 다 랜덤</button>' + (plan ? '<button type="button" class="btn" data-act="unplan">계획 칸 풀기</button>' : '') + '</span>' : '');
+        /* 폰에선 「처음부터 다 랜덤」이 아래 막대에 있다 — 여기엔 계획 칸 풀기만 */
+        (canRand && ss.length ? '<span class="rand">' + (mobile() ? '' : '<button type="button" class="btn" data-rand-all="' + ss[0].key + '">처음부터 다 랜덤</button>') + (plan ? '<button type="button" class="btn" data-act="unplan">계획 칸 풀기</button>' : '') + '</span>' : '');
     }
     if (formy()) return cardPanel(k);
     if (k === 'axes') {
@@ -366,8 +376,32 @@
     var list = inTree(k), out = st.unlock[k] ? outTree(k) : [];
     var note = k === 'expr' && !CT.exprOk(tree, st.scene) ? '<p class="note">하는 일이 표정을 정하거나 등을 보이는 방향이라 표정은 고르지 않는다.</p>' : '';
     return '<h3>' + esc(step.ko) + '</h3>' + note + optButtons(list, st.scene[k]) +
-      '<div class="bar"><label class="unlock"><input type="checkbox" id="unlock" ' + (st.unlock[k] ? 'checked' : '') + '> 해방 — 트리 밖 선택지도 보기(' + outTree(k).length + ')</label>' + randomBar(k) + '</div>' +
+      (mobile() ? '' : '<div class="bar"><label class="unlock"><input type="checkbox" id="unlock" ' + (st.unlock[k] ? 'checked' : '') + '> 해방 — 트리 밖 선택지도 보기(' + outTree(k).length + ')</label>' + randomBar(k) + '</div>') +
       (out.length ? '<p class="note">흐린 것은 이 길에서 빠진 값이다. 고르면 🔓 가 붙고 기록에 남는다 — 트리가 그 칸을 고치지 않는다.</p>' + optButtons(out, st.scene[k]) : '');
+  }
+  /* ── 폰 아래 고정 막대 — 이전 · 🔓 해방(n) · 🎲 랜덤 ▾(이 칸 · 여기부터 · 다 골랐다로) · 다음/건너뛰기 ›. 다 고르면 🎲 처음부터 · 기록 JSON · 📋 복사.
+     단추의 data-* 는 판 밑 단추와 같다(검사도 같은 것을 누른다). 공방·화풍·대상·출력 단계엔 없다 ── */
+  function hbarHTML() {
+    if (!mobile() || !A || !D) return '';
+    var k = st.open, ks = keysOf(), i = ks.indexOf(k);
+    if (k === 'done') {
+      var ss = steps(), canRand = !formy() || ss.some(function (x) { return x.random; });
+      return (canRand && ss.length ? '<button type="button" class="btn" data-rand-all="' + ss[0].key + '">🎲 처음부터</button>' : '') +
+        '<button type="button" class="btn" data-act="record">기록 JSON</button><button type="button" class="btn pri" data-act="copy">📋 복사</button>';
+    }
+    if (i < 0) return '';
+    var cs = formy() ? stepOf(k) : STEPS[i], last = i === ks.length - 1;
+    var hasNext = formy() ? !!(cs && cs.next) : (k === 'axes' || k === 'notes');
+    var hasRand = formy() ? !!(cs && cs.random) : (k !== 'axes' && k !== 'notes');
+    var showUnlock = !formy() && k !== 'axes' && k !== 'notes';
+    var canSkip = !hasNext && !(cs && cs.need && !st.scene[k]);   // 꼭 있어야 하는 칸이 비었으면 못 건넌다
+    var right = hasNext ? '<button type="button" class="btn pri" data-next="' + k + '">' + (last ? '다 골랐다' : '다음 ›') + '</button>'
+      : canSkip ? '<button type="button" class="btn pri" data-skip="' + k + '">' + (last ? '다 골랐다' : '건너뛰기 ›') + '</button>'
+      : (skipBtn() ? '<button type="button" class="btn pri" data-open="done">다 골랐다로</button>' : '');
+    var menu = st.menu && hasRand ? '<div class="hmenu" role="menu"><button type="button" class="btn" data-rand="' + k + '">🎲 이 칸 랜덤</button><button type="button" class="btn" data-rand-all="' + k + '">🎲 여기부터 다 랜덤</button>' + skipBtn() + '</div>' : '';
+    return '<button type="button" class="btn ico" data-prev="' + k + '" aria-label="이전 단계">‹</button>' +
+      (showUnlock ? '<label class="unlock"><input type="checkbox" id="unlock" ' + (st.unlock[k] ? 'checked' : '') + '> 🔓 해방 (' + outTree(k).length + ')</label>' : '') +
+      (hasRand ? '<button type="button" class="btn" data-menu="rand" aria-expanded="' + (st.menu ? 'true' : 'false') + '">🎲 랜덤 ▾</button>' : '') + right + menu;
   }
   function casualTexts() { return (A && A.casualTexts) || ['outfit', 'scene', 'custom']; }
   function field(id, labelText, value, multi, help, ph, at) {
@@ -375,10 +409,11 @@
     return '<label class="axis" for="f-' + id + '">' + esc(labelText) + (multi ? '<textarea id="f-' + id + '" data-field="' + id + '"' + at + ' rows="3" placeholder="' + esc(ph || '') + '">' + esc(value || '') + '</textarea>' :
       '<input type="text" id="f-' + id + '" data-field="' + id + '"' + at + ' value="' + esc(value || '') + '" placeholder="' + esc(ph || '') + '">') + (help ? '<small>' + esc(help) + '</small>' : '') + '</label>';
   }
-  function nextBtn(k) { var ks = keysOf(), n = ks[ks.indexOf(k) + 1]; return '<p class="rand"><button type="button" class="btn" data-next="' + k + '">' + (n ? '다음' : '다 골랐다') + '</button>' + (n ? skipBtn() : '') + '</p>'; }
+  /* 판 밑 단추(다음·랜덤) — 폰에선 아래 막대(hbarHTML)가 대신하니 비운다 */
+  function nextBtn(k) { if (mobile()) return ''; var ks = keysOf(), n = ks[ks.indexOf(k) + 1]; return '<p class="rand"><button type="button" class="btn" data-next="' + k + '">' + (n ? '다음' : '다 골랐다') + '</button>' + (n ? skipBtn() : '') + '</p>'; }
   /* 한 번 다 골랐고 지금도 다 찼으면 — 남은 단계를 건너뛰어 다 골랐다로 */
   function skipBtn() { return st.seen[st.out] && firstOpen() === 'done' && prompt() ? '<button type="button" class="btn" data-open="done">다 골랐다로</button>' : ''; }
-  function randomBar(k) { return '<span class="rand"><button type="button" class="btn" data-rand="' + k + '">이 칸 랜덤</button><button type="button" class="btn" data-rand-all="' + k + '">여기부터 다 랜덤</button>' + skipBtn() + '</span>'; }
+  function randomBar(k) { if (mobile()) return ''; return '<span class="rand"><button type="button" class="btn" data-rand="' + k + '">이 칸 랜덤</button><button type="button" class="btn" data-rand-all="' + k + '">여기부터 다 랜덤</button>' + skipBtn() + '</span>'; }
   function subjectsHTML() {
     var f = (st.find || '').trim().toLowerCase(), list = A.subjects(D).filter(function (x) { return !f || (x.ko + ' ' + x.sub).toLowerCase().indexOf(f) >= 0; });
     /* 다 그린다(포켓몬 1025) — 앞 120 만 그렸더니 그 밑으로 못 내려갔다 */
@@ -404,12 +439,19 @@
     needLazy();
     if (st.open === 'done') st.seen[st.out] = true;   /* 한 번 다 골랐으면 그 뒤 고침은 다 골랐다로 돌아온다(advance) */
     var was = st.shown; st.shown = st.open;
+    if (was !== st.open) st.menu = false;
     /* 다시 그리기 전에 연 묶음을 읽어 둔다 — toggle 사건은 늦게 와서, 묶음을 열자마자 값을 바꾸면 닫힌 채 다시 그려졌다 */
     [].forEach.call(document.querySelectorAll('details[data-grp]'), function (d) { st.grpOpen[d.dataset.grp] = d.open; });
     $('chips').innerHTML = chipsHTML();
     $('panel').innerHTML = panelHTML();
-    /* 단계가 바뀌었는데 새 단계 윗머리가 화면 위로 가 있으면(긴 대상 목록 끝에서 골랐을 때) 그 단계로 올린다 */
-    if (was && was !== st.open && $('panel').getBoundingClientRect().top < 0) $('panel').scrollIntoView({ block: 'start' });
+    var hb = $('hbar'); if (hb) { hb.innerHTML = hbarHTML(); hb.hidden = !hb.innerHTML; }
+    if (mobile()) {
+      /* 칩 레일 — 지금 칸을 가운데로(세로는 안 움직인다) */
+      var rail = $('chips'), on = rail.querySelector('.hchip.on');
+      if (on) rail.scrollLeft = Math.max(0, on.offsetLeft - (rail.clientWidth - on.offsetWidth) / 2);
+      /* 단계가 바뀌면 새 단계 윗머리를 레일 바로 아래로 — 긴 목록 중간에서 골랐을 때 새 단계가 화면 밖에서 시작하지 않게 */
+      if (was && was !== st.open) window.scrollTo({ top: Math.max(0, $('panel').getBoundingClientRect().top + window.scrollY - rail.offsetHeight - 8), behavior: 'auto' });
+    } else if (was && was !== st.open && $('panel').getBoundingClientRect().top < 0) $('panel').scrollIntoView({ block: 'start' });   // PC — 윗머리가 화면 위로 갔을 때만
     renderOut();
   }
 
@@ -423,6 +465,12 @@
     if (b.dataset.randAll) { randomFrom(b.dataset.randAll, true); return; }
     if (b.dataset.next) { advance(b.dataset.next); save(); render(); return; }
     if (b.dataset.act === 'unplan') { st.scene.planned = []; save(); render(); return; }
+    /* 폰 아래 막대 */
+    if (b.dataset.prev) { var pk = keysOf(), pi = pk.indexOf(b.dataset.prev); st.open = pi > 0 ? pk[pi - 1] : 'out'; render(); return; }
+    if (b.dataset.skip) { advance(b.dataset.skip); save(); render(); return; }
+    if (b.dataset.menu) { st.menu = !st.menu; var hb2 = $('hbar'); hb2.innerHTML = hbarHTML(); hb2.hidden = !hb2.innerHTML; return; }
+    if (b.dataset.act === 'copy') { $('copy').click(); b.textContent = '복사했다 ✓'; setTimeout(function () { var c = document.querySelector('[data-act="copy"]'); if (c) c.textContent = '📋 복사'; }, 1500); return; }
+    if (b.dataset.act === 'record') { $('record').click(); $('record-out').scrollIntoView({ block: 'start' }); return; }
     if (b.dataset.btn != null) { var bs = stepOf(st.open), bp = bs && bs.parts[+b.dataset.part]; if (bp) bp.items[+b.dataset.btn].run(); save(); render(); return; }
     if (b.dataset.pick != null) {
       if (st.open === 'style') { st.style = b.dataset.pick; st.open = st.subject ? begin() : 'subject'; save(); render(); return; }
@@ -454,6 +502,8 @@
     }
   });
   document.addEventListener('toggle', function (e) { var d = e.target; if (d.dataset && d.dataset.grp && d.isConnected) st.grpOpen[d.dataset.grp] = d.open; }, true);
+  /* 폰 키보드가 올라오면(보이는 화면이 150px 넘게 줄면) 아래 막대를 숨긴다 — 글 칸과 겹치지 않게. 초점으로 숨기면 글을 쓰다 바로 「다음」을 못 누른다 */
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', function () { document.body.classList.toggle('kb', window.visualViewport.height < window.innerHeight - 150); });
   document.addEventListener('input', function (e) {
     var t = e.target;
     if (t.id === 'find') { st.find = t.value; $('subjects').innerHTML = subjectsHTML(); return; }

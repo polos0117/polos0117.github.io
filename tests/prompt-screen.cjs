@@ -2,7 +2,7 @@
    ① 같은 일상컷 장면을 허브와 그 공방의 옛 생성기(/<공방>/prompt.html)에 넣으면 지시문이 글자 하나 다르지 않다 — 네 공방(게임·책·신화 무기·포켓몬).
    ② 포켓몬으로 단계를 처음부터 — 공방 → 화풍(기본) → 대상 → 출력 → 시대 → … 고른 단계는 칩으로 접히고 누르면 돌아간다.
       해방을 켜면 트리 밖이 까닭과 함께 흐리게 뜨고, 고르면 🔓 와 기록(unlocked)에 남는다. 안 쓰는 값(등 돌림)엔 「안 쓴다」.
-   ③ 344×882 · 390×844 · 1280×900 에서 옆으로 넘치지 않고 누르는 자리 44px.
+   ③ 344×882 · 390×844 · 1280×900 에서 옆으로 넘치지 않고 누르는 자리 44px. 폰(≤768)은 칩 레일 한 줄·아래 고정 막대(이전·해방·랜덤·다음)·판 밑 단추 없음, PC 는 판 밑 단추(docs/PROMPT_MOBILE_PLAN.md ①).
    옆 저장소(../game-atelier · ../book-atelier · ../myth-atelier · ../pkm-atelier)를 같은 출처의 /<저장소>/ 로 내준다 — 실제 Pages 와 같은 꼴.
    Run: CHROMIUM_PATH=<chrome> NODE_PATH=<playwright 가 있는 node_modules> node tests/prompt-screen.cjs   (HUB_PORT 로 자리 바꾸기, 기본 8783) */
 const assert = require('node:assert/strict'), http = require('node:http'), fs = require('node:fs'), path = require('node:path');
@@ -65,6 +65,8 @@ const OLD = {
   await new Promise(r => server.listen(PORT, '127.0.0.1', r));
   const br = await chromium.launch({ headless: true, ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox', '--disable-dev-shm-usage'] } : {}) });
   let checks = 0;
+  const toDone = async (pg) => { if (await pg.locator('#panel [data-open="done"]').count()) return pg.click('#panel [data-open="done"]'); const m = pg.locator('[data-menu="rand"]'); if (await m.count()) await m.click(); await pg.click('#hbar [data-open="done"]'); };   // 「다 골랐다로」 — PC 는 판 밑, 폰은 🎲 메뉴 안
+  const randAll = async (pg, k) => { const m = pg.locator('[data-menu="rand"]'); if (await m.count()) await m.click(); await pg.click('[data-rand-all="' + k + '"]'); };   // 폰(≤768)에선 🎲 메뉴를 먼저 연다
   const open = async (url, store, viewport = { width: 390, height: 844 }) => {
     const ctx = await br.newContext({ viewport });
     /* 바깥 것(글꼴·CDN)은 받지 않는다. 옛 생성기의 preact(esm.sh)는 ESM_DIR 사본으로 — 공방 tests/browser-harness.cjs 와 같게 */
@@ -162,7 +164,7 @@ const OLD = {
     assert.match(await p.locator('#unlocked-note').textContent(), /자세/);
     /* 다 고른 뒤 고쳐도 건너뛰지 않는다 — 바로 다음 칸(방향). 남은 단계는 「다 골랐다로」 로 건너뛴다(2026-10-29 사용자 「다다음 칸으로 건너뛰어지는게 많네」) */
     assert.equal(await p.evaluate(() => window.AtelierHubPrompt.state().open), 'orient', '고친 뒤엔 바로 다음 칸');
-    await p.click('#panel [data-open="done"]');
+    await toDone(p);
     assert.equal(await p.evaluate(() => window.AtelierHubPrompt.state().open), 'done', '「다 골랐다로」 로 남은 단계를 건너뛴다');
     const t2 = await p.locator('#prompt').inputValue();
     assert(t2.includes(await p.evaluate(() => window.AtelierSpec.POSE_GUIDES.sitting[1])), '해방한 자세가 지시문에 남는다(트리가 고치지 않는다)');
@@ -177,7 +179,7 @@ const OLD = {
     for (let i = 0; i < 4; i++) { await p.locator('#panel .opt[data-pick]:not([data-out])').first().click(); walk.push(await p.evaluate(() => window.AtelierHubPrompt.state().open)); }
     assert.deepEqual(walk, ['ofam', 'item', 'frame', 'lens'], '고친 뒤 한 칸씩: ' + walk.join(' > '));
     /* 랜덤 — 트리 안에서만, 다 고르면 지시문 */
-    await p.click('[data-open="act"]'); await p.click('[data-rand-all="act"]');
+    await p.click('[data-open="act"]'); await randAll(p, 'act');
     const sc = await p.evaluate(() => window.AtelierHubPrompt.state().scene);
     assert(sc.place === 'water_pool' && sc.act && sc.ofam && sc.frame && sc.orient, '랜덤으로 다 채운다');
     assert(await p.evaluate(sc => window.AtelierHubPrompt.settled(sc), sc), '랜덤한 장면은 트리가 고칠 데가 없다');
@@ -208,7 +210,7 @@ const OLD = {
       await p.click('[data-next="design"]'); assert.equal(await now(), 'action', '이어가기는 외형을 건너뛴다');
       await p.selectOption('select[data-sel][data-part="1"]', 'melee');
       assert.equal(await p.locator('select[data-sel]').count(), 2 + (await p.evaluate(() => window.AtelierSpec.ACTION_CONTROLS.length)), '갈래를 고르면 예시가 열린다');
-      await p.click('[data-rand-all="action"]'); assert.equal(await now(), 'done');
+      await randAll(p, 'action'); assert.equal(await now(), 'done');
       const sc = await p.evaluate(() => window.AtelierHubPrompt.state().card.scenes.form);
       assert(sc.action.category && sc.expr && sc.frame && sc.aspect, '연출부터 다 랜덤');
       assert.match(await p.locator('[data-open="ident"]').textContent(), /이어가기 · 타이틀/);
@@ -245,7 +247,7 @@ const OLD = {
       assert((await q.locator('#prompt').inputValue()).includes('yellow ear headband'), '머리 특징 직접 입력이 지시문에');
       await q.click('[data-next="design"]'); assert.equal(await at(), 'look');
       await q.click('[data-next="look"]'); assert.equal(await at(), 'action');
-      await q.click('[data-rand-all="action"]'); assert.equal(await at(), 'done');
+      await randAll(q, 'action'); assert.equal(await at(), 'done');
       assert((await q.evaluate(() => window.AtelierHubPrompt.state().card.scenes.action.action.category)), '연출 랜덤');
       /* 이어가기면 원작 특징·외형 단계가 빠진다 */
       await q.click('[data-open="ident"]'); await q.click('[data-pick="reference"]');
@@ -321,7 +323,7 @@ const OLD = {
       assert((await p.locator('#prompt').inputValue()).includes('Outfit: a white string bikini with a sheer sarong'), '덧붙임 옷이 지시문에');
       await p.click('[data-next="notes"]'); assert.equal(await p.evaluate(() => window.AtelierHubPrompt.state().open), 'done');
       /* 처음부터 다 랜덤 — 계획 칸은 그대로 */
-      await p.click('[data-rand-all="era"]');
+      await randAll(p, 'era');
       const after = await p.evaluate(() => window.AtelierHubPrompt.state().scene);
       for (const k of ['era', 'place', 'act', 'ofam', 'item', 'orient', 'frame', 'lens', 'expr']) assert.equal(after[k], cut[k], '랜덤이 계획 칸을 안 바꾼다 ' + k);
       /* 계획 칸 풀기 → 랜덤이 바꿀 수 있다. 손으로 고친 칸은 계획 표시가 빠진다 */
@@ -349,6 +351,10 @@ const OLD = {
         small: [...document.querySelectorAll('button, a.opt, a.home, select, input[type="search"]')].filter(e => e.offsetParent && e.getBoundingClientRect().height < 43.5).map(e => e.outerHTML.slice(0, 60)) }));
       assert(m.over <= 0, vp.width + ' 옆으로 넘친다 ' + m.over);
       assert.deepEqual(m.small, [], vp.width + ' 44px 안 되는 자리');
+      const mb = await v.page.evaluate(() => { const rail = document.getElementById('chips').getBoundingClientRect(), hb = document.getElementById('hbar'), r = hb.getBoundingClientRect();
+        return { rail: rail.height, bar: !hb.hidden, barIn: !hb.hidden && r.bottom <= innerHeight + 0.5 && r.top > innerHeight / 2, inPanel: document.querySelectorAll('#panel .bar, #panel [data-next], #panel [data-rand]').length, chips: document.querySelectorAll('.hchip').length }; });
+      if (vp.width <= 768) { assert(mb.rail <= 60, vp.width + ' 칩 레일이 한 줄이 아니다 ' + mb.rail); assert(mb.bar && mb.barIn, vp.width + ' 아래 막대가 화면 안에 없다'); assert.equal(mb.inPanel, 0, vp.width + ' 판 밑에 단추가 남아 있다'); }
+      else { assert(!mb.bar, '1280 에선 아래 막대가 없다'); assert(mb.inPanel > 0, '1280 은 판 밑 단추'); }
       assert.deepEqual(v.errors, []);
       await v.ctx.close(); checks++;
       /* 카드 갈래 외형(긴 고르개) — 게임 폼 · 신화 초상 · 포켓몬 액션, 옆으로 넘치지 않는다 */
