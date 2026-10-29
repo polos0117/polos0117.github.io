@@ -138,7 +138,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   body.sheet .hbar { display: none; }
   /* ⑤ 대상 — 칸마다 그리기를 미룬다(1,025명), 건너뛰기 자리는 레일·찾기 칸 아래로 */
   .opts.people .opt { content-visibility: auto; contain-intrinsic-size: auto 64px; scroll-margin-top: 180px; }
-  .gtabs.jump { position: sticky; top: var(--hchips-h, 116px); z-index: 2; margin-top: -4px; padding-top: 6px; padding-bottom: 6px; background: var(--card); }
+  .gtabs.ini { position: sticky; top: var(--hchips-h, 116px); z-index: 2; margin-top: -4px; padding-top: 6px; padding-bottom: 6px; background: var(--card); }
   /* ⑥ 고르개는 라벨과 한 줄 */
   .axis:has(> select) { display: grid; grid-template-columns: 38% 1fr; align-items: center; gap: 4px 8px; }
   .axis:has(> select) small { grid-column: 1 / -1; }
@@ -208,6 +208,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 <div class="hsheet" id="hsheet" hidden></div>
 <script src="prompt/adapters.js?v=5"></script>
 <script src="prompt/steps.js?v=2"></script>
-<script src="prompt/hub.js?v=12"></script>
+<script src="prompt/hub.js?v=13"></script>
 </body>
 </html>

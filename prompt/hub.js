@@ -519,6 +519,7 @@
   function randomBar(k) { if (mobile()) return ''; return '<span class="rand"><button type="button" class="btn" data-rand="' + k + '">이 칸 랜덤</button><button type="button" class="btn" data-rand-all="' + k + '">여기부터 다 랜덤</button>' + skipBtn() + restartBtn(k) + '</span>'; }
   /* 이름 첫 글자 — 한글은 초성(된소리는 예사소리로), 숫자는 #, 그 밖은 대문자. 대상 목록 건너뛰기 칩 */
   var CHO = ['ㄱ', 'ㄱ', 'ㄴ', 'ㄷ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅂ', 'ㅅ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+  var INI_ORDER = 'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ#ABCDEFGHIJKLMNOPQRSTUVWXYZ';   // 거르개 칩 차례 — 가나다, 숫자, 영문
   function initial(s) {
     var c = String(s || '').trim().charCodeAt(0); if (!c) return '';
     if (c >= 0xAC00 && c <= 0xD7A3) return CHO[Math.floor((c - 0xAC00) / 588)];
@@ -530,11 +531,16 @@
     var f = (st.find || '').trim().toLowerCase(), all = A.subjects(D), list = all.filter(function (x) { return !f || (x.ko + ' ' + x.sub).toLowerCase().indexOf(f) >= 0; });
     var html = '';
     if (mobile() && !f) {
-      /* 최근 고른 대상 다섯 · 첫 글자 건너뛰기(이름 차례가 아닐 수 있어 처음 나오는 자리로) */
+      /* 최근 고른 대상 다섯 · 첫 글자(초성) 거르개 — 목록은 도감 번호 차례라 「그 자리로 건너뛰기」는 쓸모가 없었다(ㄱ 이 여기저기 흩어져 있다). 누르면 그 글자로 시작하는 이름만 보인다, ㄱㄴㄷ 차례 */
       var rc = (((saved.by || {})[st.a] || {}).recent || []).map(function (k) { return all.filter(function (x) { return x.key === k; })[0]; }).filter(Boolean);
       if (rc.length) html += '<h4>최근</h4><div class="opts people">' + rc.map(subjectBtn).join('') + '</div>';
       var seen = {}, inits = []; list.forEach(function (x) { var i = initial(x.ko); if (i && !seen[i]) { seen[i] = 1; inits.push(i); } });
-      if (inits.length > 3) html += '<div class="gtabs jump" aria-label="첫 글자로 건너뛰기">' + inits.map(function (i) { return '<button type="button" class="gtab" data-jump="' + esc(i) + '">' + esc(i) + '</button>'; }).join('') + '</div>';
+      inits.sort(function (a, b) { var ia = INI_ORDER.indexOf(a), ib = INI_ORDER.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || (a < b ? -1 : a > b ? 1 : 0); });
+      if (inits.length > 3) {
+        if (st.ini && !seen[st.ini]) st.ini = '';
+        html += '<div class="gtabs ini" aria-label="첫 글자로 거르기">' + [''].concat(inits).map(function (i) { return '<button type="button" class="gtab' + (i === (st.ini || '') ? ' on' : '') + '" data-ini="' + esc(i) + '" aria-pressed="' + (i === (st.ini || '')) + '">' + (i ? esc(i) : '전체') + '</button>'; }).join('') + '</div>';
+        if (st.ini) list = list.filter(function (x) { return initial(x.ko) === st.ini; });
+      }
     }
     /* 다 그린다(포켓몬 1025) — 앞 120 만 그렸더니 그 밑으로 못 내려갔다. 폰은 content-visibility 로 그리기를 미룬다(CSS) */
     return html + '<p class="note">' + list.length + '명</p><div class="opts people">' + list.map(subjectBtn).join('') + '</div>';
@@ -608,7 +614,11 @@
     if (b.dataset.act === 'sheet') { st.sheet = 'prompt'; render(); return; }
     if (b.dataset.act === 'sheet-close') { st.sheet = ''; render(); return; }
     if (b.dataset.act === 'more') { st.outOpen = !st.outOpen; render(); return; }
-    if (b.dataset.jump != null) { var tgt = document.querySelector('#subjects .opt[data-initial="' + b.dataset.jump.replace(/"/g, '\\"') + '"]'); if (tgt) tgt.scrollIntoView({ block: 'start' }); return; }
+    if (b.dataset.ini != null) {   // 첫 글자 거르개 — 목록만 다시 그리고, 거른 목록 머리가 붙는 머리 바로 아래 오게
+      st.ini = b.dataset.ini; $('subjects').innerHTML = subjectsHTML();
+      var tb = $('subjects').querySelector('.gtabs.ini'); if (tb) window.scrollTo({ top: Math.min(window.scrollY, tb.getBoundingClientRect().top + window.scrollY - $('chips').offsetHeight - 4), behavior: 'auto' });
+      return;
+    }
     if (b.id === 'help') { st.help = !st.help; render(); return; }
     if (b.dataset.btn != null) { var bs = stepOf(st.open), bp = bs && bs.parts[+b.dataset.part]; if (bp) bp.items[+b.dataset.btn].run(); save(); render(); return; }
     if (b.dataset.pick != null) {

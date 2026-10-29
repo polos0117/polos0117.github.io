@@ -140,6 +140,17 @@ const OLD = {
     /* 대상은 다 있고 페이지 스크롤로 끝까지 — 안에 따로 스크롤하는 상자가 없다(앞 120 만 그려 못 내려갔다) */
     assert.equal(await p.locator('[data-subject]').count(), 1025, '포켓몬 1025 다');
     assert(await p.evaluate(() => { const e = document.querySelector('.opts.people'); return e.scrollHeight <= e.clientHeight + 1 && getComputedStyle(e).overflowY === 'visible'; }), '대상 목록 안 스크롤 상자 없음');
+    /* 첫 글자 거르개(폰) — 칩은 전체·ㄱㄴㄷ 차례, 누르면 그 글자로 시작하는 이름만(2026-10-29 사용자 「순서도 안 맞고 이동도 안 한다」 → 건너뛰기에서 거르개로) */
+    if (await p.locator('.gtabs.ini').count()) {
+      const order = await p.locator('.gtabs.ini .gtab').allTextContents();
+      assert.equal(order[0], '전체'); const ko = order.slice(1).filter(c => /^[ㄱ-ㅎ]$/.test(c)); assert.deepEqual(ko, ko.slice().sort((a, b) => 'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ'.indexOf(a) - 'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ'.indexOf(b)), '칩이 가나다 차례 ' + order.join(''));
+      await p.click('.gtabs.ini [data-ini="ㅍ"]');
+      const ini = await p.evaluate(() => [...document.querySelectorAll('#subjects .opts.people:last-of-type .opt')].map(e => e.dataset.initial));
+      assert(ini.length > 0 && ini.every(i => i === 'ㅍ'), 'ㅍ 으로 시작하는 이름만 ' + ini.length);
+      assert.equal(await p.locator('.gtabs.ini .gtab.on').textContent(), 'ㅍ');
+      await p.click('.gtabs.ini [data-ini=""]');
+      assert.equal(await p.locator('#subjects .opts.people:last-of-type .opt').count(), 1025, '전체로 돌아온다');
+    }
     await p.locator('[data-subject]').last().scrollIntoViewIfNeeded();
     assert(await p.evaluate(() => { const r = document.querySelector('[data-subject]:last-child').getBoundingClientRect(); return r.bottom <= innerHeight && r.top >= 0; }), '마지막 대상까지 내려간다');
     await p.locator('[data-subject]').last().click();
@@ -226,7 +237,7 @@ const OLD = {
     assert.match(await p.locator('[data-open="place"]').textContent(), /수영장/, '고른 값이 남는다');
     assert.deepEqual(s.errors, [], '오류 없음');
     await s.ctx.close();
-    checks += 14;
+    checks += 15;
 
     /* ②-2 게임 폼 초상·개방 단계 — 폼 → 인물 기준(이어가기면 기준 폼까지) → 노출 → 설계 줄 → (새 인물만 외형) → 연출 → … → 덧붙임 */
     {
