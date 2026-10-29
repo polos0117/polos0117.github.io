@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>통합 생성기 모바일 시안</title>
+<!-- docs/PROMPT_MOBILE_PLAN.md 의 그림을 그대로 그린 정적 시안(가짜 자료). ?m=step 단계 화면 · ?m=done 다 고른 화면. 실제 생성기가 아니다 -->
+<style>
+:root{--bg:#0b0a0e;--card:#18161d;--card2:#201d26;--line:#ffffff1a;--text:#f1ece2;--muted:#a8a09a;--gold:#d9b45a;--bad:#ff8f80}
+*{box-sizing:border-box}html,body{margin:0}body{background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,'Apple SD Gothic Neo',sans-serif;min-height:100dvh;padding-bottom:72px}
+.rail{position:sticky;top:0;z-index:5;background:#0b0a0ef2;backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 12px 8px}
+.rail .t{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.rail h1{margin:0;font:800 20px/1.1 'Noto Serif KR',serif;background:linear-gradient(180deg,#fff 30%,var(--gold));-webkit-background-clip:text;color:transparent}
+.rail .path{display:flex;align-items:center;gap:6px;margin:4px 0 8px;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rail .path b{color:var(--text);font-weight:600}.rail .path .n{margin-left:auto;color:var(--gold);font-weight:700}
+.ic{display:inline-flex;align-items:center;justify-content:center;min-width:36px;height:36px;border:1px solid #ffffff2b;border-radius:99px;background:#000b;color:var(--text);font-size:13px;padding:0 10px;text-decoration:none}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;scroll-snap-type:x proximity}.chips::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;display:inline-flex;align-items:baseline;gap:5px;height:36px;padding:0 10px;border:1px solid #ffffff2b;border-radius:10px;background:#ffffff08;font:600 13px/36px system-ui;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;scroll-snap-align:center}
+.chip small{color:var(--muted);font-weight:500;font-size:11px}.chip.on{border-color:var(--gold);background:#d9b45a1f}.chip.next{color:var(--muted);border-style:dashed}
+main{padding:12px 12px 0}
+h3{margin:4px 0 8px;font:800 18px/1.3 'Noto Serif KR',serif}
+.tabs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -12px 10px;padding:0 12px}.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;height:34px;padding:0 12px;border-radius:99px;border:1px solid #ffffff22;background:#ffffff06;color:var(--muted);font:600 13px/34px system-ui;white-space:nowrap}.tab.on{color:#120b16;background:var(--gold);border-color:var(--gold)}
+.list{display:grid;gap:6px}
+.row{display:flex;align-items:center;gap:10px;min-height:48px;padding:0 12px;border:1px solid #ffffff22;border-radius:10px;background:#ffffff06;text-align:left;color:var(--text);width:100%}
+.row .dot{flex:none;width:16px;height:16px;border-radius:50%;border:2px solid #ffffff55}.row.on{border-color:var(--gold);background:#d9b45a1f}.row.on .dot{border-color:var(--gold);background:var(--gold);box-shadow:inset 0 0 0 3px #201d26}
+.row b{flex:1 1 auto;font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.row span{flex:0 1 46%;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+.row.out{opacity:.55;border-style:dashed}.row.out span{color:var(--bad)}
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:6;display:grid;grid-template-columns:auto 1fr 1fr auto;gap:6px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));background:#0f0e13f2;border-top:1px solid var(--line);backdrop-filter:blur(8px)}
+.bar button{height:44px;border:1px solid #ffffff2b;border-radius:12px;background:#000b;color:var(--text);font:600 13px system-ui;padding:0 12px;white-space:nowrap}
+.bar .pri{background:var(--gold);color:#120b16;border-color:var(--gold)}.bar .tog.on{border-color:var(--gold);color:var(--gold)}
+.result{padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--card2);margin:0 0 12px}
+.result .h{display:flex;align-items:baseline;justify-content:space-between;margin:0 0 6px}.result .h b{font:800 17px 'Noto Serif KR',serif}.result .h small{color:var(--muted)}
+.result pre{margin:0;max-height:190px;overflow:hidden;white-space:pre-wrap;font:12px/1.5 ui-monospace,Menlo,monospace;color:#d8d2c8;position:relative}
+.result pre::after{content:'';position:absolute;inset:auto 0 0 0;height:60px;background:linear-gradient(180deg,transparent,var(--card2))}
+.result .more{margin:6px 0 0;color:var(--gold);font-size:13px;background:none;border:0;padding:0}
+.note{color:var(--muted);font-size:13px;margin:0 0 10px}
+</style></head><body>
+<header class="rail">
+  <div class="t"><h1>통합 생성기</h1><div><a class="ic" href="#">?</a> <a class="ic" href="#">지도</a></div></div>
+  <div class="path"><b>포켓몬</b>›<b>피카츄</b>›<b>일상컷</b><span class="n" id="n">3/12</span></div>
+  <div class="chips" id="chips"></div>
+</header>
+<main id="main"></main>
+<nav class="bar" id="bar"></nav>
+<script>
+const mode = new URLSearchParams(location.search).get('m') || 'step';
+const chips = [['시대','지금 현실'],['장소','침실'],['하는 일','창밖·풍경 바라보기'],['의상 계열','홈웨어'],['옷','자동'],['프레이밍','얼굴 클로즈업'],['렌즈','준망원 85mm'],['자세','하는 일대로'],['방향','뒤돌아보기'],['표정','차분함'],['세부 강도','피부 노출 많이'],['덧붙임','없음']];
+const cur = mode === 'step' ? 2 : 12;
+document.getElementById('chips').innerHTML = chips.map((c,i)=>`<button class="chip${i===cur?' on':''}${i>cur?' next':''}"><small>${c[0]}</small> ${i>cur?'▸':c[1]}</button>`).join('');
+if (mode === 'step') {
+  document.getElementById('main').innerHTML = `<h3>하는 일</h3>
+  <div class="tabs"><button class="tab on">전체 14</button><button class="tab">휴식 5</button><button class="tab">몸단장 3</button><button class="tab">집안일 4</button><button class="tab">놀이 2</button></div>
+  <div class="list">
+  ${[['창밖·풍경 바라보기','휴식',1],['침대에 걸터앉기','휴식'],['이불 속에서 뒹굴기','휴식'],['거울 보기','몸단장'],['머리 말리기','몸단장'],['화장하기','몸단장'],['빨래 개기','집안일'],['청소기 돌리기','집안일'],['화분에 물 주기','집안일'],['책 읽기','휴식'],['게임기 들고 놀기','놀이'],['포켓몬과 뒹굴기','놀이'],['🔓 요리하기','여기서 안 하는 일',0,1],['🔓 운동하기','이 장소에선 안 하는 일',0,1]].map(r=>`<button class="row${r[2]?' on':''}${r[3]?' out':''}"><i class="dot"></i><b>${r[0]}</b><span>${r[1]}</span></button>`).join('')}
+  </div>`;
+  document.getElementById('bar').innerHTML = `<button>‹ 이전</button><button class="tog on">🔓 해방 (12)</button><button>🎲 랜덤 ▾</button><button class="pri">건너뛰기 ›</button>`;
+  setTimeout(()=>document.querySelector('.chip.on').scrollIntoView({inline:'center',block:'nearest'}),0);
+} else {
+  document.getElementById('n').textContent = '12/12';
+  document.getElementById('main').innerHTML = `<h3>다 골랐다</h3><p class="note">칩을 누르면 그 단계로 돌아간다.</p>
+  <section class="result"><div class="h"><b>지시문</b><small>744낱말</small></div><pre>CHARACTER: the same woman as the attached image — Pikachu (피카츄) personified, electric type. Keep her face, eye and hair colors, haircut, skin tone and body proportions; expression and hair motion may change.
+
+STYLE: Premium glossy anime promotional key art with clean linework, vivid controlled color, dimensional 2.5D shading and dense but organized clothing and accessory detail. Render the face and outfit at high fidelity.
+
+SCENE: present-day real world, her bedroom — an unmade bed and soft window light; she is looking out of the window at the view…</pre><button class="more">펼치기 ▾</button></section>
+  <p class="note">🔓 트리 밖에서 고른 칸: 없음 · 📌 계획 칸: 없음</p>`;
+  document.getElementById('bar').innerHTML = `<button>🎲 처음부터</button><button>기록 JSON</button><button class="pri" style="grid-column:span 2">📋 복사</button>`;
+  setTimeout(()=>document.querySelector('.chips').scrollTo({left:9999}),0);
+}
+</script></body></html>
