@@ -38,7 +38,7 @@
   function getJSON(u) { return fetch(u, { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); }); }
 
   var A = null, D = null, S = null, CT = null, T = null, tree = null, saved = readStore();
-  var st = { a: '', style: '', subject: '', out: 'casual', scene: { unlocked: [] }, card: null, open: 'a', unlock: {}, walked: {}, seen: {}, grpOpen: {}, menu: false };
+  var st = { a: '', style: '', subject: '', out: 'casual', scene: { unlocked: [] }, card: null, open: 'a', unlock: {}, walked: {}, seen: {}, grpOpen: {}, menu: false, tab: {} };
   /* 폰(폭 ≤ 768) — docs/PROMPT_MOBILE_PLAN.md ①: 칩 레일 한 줄 + 아래 고정 막대(#hbar). PC 는 판 밑 단추 그대로. 폭이 바뀌면 다시 그린다 */
   var mq = window.matchMedia ? window.matchMedia('(max-width: 768px)') : null;
   var mobile = function () { return !!(mq && mq.matches); };
@@ -295,7 +295,8 @@
     var step = stepOf(k);
     if (!step) return '';
     if (mobile()) return '<h3>' + esc(step.ko) + '</h3>' + partsHTML(step);   // 단추는 아래 막대에
-    return '<h3>' + esc(step.ko) + '</h3>' + partsHTML(step) + (step.random ? '<div class="bar"><span></span>' + randomBar(k) + '</div>' : (skipBtn() ? '<div class="bar"><span></span><span class="rand">' + skipBtn() + '</span></div>' : '')) + (step.next ? nextBtn(k) : '');
+    var tail = step.random ? randomBar(k) : '<span class="rand">' + skipBtn() + restartBtn(k) + '</span>';
+    return '<h3>' + esc(step.ko) + '</h3>' + partsHTML(step) + (tail.indexOf('<button') >= 0 ? '<div class="bar"><span></span>' + tail + '</div>' : '') + (step.next ? nextBtn(k) : '');
   }
 
   /* ── 그리기 ── */
@@ -322,17 +323,68 @@
     });
     return out.join('');
   }
-  function optButtons(list, cur) {
+  /* 선택지 — list: [{v, ko, sub, tag, group, why, out, off, attr}]. tabKey(폰·묶음이 둘 이상일 때) 가 있으면 위에 묶음 탭(전체 · 집 · 거리…)을 두고 고른 묶음만 그린다(docs/PROMPT_MOBILE_PLAN.md ④).
+     폰에선 칸이 1열 줄(제목 왼쪽 · 꼬리 오른쪽 한 줄) — 모양은 prompt.html 의 ≤768 CSS */
+  function optButtons(list, cur, tabKey) {
     var groups = {}, order = [];
     list.forEach(function (x) { var g = x.group || ''; if (!groups[g]) { groups[g] = []; order.push(g); } groups[g].push(x); });
-    return order.map(function (g) {
+    var tabs = '', show = order;
+    if (mobile() && tabKey && order.length > 1) {
+      var t = st.tab[tabKey] || '';
+      if (t && !groups[t]) t = '';
+      show = t ? [t] : order;
+      tabs = '<div class="gtabs" role="tablist">' + [['', '전체', list.length]].concat(order.map(function (g) { return [g, (CT.group(tree, g) || {}).ko || g || '기타', groups[g].length]; })).map(function (r) {
+        return '<button type="button" class="gtab' + (r[0] === t ? ' on' : '') + '" role="tab" aria-selected="' + (r[0] === t) + '" data-gtab="' + esc(r[0]) + '" data-gtab-key="' + esc(tabKey) + '">' + esc(r[1]) + ' <i>' + r[2] + '</i></button>';
+      }).join('') + '</div>';
+    }
+    return tabs + show.map(function (g) {
       var head = g ? '<h4>' + esc((CT.group(tree, g) || {}).ko || g) + '</h4>' : '';
       return head + '<div class="opts">' + groups[g].map(function (x) {
+        var tail = x.why ? '<span class="why">' + esc(x.why) + '</span>' : (mobile() && x.tag) ? '<span>' + esc(x.tag) + '</span>' : x.sub ? '<span>' + esc(x.sub) + '</span>' : '';
         return '<button type="button" class="opt' + (x.out ? ' out' : '') + '" data-pick="' + esc(x.v) + '"' + (x.out ? ' data-out="1"' : '') + (x.attr || '') + (x.off ? ' disabled' : '') + ' aria-pressed="' + (String(cur || '') === String(x.v) ? 'true' : 'false') + '">' +
-          '<b>' + (x.out ? '🔓 ' : '') + esc(x.ko) + (x.tag ? ' <i>' + esc(x.tag) + '</i>' : '') + '</b>' + (x.why ? '<span class="why">' + esc(x.why) + '</span>' : x.sub ? '<span>' + esc(x.sub) + '</span>' : '') + '</button>';
+          '<b>' + (x.out ? '🔓 ' : '') + esc(x.ko) + (x.tag ? ' <i>' + esc(x.tag) + '</i>' : '') + '</b>' + tail + '</button>';
       }).join('') + '</div>';
     }).join('');
   }
+  /* 여기부터 다시 — 지금 단계 뒤의 칸을 다 비우고 이 단계부터 다시 고른다(2026-10-29 사용자). 비운 칸 수를 돌려준다 */
+  function restartFrom(key) {
+    var ks = keysOf(), i = ks.indexOf(key), later = ks.slice(i + 1), n = 0;
+    if (i < 0) return 0;
+    if (!formy()) {
+      var sc = Object.assign({}, st.scene);
+      later.forEach(function (k) {
+        if (k === 'axes') { if (JSON.stringify(sc.axes) !== JSON.stringify(H.FIXED)) n++; sc.axes = Object.assign({}, H.FIXED); return; }
+        if (k === 'notes') { casualTexts().forEach(function (f) { if ((sc[f] || '').trim()) n++; sc[f] = ''; }); return; }
+        if (sc[k]) n++; delete sc[k];
+      });
+      sc.unlocked = (sc.unlocked || []).filter(function (k) { return later.indexOf(k) < 0; });
+      if (sc.planned) sc.planned = sc.planned.filter(function (k) { return later.indexOf(k) < 0; });
+      sc.preset = '';
+      st.scene = repair(sc);
+    } else {
+      /* 카드 갈래 — 새 카드(기본값)의 같은 단계·같은 조각에서 값을 가져온다. 단계 표는 카드 값에 따라 달라지니 열쇠로 맞춘다 */
+      var make = (window.AtelierHubSteps || {})[st.a], fresh = A.card ? A.card(D, st.subject, S, undefined) : null;
+      if (!make || !fresh) return 0;
+      var x = { A: A, D: D, S: S, P: window.AtelierPrompt, R: window.AtelierSceneRandom, w: w, subject: st.subject, g: subj(), rnd: rnd2 };
+      later.forEach(function (k) {
+        var cur = stepOf(k), fs = make(st.out, Object.assign({}, x, { card: fresh })).filter(function (s) { return s.key === k; })[0];
+        if (!cur || !fs) return;
+        cur.parts.forEach(function (p, pi) {
+          var q = fs.parts[pi]; if (!q || q.type !== p.type) return;
+          try {
+            if (p.type === 'params') { p.groups.forEach(function (g) { g.defs.forEach(function (d) { if (p.get(d.key) !== q.get(d.key)) { n++; p.set(d.key, q.get(d.key)); } if (p.custom && q.custom) p.custom.set(d.key, q.custom.get(d.key)); }); }); }
+            else if (p.set && q.get) { var a = p.get(), b = q.get(); if (JSON.stringify(a) !== JSON.stringify(b)) { n++; p.set(b); } }
+          } catch (e) { /* 그 조각은 못 비웠다 — 나머지는 계속 */ }
+        });
+      });
+    }
+    st.seen[st.out] = false;   // 뒤 칸은 아직 안 온 단계 — 칩도 다시 숨는다
+    st.open = key; st.menu = false;
+    save(); render();
+    $('status').textContent = n ? '여기부터 다시 — 뒤 ' + n + '칸을 비웠다. 이 단계부터 고른다.' : '여기부터 다시 — 뒤에 비울 칸이 없다.';
+    return n;
+  }
+  function restartBtn(k) { var ks = keysOf(); return ks.indexOf(k) >= 0 && ks.indexOf(k) < ks.length - 1 ? '<button type="button" class="btn" data-restart="' + k + '" title="뒤 단계를 다 비우고 이 단계부터 다시">↺ 여기부터 다시</button>' : ''; }
   function panelHTML() {
     var k = st.open;
     if (k === 'a') return '<h3>공방</h3><p class="note">어느 공방의 인물인가. 고르면 그 공방의 표·조립 코드로 다시 연다.</p><div class="opts">' +
@@ -375,8 +427,10 @@
     if (!step) return '';
     var list = inTree(k), out = st.unlock[k] ? outTree(k) : [];
     var note = k === 'expr' && !CT.exprOk(tree, st.scene) ? '<p class="note">하는 일이 표정을 정하거나 등을 보이는 방향이라 표정은 고르지 않는다.</p>' : '';
+    /* 폰 — 해방한 트리 밖 선택지는 따로 아래가 아니라 같은 목록(제 묶음) 안에 흐리게 끼운다(⑤) */
+    if (mobile()) return '<h3>' + esc(step.ko) + '</h3>' + note + (out.length ? '<p class="note">🔓 흐린 것은 이 길에서 빠진 값 — 고르면 기록에 남고 트리가 그 칸을 고치지 않는다.</p>' : '') + optButtons(list.concat(out), st.scene[k], k);
     return '<h3>' + esc(step.ko) + '</h3>' + note + optButtons(list, st.scene[k]) +
-      (mobile() ? '' : '<div class="bar"><label class="unlock"><input type="checkbox" id="unlock" ' + (st.unlock[k] ? 'checked' : '') + '> 해방 — 트리 밖 선택지도 보기(' + outTree(k).length + ')</label>' + randomBar(k) + '</div>') +
+      '<div class="bar"><label class="unlock"><input type="checkbox" id="unlock" ' + (st.unlock[k] ? 'checked' : '') + '> 해방 — 트리 밖 선택지도 보기(' + outTree(k).length + ')</label>' + randomBar(k) + '</div>' +
       (out.length ? '<p class="note">흐린 것은 이 길에서 빠진 값이다. 고르면 🔓 가 붙고 기록에 남는다 — 트리가 그 칸을 고치지 않는다.</p>' + optButtons(out, st.scene[k]) : '');
   }
   /* ── 폰 아래 고정 막대 — 이전 · 🔓 해방(n) · 🎲 랜덤 ▾(이 칸 · 여기부터 · 다 골랐다로) · 다음/건너뛰기 ›. 다 고르면 🎲 처음부터 · 기록 JSON · 📋 복사.
@@ -398,10 +452,12 @@
     var right = hasNext ? '<button type="button" class="btn pri" data-next="' + k + '">' + (last ? '다 골랐다' : '다음 ›') + '</button>'
       : canSkip ? '<button type="button" class="btn pri" data-skip="' + k + '">' + (last ? '다 골랐다' : '건너뛰기 ›') + '</button>'
       : (skipBtn() ? '<button type="button" class="btn pri" data-open="done">다 골랐다로</button>' : '');
-    var menu = st.menu && hasRand ? '<div class="hmenu" role="menu"><button type="button" class="btn" data-rand="' + k + '">🎲 이 칸 랜덤</button><button type="button" class="btn" data-rand-all="' + k + '">🎲 여기부터 다 랜덤</button>' + skipBtn() + '</div>' : '';
+    /* 메뉴 — 랜덤 둘 · 다 골랐다로 · 여기부터 다시. 랜덤이 없는 단계도 「여기부터 다시」는 있다 */
+    var items = (hasRand ? '<button type="button" class="btn" data-rand="' + k + '">🎲 이 칸 랜덤</button><button type="button" class="btn" data-rand-all="' + k + '">🎲 여기부터 다 랜덤</button>' : '') + skipBtn() + restartBtn(k);
+    var menu = st.menu && items ? '<div class="hmenu" role="menu">' + items + '</div>' : '';
     return '<button type="button" class="btn ico" data-prev="' + k + '" aria-label="이전 단계">‹</button>' +
       (showUnlock ? '<label class="unlock"><input type="checkbox" id="unlock" ' + (st.unlock[k] ? 'checked' : '') + '> 🔓 해방 (' + outTree(k).length + ')</label>' : '') +
-      (hasRand ? '<button type="button" class="btn" data-menu="rand" aria-expanded="' + (st.menu ? 'true' : 'false') + '">🎲 랜덤 ▾</button>' : '') + right + menu;
+      (items ? '<button type="button" class="btn" data-menu="rand" aria-expanded="' + (st.menu ? 'true' : 'false') + '">' + (hasRand ? '🎲 랜덤' : '↺ 더') + ' ▾</button>' : '') + right + menu;
   }
   function casualTexts() { return (A && A.casualTexts) || ['outfit', 'scene', 'custom']; }
   function field(id, labelText, value, multi, help, ph, at) {
@@ -410,10 +466,10 @@
       '<input type="text" id="f-' + id + '" data-field="' + id + '"' + at + ' value="' + esc(value || '') + '" placeholder="' + esc(ph || '') + '">') + (help ? '<small>' + esc(help) + '</small>' : '') + '</label>';
   }
   /* 판 밑 단추(다음·랜덤) — 폰에선 아래 막대(hbarHTML)가 대신하니 비운다 */
-  function nextBtn(k) { if (mobile()) return ''; var ks = keysOf(), n = ks[ks.indexOf(k) + 1]; return '<p class="rand"><button type="button" class="btn" data-next="' + k + '">' + (n ? '다음' : '다 골랐다') + '</button>' + (n ? skipBtn() : '') + '</p>'; }
+  function nextBtn(k) { if (mobile()) return ''; var ks = keysOf(), n = ks[ks.indexOf(k) + 1]; return '<p class="rand"><button type="button" class="btn" data-next="' + k + '">' + (n ? '다음' : '다 골랐다') + '</button>' + (n ? skipBtn() + (formy() ? '' : restartBtn(k)) : '') + '</p>'; }
   /* 한 번 다 골랐고 지금도 다 찼으면 — 남은 단계를 건너뛰어 다 골랐다로 */
   function skipBtn() { return st.seen[st.out] && firstOpen() === 'done' && prompt() ? '<button type="button" class="btn" data-open="done">다 골랐다로</button>' : ''; }
-  function randomBar(k) { if (mobile()) return ''; return '<span class="rand"><button type="button" class="btn" data-rand="' + k + '">이 칸 랜덤</button><button type="button" class="btn" data-rand-all="' + k + '">여기부터 다 랜덤</button>' + skipBtn() + '</span>'; }
+  function randomBar(k) { if (mobile()) return ''; return '<span class="rand"><button type="button" class="btn" data-rand="' + k + '">이 칸 랜덤</button><button type="button" class="btn" data-rand-all="' + k + '">여기부터 다 랜덤</button>' + skipBtn() + restartBtn(k) + '</span>'; }
   function subjectsHTML() {
     var f = (st.find || '').trim().toLowerCase(), list = A.subjects(D).filter(function (x) { return !f || (x.ko + ' ' + x.sub).toLowerCase().indexOf(f) >= 0; });
     /* 다 그린다(포켓몬 1025) — 앞 120 만 그렸더니 그 밑으로 못 내려갔다 */
@@ -468,6 +524,8 @@
     /* 폰 아래 막대 */
     if (b.dataset.prev) { var pk = keysOf(), pi = pk.indexOf(b.dataset.prev); st.open = pi > 0 ? pk[pi - 1] : 'out'; render(); return; }
     if (b.dataset.skip) { advance(b.dataset.skip); save(); render(); return; }
+    if (b.dataset.restart) { restartFrom(b.dataset.restart); return; }
+    if (b.dataset.gtab != null) { st.tab[b.dataset.gtabKey] = b.dataset.gtab; render(); return; }
     if (b.dataset.menu) { st.menu = !st.menu; var hb2 = $('hbar'); hb2.innerHTML = hbarHTML(); hb2.hidden = !hb2.innerHTML; return; }
     if (b.dataset.act === 'copy') { $('copy').click(); b.textContent = '복사했다 ✓'; setTimeout(function () { var c = document.querySelector('[data-act="copy"]'); if (c) c.textContent = '📋 복사'; }, 1500); return; }
     if (b.dataset.act === 'record') { $('record').click(); $('record-out').scrollIntoView({ block: 'start' }); return; }

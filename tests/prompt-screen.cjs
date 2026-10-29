@@ -184,12 +184,26 @@ const OLD = {
     assert(sc.place === 'water_pool' && sc.act && sc.ofam && sc.frame && sc.orient, '랜덤으로 다 채운다');
     assert(await p.evaluate(sc => window.AtelierHubPrompt.settled(sc), sc), '랜덤한 장면은 트리가 고칠 데가 없다');
     assert((await p.locator('#prompt').inputValue()).length > 200, '랜덤 뒤 지시문');
+    /* 여기부터 다시 — 장소를 열고 뒤 칸(하는 일~덧붙임)을 비운다. 앞 칸(시대·장소)은 그대로, 뒤 칸 칩은 다시 숨는다(2026-10-29 사용자) */
+    await p.click('[data-open="place"]');
+    const rm = p.locator('[data-menu="rand"]'); if (await rm.count()) await rm.click();
+    await p.click('[data-restart="place"]');
+    const rs = await p.evaluate(() => { const s = window.AtelierHubPrompt.state(); return { open: s.open, act: s.scene.act || '', ofam: s.scene.ofam || '', frame: s.scene.frame || '', lens: s.scene.lens || '', era: s.scene.era || '', place: s.scene.place || '' }; });
+    assert.equal(rs.open, 'place', '그 단계에 남는다');
+    assert(!rs.act && !rs.ofam && !rs.frame && !rs.lens, '뒤 칸을 비웠다 ' + JSON.stringify(rs));
+    assert(rs.era && rs.place === 'water_pool', '앞 칸은 그대로 ' + JSON.stringify(rs));
+    assert.equal(await p.locator('.hchip[data-open="frame"]').count(), 0, '뒤 칸 칩은 다시 숨는다');
+    assert.match(await p.locator('#status').textContent(), /여기부터 다시/);
+    assert.equal(await p.locator('#out').isHidden(), true, '다 안 골랐으니 지시문도 없다');
+    /* 다시 채운다 — 하는 일부터 랜덤으로(장소는 그대로 수영장) */
+    await p.click('[data-open="place"]'); await p.locator('#panel .opt[data-pick="water_pool"]').click();
+    await randAll(p, 'act');
     /* 새로 고쳐도 남는다 */
     await p.reload(); await p.waitForSelector('[data-open="place"]');
     assert.match(await p.locator('[data-open="place"]').textContent(), /수영장/, '고른 값이 남는다');
     assert.deepEqual(s.errors, [], '오류 없음');
     await s.ctx.close();
-    checks += 12;
+    checks += 13;
 
     /* ②-2 게임 폼 초상·개방 단계 — 폼 → 인물 기준(이어가기면 기준 폼까지) → 노출 → 설계 줄 → (새 인물만 외형) → 연출 → … → 덧붙임 */
     {

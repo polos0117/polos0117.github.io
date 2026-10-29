@@ -119,6 +119,24 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .hbar .unlock { border: 1px solid #ffffff33; background: #000b; color: var(--text); font: 600 13px/1 var(--sans); cursor: pointer; }
   .hbar .unlock input { width: 16px; height: 16px; margin: 0; accent-color: var(--gold); }
   .hbar .unlock:has(input:checked) { border-color: var(--gold); color: var(--gold); }
+  /* ④ 선택지 1열 줄 — 제목 왼쪽, 꼬리(묶음·영어 설명·까닭) 오른쪽 한 줄. 대상 목록은 2열 그대로(1열이면 1,025명이 두 배로 길다) */
+  .opts { grid-template-columns: minmax(0, 1fr); gap: 6px; }   /* minmax(0, …) — 한 줄로 안 접는 글이 칸을 넓히지 않게 */
+  .opts.people { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .opts:not(.people) .opt { display: flex; align-items: center; gap: 10px; min-height: 48px; min-width: 0; padding: 0 12px; }
+  .opts:not(.people) .opt::before { content: ''; flex: none; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #ffffff55; }
+  .opts:not(.people) .opt[aria-pressed="true"]::before { background: var(--gold); border-color: var(--gold); box-shadow: inset 0 0 0 3px #201d26; }
+  .opts:not(.people) .opt b { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .opts:not(.people) .opt b i { display: none; }   /* 묶음 이름은 오른쪽 꼬리로 */
+  .opts:not(.people) .opt span { flex: 0 1 46%; min-width: 0; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .opts:not(.people) .opt.out { opacity: .6; }
+  /* 묶음 탭 — 한 줄 가로 스크롤, 전체 · 묶음마다 수 */
+  .gtabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px 10px; padding: 2px 16px; }
+  .gtabs::-webkit-scrollbar { display: none; }
+  .gtab { flex: 0 0 auto; min-height: 44px; padding: 0 12px; border: 1px solid #ffffff22; border-radius: 99px; background: #ffffff06; color: var(--muted); font: 600 13px/1 var(--sans); white-space: nowrap; }
+  .gtab i { font-style: normal; opacity: .7; margin-left: 2px; }
+  .gtab.on { background: var(--gold); color: #120b16; border-color: var(--gold); }
+  .gtab.on i { opacity: .8; }
+  .panel h4 { position: sticky; top: 60px; z-index: 1; margin: 10px -4px 6px; padding: 4px 4px; background: var(--card); }   /* 전체 보기에서 묶음 이름은 레일 아래에 붙는다 */
   /* 랜덤 메뉴 — 막대 위로 뜬다 */
   .hmenu { position: fixed; right: 10px; bottom: calc(68px + env(safe-area-inset-bottom)); z-index: 7; display: grid; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 14px; background: #18161df8; box-shadow: 0 10px 30px #000a; }
   .hmenu .btn { justify-content: flex-start; width: 100%; }
@@ -147,6 +165,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 <nav class="hbar" id="hbar" aria-label="단계 단추" hidden></nav>
 <script src="prompt/adapters.js?v=5"></script>
 <script src="prompt/steps.js?v=2"></script>
-<script src="prompt/hub.js?v=9"></script>
+<script src="prompt/hub.js?v=10"></script>
 </body>
 </html>
