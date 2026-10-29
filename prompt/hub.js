@@ -39,6 +39,7 @@
 
   var A = null, D = null, S = null, CT = null, T = null, tree = null, saved = readStore();
   var st = { a: '', style: '', subject: '', out: 'casual', scene: { unlocked: [] }, card: null, open: 'a', unlock: {}, walked: {}, seen: {}, grpOpen: {}, menu: false, tab: {} };
+  var renderedOpen = {};   // 그릴 때 open 으로 쓴 외형 묶음 — 그 뒤 처음 오는 toggle 은 브라우저가 그리며 낸 것(사람이 누른 게 아니다)
   /* 폰(폭 ≤ 768) — docs/PROMPT_MOBILE_PLAN.md ①: 칩 레일 한 줄 + 아래 고정 막대(#hbar). PC 는 판 밑 단추 그대로. 폭이 바뀌면 다시 그린다 */
   var mq = window.matchMedia ? window.matchMedia('(max-width: 768px)') : null;
   var mobile = function () { return !!(mq && mq.matches); };
@@ -144,7 +145,7 @@
     saved.last = st.a; saved.by = saved.by || {};
     var mine = saved.by[st.a] || {}, cards = Object.assign({}, mine.cards || {});
     if (st.card && st.subject) cards[st.subject] = st.card;
-    saved.by[st.a] = { style: st.style, subject: st.subject, out: st.out, scene: st.scene, walked: st.walked, cards: cards };
+    saved.by[st.a] = { style: st.style, subject: st.subject, out: st.out, scene: st.scene, walked: st.walked, cards: cards, recent: mine.recent || [] };
     writeStore(saved);
     try { var u = new URLSearchParams(location.search); u.set('a', st.a); if (st.subject) u.set('s', st.subject); u.set('o', st.out); u.delete('casual'); u.delete('mech'); history.replaceState(null, '', location.pathname + '?' + u + location.hash); } catch (e) { /* 주소만 못 바꿨다 */ }
   }
@@ -278,7 +279,10 @@
         case 'buttons': return '<p class="rand">' + p.items.map(function (b, j) { return '<button type="button" class="btn"' + at + ' data-btn="' + j + '">' + esc(b.ko) + '</button>'; }).join('') + '</p>';
         case 'params': return p.groups.map(function (g, gi) {
           /* 연 묶음은 다시 그려도 열린 채(값을 바꿀 때마다 닫혔다) */
-          var on = st.grpOpen[g.key] != null ? st.grpOpen[g.key] : gi === 0;
+          /* 폰은 한 번에 하나만 — 다른 묶음을 열어 뒀으면 첫 묶음의 기본 열림을 끈다(둘이 열린 채 그려지면 toggle 이 서로 닫는다) */
+          var anyOpen = mobile() && p.groups.some(function (o) { return st.grpOpen[o.key]; });
+          var on = st.grpOpen[g.key] != null ? st.grpOpen[g.key] : (gi === 0 && !anyOpen);
+          renderedOpen[g.key] = on;
           return '<details class="grp" data-grp="' + esc(g.key) + '"' + (on ? ' open' : '') + '><summary>' + esc(g.ko) + '</summary>' + (g.note ? '<p class="note">' + esc(g.note) + '</p>' : '') + g.defs.map(function (d) {
             var v = p.get(d.key), opts = d.opts.slice();
             if (v && !opts.some(function (o) { return o[0] === v; })) opts.push([v, v]);
@@ -303,14 +307,25 @@
   function chip(key, ko, val, mark, plan) { return '<button type="button" class="hchip' + (st.open === key ? ' on' : '') + '" data-open="' + key + '"><small>' + esc(ko) + '</small> ' + esc(shortLabel(val)) + (mark ? ' <span class="lock" title="트리 밖에서 고른 값">🔓</span>' : '') + (plan ? ' <span class="lock" title="계획기 값 — 랜덤이 안 바꾼다">📌</span>' : '') + '</button>'; }
   /* 폰 — 아직 안 온 다음 한 칸을 미리(▸, 누를 수 없다 · data-open 이 아니다) */
   function chipNext(key, ko) { return mobile() ? '<span class="hchip next" data-next-chip="' + key + '" aria-hidden="true"><small>' + esc(ko) + '</small> ▸</span>' : ''; }
+  /* 폰 — 공방·화풍·대상·출력은 칩 대신 경로 한 줄(포켓몬 › 글로시… › 피카츄 › 일상컷 · 6/12), 그 아래 단계 칩 레일(.hrail). PC 는 칩 한 줄에 다 */
+  function crumbs(head, n) {
+    return '<div class="hpath">' + head.map(function (c, i) { return (i ? '<i>›</i>' : '') + '<button type="button" class="hcrumb' + (st.open === c[0] ? ' on' : '') + '" data-open="' + c[0] + '" title="' + esc(c[1]) + '">' + esc(c[2]) + '</button>'; }).join('') +
+      (n ? '<span class="n">' + n + '</span>' : '') + '</div>';
+  }
   function chipsHTML() {
-    var out = [chip('a', '공방', A ? A.ko : '—')];
-    if (!A || !D) return out.join('');
-    out.push(chip('style', '화풍', (A.styles(D, S).filter(function (x) { return x.key === st.style; })[0] || {}).ko || st.style));
-    out.push(chip('subject', '대상', st.subject ? (A.subjects(D).filter(function (x) { return x.key === st.subject; })[0] || {}).ko : '—'));
-    if (!st.subject) return out.join('');
-    out.push(chip('out', '출력', (outList().filter(function (o) { return o.key === st.out; })[0] || {}).ko));
+    var head = [['a', '공방', A ? A.ko : '—']];
+    var wrap = function (headChips, stepChips, n) {
+      if (!mobile()) return headChips.map(function (c) { return chip(c[0], c[1], c[2]); }).concat(stepChips).join('');
+      return crumbs(headChips, n) + (stepChips.length ? '<div class="hrail">' + stepChips.join('') + '</div>' : '');
+    };
+    if (!A || !D) return wrap(head, []);
+    head.push(['style', '화풍', (A.styles(D, S).filter(function (x) { return x.key === st.style; })[0] || {}).ko || st.style]);
+    head.push(['subject', '대상', st.subject ? (A.subjects(D).filter(function (x) { return x.key === st.subject; })[0] || {}).ko : '—']);
+    if (!st.subject) return wrap(head, []);
+    head.push(['out', '출력', (outList().filter(function (o) { return o.key === st.out; })[0] || {}).ko]);
+    var out = [];
     var keys = keysOf(), at = st.open === 'done' ? keys.length : keys.indexOf(st.open), seen = st.seen[st.out];
+    var n = keys.length && at >= 0 ? Math.min(at + 1, keys.length) + '/' + keys.length : '';
     steps().forEach(function (s, idx) {
       /* 아직 안 온 단계는 칩을 안 띄운다. 한 번 다 골랐으면 다 띄운다 */
       /* 단계 밖(출력·대상 고르는 중)이고 아직 다 고른 적 없으면 단계 칩은 하나도 안 띄운다 */
@@ -321,7 +336,32 @@
       if (s.key === 'notes') { var n = casualTexts().filter(function (f) { return (st.scene[f] || '').trim(); }).length; out.push(chip('notes', s.ko, n ? n + '칸' : '없음')); return; }
       out.push(chip(s.key, s.ko, shown(s.key, st.scene[s.key]), unl(st.scene, s.key), planned(st.scene, s.key)));
     });
-    return out.join('');
+    return wrap(head, out, n);
+  }
+  /* ── 폰 결과 — 다 고르면 판 첫 칸에 지시문(8줄, 펼치기), 단계 중엔 아래 막대의 「지시문 n낱말」이 시트(#hsheet)를 연다. #out(글 칸·복사)은 폰에선 숨기고 값만 쓴다 ── */
+  function words(t) { return (t.match(/\S+/g) || []).length; }
+  function hresHTML() {
+    var t = prompt(); if (!t) return '';
+    var un = formy() ? [] : (st.scene.unlocked || []);
+    return '<section class="hres"><div class="h"><b>지시문</b><small>' + words(t) + '낱말</small></div><pre class="hres-text' + (st.outOpen ? ' open' : '') + '">' + esc(t) + '</pre>' +
+      '<button type="button" class="more" data-act="more">' + (st.outOpen ? '접기 ▴' : '펼치기 ▾') + '</button>' +
+      (un.length ? '<p class="note">🔓 트리 밖에서 고른 칸: ' + esc(un.map(function (k) { return (STEPS.filter(function (s) { return s.key === k; })[0] || {}).ko || k; }).join(' · ')) + '</p>' : '') + '</section>';
+  }
+  function recordJSON() {
+    var rec = { version: 1, hub: 'polos0117.github.io/prompt.html', atelier: st.a, subject: st.subject, style: st.style, mode: st.out, at: new Date().toISOString(), prompt: prompt() };
+    if (formy()) { rec.card = st.card; if (st.card && st.card.form) rec.form = st.card.form; } else { rec.scene = st.scene; rec.unlocked = st.scene.unlocked || []; if ((st.scene.planned || []).length) rec.planned = st.scene.planned; }
+    return rec;
+  }
+  function sheetHTML() {
+    if (!st.sheet) return '';
+    var isRec = st.sheet === 'record', t = isRec ? JSON.stringify(recordJSON(), null, 1) : prompt();
+    return '<div class="pane" role="dialog" aria-modal="true" aria-label="' + (isRec ? '기록 JSON' : '지시문') + '"><div class="h"><b>' + (isRec ? '기록 JSON' : '지시문') + '</b><small>' + (isRec ? '' : words(t) + '낱말') + '</small>' +
+      '<button type="button" class="btn ico" data-act="sheet-close" aria-label="닫기">✕</button></div><textarea readonly aria-label="' + (isRec ? '기록' : '지시문') + '">' + esc(t) + '</textarea>' +
+      '<p class="rand"><button type="button" class="btn pri" data-act="copy-sheet">📋 복사</button>' + (isRec ? '' : '<button type="button" class="btn" data-act="record">기록 JSON</button>') + '</p></div>';
+  }
+  function copyText(t, btn) {
+    var done = function () { if (btn) { btn.textContent = '복사했다 ✓'; setTimeout(function () { btn.textContent = '📋 복사'; }, 1500); } };
+    if (navigator.clipboard) navigator.clipboard.writeText(t).then(done, function () { if (btn) btn.textContent = '자동 복사가 안 된다'; });
   }
   /* 선택지 — list: [{v, ko, sub, tag, group, why, out, off, attr}]. tabKey(폰·묶음이 둘 이상일 때) 가 있으면 위에 묶음 탭(전체 · 집 · 거리…)을 두고 고른 묶음만 그린다(docs/PROMPT_MOBILE_PLAN.md ④).
      폰에선 칸이 1열 줄(제목 왼쪽 · 꼬리 오른쪽 한 줄) — 모양은 prompt.html 의 ≤768 CSS */
@@ -407,7 +447,7 @@
     if (k === 'done') {
       var ss = steps(), canRand = !formy() || ss.some(function (x) { return x.random; });
       var plan = !formy() && (st.scene.planned || []).length;
-      return '<h3>다 골랐다</h3><p class="note">칩을 누르면 그 단계로 돌아간다. 아래 지시문을 복사해 쓴다.' + (formy() && canRand ? ' 랜덤은 랜덤 단추가 있는 단계만 — 나머지는 그대로.' : '') +
+      return (mobile() ? hresHTML() : '') + '<h3>다 골랐다</h3><p class="note">칩을 누르면 그 단계로 돌아간다. ' + (mobile() ? '위 지시문을 아래 「복사」로 쓴다.' : '아래 지시문을 복사해 쓴다.') + (formy() && canRand ? ' 랜덤은 랜덤 단추가 있는 단계만 — 나머지는 그대로.' : '') +
         (plan ? ' 📌 계획기 칸 ' + plan + '개는 랜덤이 안 바꾼다.' : '') + '</p>' +
         /* 폰에선 「처음부터 다 랜덤」이 아래 막대에 있다 — 여기엔 계획 칸 풀기만 */
         (canRand && ss.length ? '<span class="rand">' + (mobile() ? '' : '<button type="button" class="btn" data-rand-all="' + ss[0].key + '">처음부터 다 랜덤</button>') + (plan ? '<button type="button" class="btn" data-act="unplan">계획 칸 풀기</button>' : '') + '</span>' : '');
@@ -455,8 +495,10 @@
     /* 메뉴 — 랜덤 둘 · 다 골랐다로 · 여기부터 다시. 랜덤이 없는 단계도 「여기부터 다시」는 있다 */
     var items = (hasRand ? '<button type="button" class="btn" data-rand="' + k + '">🎲 이 칸 랜덤</button><button type="button" class="btn" data-rand-all="' + k + '">🎲 여기부터 다 랜덤</button>' : '') + skipBtn() + restartBtn(k);
     var menu = st.menu && items ? '<div class="hmenu" role="menu">' + items + '</div>' : '';
+    var pt = prompt();
     return '<button type="button" class="btn ico" data-prev="' + k + '" aria-label="이전 단계">‹</button>' +
-      (showUnlock ? '<label class="unlock"><input type="checkbox" id="unlock" ' + (st.unlock[k] ? 'checked' : '') + '> 🔓 해방 (' + outTree(k).length + ')</label>' : '') +
+      (pt ? '<button type="button" class="btn" data-act="sheet">지시문 ' + words(pt) + '</button>' : '') +   /* 카드 갈래는 처음부터 지시문이 있다 — 고치다 바로 본다 */
+      (showUnlock ? '<label class="unlock"><input type="checkbox" id="unlock" ' + (st.unlock[k] ? 'checked' : '') + '><span>🔓 해방 <i>(' + outTree(k).length + ')</i></span></label>' : '') +
       (items ? '<button type="button" class="btn" data-menu="rand" aria-expanded="' + (st.menu ? 'true' : 'false') + '">' + (hasRand ? '🎲 랜덤' : '↺ 더') + ' ▾</button>' : '') + right + menu;
   }
   function casualTexts() { return (A && A.casualTexts) || ['outfit', 'scene', 'custom']; }
@@ -470,11 +512,27 @@
   /* 한 번 다 골랐고 지금도 다 찼으면 — 남은 단계를 건너뛰어 다 골랐다로 */
   function skipBtn() { return st.seen[st.out] && firstOpen() === 'done' && prompt() ? '<button type="button" class="btn" data-open="done">다 골랐다로</button>' : ''; }
   function randomBar(k) { if (mobile()) return ''; return '<span class="rand"><button type="button" class="btn" data-rand="' + k + '">이 칸 랜덤</button><button type="button" class="btn" data-rand-all="' + k + '">여기부터 다 랜덤</button>' + skipBtn() + restartBtn(k) + '</span>'; }
+  /* 이름 첫 글자 — 한글은 초성(된소리는 예사소리로), 숫자는 #, 그 밖은 대문자. 대상 목록 건너뛰기 칩 */
+  var CHO = ['ㄱ', 'ㄱ', 'ㄴ', 'ㄷ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅂ', 'ㅅ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+  function initial(s) {
+    var c = String(s || '').trim().charCodeAt(0); if (!c) return '';
+    if (c >= 0xAC00 && c <= 0xD7A3) return CHO[Math.floor((c - 0xAC00) / 588)];
+    if (c >= 48 && c <= 57) return '#';
+    return String.fromCharCode(c).toUpperCase();
+  }
+  function subjectBtn(x) { return '<button type="button" class="opt" data-subject="' + esc(x.key) + '" data-initial="' + esc(initial(x.ko)) + '" aria-pressed="' + (st.subject === x.key) + '"><b>' + esc(x.ko) + '</b><span>' + esc(x.sub) + '</span></button>'; }
   function subjectsHTML() {
-    var f = (st.find || '').trim().toLowerCase(), list = A.subjects(D).filter(function (x) { return !f || (x.ko + ' ' + x.sub).toLowerCase().indexOf(f) >= 0; });
-    /* 다 그린다(포켓몬 1025) — 앞 120 만 그렸더니 그 밑으로 못 내려갔다 */
-    return '<p class="note">' + list.length + '명</p><div class="opts people">' + list.map(function (x) {
-      return '<button type="button" class="opt" data-subject="' + esc(x.key) + '" aria-pressed="' + (st.subject === x.key) + '"><b>' + esc(x.ko) + '</b><span>' + esc(x.sub) + '</span></button>'; }).join('') + '</div>';
+    var f = (st.find || '').trim().toLowerCase(), all = A.subjects(D), list = all.filter(function (x) { return !f || (x.ko + ' ' + x.sub).toLowerCase().indexOf(f) >= 0; });
+    var html = '';
+    if (mobile() && !f) {
+      /* 최근 고른 대상 다섯 · 첫 글자 건너뛰기(이름 차례가 아닐 수 있어 처음 나오는 자리로) */
+      var rc = (((saved.by || {})[st.a] || {}).recent || []).map(function (k) { return all.filter(function (x) { return x.key === k; })[0]; }).filter(Boolean);
+      if (rc.length) html += '<h4>최근</h4><div class="opts people">' + rc.map(subjectBtn).join('') + '</div>';
+      var seen = {}, inits = []; list.forEach(function (x) { var i = initial(x.ko); if (i && !seen[i]) { seen[i] = 1; inits.push(i); } });
+      if (inits.length > 3) html += '<div class="gtabs jump" aria-label="첫 글자로 건너뛰기">' + inits.map(function (i) { return '<button type="button" class="gtab" data-jump="' + esc(i) + '">' + esc(i) + '</button>'; }).join('') + '</div>';
+    }
+    /* 다 그린다(포켓몬 1025) — 앞 120 만 그렸더니 그 밑으로 못 내려갔다. 폰은 content-visibility 로 그리기를 미룬다(CSS) */
+    return html + '<p class="note">' + list.length + '명</p><div class="opts people">' + list.map(subjectBtn).join('') + '</div>';
   }
   function prompt() {
     if (!A || !D || !st.subject) return '';
@@ -501,21 +559,32 @@
     $('chips').innerHTML = chipsHTML();
     $('panel').innerHTML = panelHTML();
     var hb = $('hbar'); if (hb) { hb.innerHTML = hbarHTML(); hb.hidden = !hb.innerHTML; }
+    var sh = $('hsheet'); if (sh) { if (!mobile()) st.sheet = ''; sh.innerHTML = sheetHTML(); sh.hidden = !sh.innerHTML; document.body.classList.toggle('sheet', !!sh.innerHTML); }
+    document.body.classList.toggle('help', !!st.help);
     if (mobile()) {
-      /* 칩 레일 — 지금 칸을 가운데로(세로는 안 움직인다) */
-      var rail = $('chips'), on = rail.querySelector('.hchip.on');
+      /* 붙는 머리(경로+레일)의 높이를 CSS 에 알린다 — 묶음 이름·초성 칩이 그 바로 아래에 붙고, scrollIntoView 도 그 아래로 온다 */
+      document.documentElement.style.setProperty('--hchips-h', $('chips').offsetHeight + 'px');
+      /* 칩 레일 — 지금 칸을 가운데로(세로는 안 움직인다). 경로 줄도 지금 칸이 보이게 */
+      var rail = $('chips').querySelector('.hrail') || $('chips'), on = rail.querySelector('.hchip.on');
       if (on) rail.scrollLeft = Math.max(0, on.offsetLeft - (rail.clientWidth - on.offsetWidth) / 2);
+      var path = $('chips').querySelector('.hpath'), cr = path && path.querySelector('.hcrumb.on'); if (path) path.scrollLeft = cr ? Math.max(0, cr.offsetLeft - 24) : path.scrollWidth;   // 지금 칸이 없으면(단계·끝) 끝으로 — n/N 이 마지막 조각을 덮지 않게
       /* 단계가 바뀌면 새 단계 윗머리를 레일 바로 아래로 — 긴 목록 중간에서 골랐을 때 새 단계가 화면 밖에서 시작하지 않게 */
-      if (was && was !== st.open) window.scrollTo({ top: Math.max(0, $('panel').getBoundingClientRect().top + window.scrollY - rail.offsetHeight - 8), behavior: 'auto' });
+      if (was && was !== st.open) window.scrollTo({ top: Math.max(0, $('panel').getBoundingClientRect().top + window.scrollY - $('chips').offsetHeight - 8), behavior: 'auto' });
     } else if (was && was !== st.open && $('panel').getBoundingClientRect().top < 0) $('panel').scrollIntoView({ block: 'start' });   // PC — 윗머리가 화면 위로 갔을 때만
     renderOut();
   }
 
   /* ── 누름 ── */
   document.addEventListener('click', function (e) {
+    if (e.target.id === 'hsheet') { st.sheet = ''; render(); return; }   // 시트 바깥(어두운 자리)을 누르면 닫힌다
     var b = e.target.closest('button,[data-open]'); if (!b) return;
-    if (b.dataset.open) { st.open = b.dataset.open; render(); return; }
-    if (b.dataset.subject != null) { st.subject = b.dataset.subject; st.scene = repair(st.scene); loadCard(); st.open = 'out'; save(); render(); return; }
+    if (b.dataset.open) { st.open = b.dataset.open; st.sheet = ''; render(); return; }
+    if (b.dataset.subject != null) {
+      st.subject = b.dataset.subject; st.scene = repair(st.scene); loadCard(); st.open = 'out';
+      /* 최근 고른 대상 다섯 — 대상 목록 맨 위에 */
+      var mine0 = (saved.by || {})[st.a] || {}, rc = (mine0.recent || []).filter(function (k) { return k !== st.subject; }); rc.unshift(st.subject); mine0.recent = rc.slice(0, 5); saved.by = saved.by || {}; saved.by[st.a] = mine0;
+      save(); render(); return;
+    }
     if (b.dataset.outMode) { st.out = b.dataset.outMode; st.open = begin(); save(); render(); return; }
     if (b.dataset.rand) { randomFrom(b.dataset.rand, false); return; }
     if (b.dataset.randAll) { randomFrom(b.dataset.randAll, true); return; }
@@ -527,8 +596,14 @@
     if (b.dataset.restart) { restartFrom(b.dataset.restart); return; }
     if (b.dataset.gtab != null) { st.tab[b.dataset.gtabKey] = b.dataset.gtab; render(); return; }
     if (b.dataset.menu) { st.menu = !st.menu; var hb2 = $('hbar'); hb2.innerHTML = hbarHTML(); hb2.hidden = !hb2.innerHTML; return; }
-    if (b.dataset.act === 'copy') { $('copy').click(); b.textContent = '복사했다 ✓'; setTimeout(function () { var c = document.querySelector('[data-act="copy"]'); if (c) c.textContent = '📋 복사'; }, 1500); return; }
-    if (b.dataset.act === 'record') { $('record').click(); $('record-out').scrollIntoView({ block: 'start' }); return; }
+    if (b.dataset.act === 'copy') { copyText($('prompt').value, b); return; }
+    if (b.dataset.act === 'copy-sheet') { var ta = b.closest('.pane') && b.closest('.pane').querySelector('textarea'); copyText(ta ? ta.value : $('prompt').value, b); return; }
+    if (b.dataset.act === 'record') { if (mobile()) { st.sheet = 'record'; render(); } else { $('record').click(); $('record-out').scrollIntoView({ block: 'start' }); } return; }
+    if (b.dataset.act === 'sheet') { st.sheet = 'prompt'; render(); return; }
+    if (b.dataset.act === 'sheet-close') { st.sheet = ''; render(); return; }
+    if (b.dataset.act === 'more') { st.outOpen = !st.outOpen; render(); return; }
+    if (b.dataset.jump != null) { var tgt = document.querySelector('#subjects .opt[data-initial="' + b.dataset.jump.replace(/"/g, '\\"') + '"]'); if (tgt) tgt.scrollIntoView({ block: 'start' }); return; }
+    if (b.id === 'help') { st.help = !st.help; render(); return; }
     if (b.dataset.btn != null) { var bs = stepOf(st.open), bp = bs && bs.parts[+b.dataset.part]; if (bp) bp.items[+b.dataset.btn].run(); save(); render(); return; }
     if (b.dataset.pick != null) {
       if (st.open === 'style') { st.style = b.dataset.pick; st.open = st.subject ? begin() : 'subject'; save(); render(); return; }
@@ -536,12 +611,7 @@
       choose(st.open, b.dataset.pick, !!b.dataset.out); return;
     }
     if (b.id === 'copy') { navigator.clipboard && navigator.clipboard.writeText($('prompt').value).then(function () { $('copied').textContent = '복사했다'; }, function () { $('prompt').select(); $('copied').textContent = '자동 복사가 안 된다 — 글을 골라 두었다'; }); return; }
-    if (b.id === 'record') {
-      var rec = { version: 1, hub: 'polos0117.github.io/prompt.html', atelier: st.a, subject: st.subject, style: st.style, mode: st.out,
-        at: new Date().toISOString(), prompt: $('prompt').value };
-      if (formy()) { rec.card = st.card; if (st.card.form) rec.form = st.card.form; } else { rec.scene = st.scene; rec.unlocked = st.scene.unlocked || []; if ((st.scene.planned || []).length) rec.planned = st.scene.planned; }
-      $('record-out').hidden = false; $('record-text').value = JSON.stringify(rec, null, 1); return;
-    }
+    if (b.id === 'record') { $('record-out').hidden = false; $('record-text').value = JSON.stringify(recordJSON(), null, 1); return; }
   });
   document.addEventListener('change', function (e) {
     var t = e.target;
@@ -559,7 +629,13 @@
       save(); render();
     }
   });
-  document.addEventListener('toggle', function (e) { var d = e.target; if (d.dataset && d.dataset.grp && d.isConnected) st.grpOpen[d.dataset.grp] = d.open; }, true);
+  document.addEventListener('toggle', function (e) {
+    var d = e.target; if (!(d.dataset && d.dataset.grp && d.isConnected)) return;
+    var k = d.dataset.grp, fromRender = renderedOpen[k]; renderedOpen[k] = false;   // 그리며 난 첫 toggle 은 사람이 아니다 — 그 사이 사람이 연 다른 묶음을 닫으면 안 된다
+    st.grpOpen[k] = d.open;
+    /* 폰 — 외형 묶음은 한 번에 하나만 연다(긴 쪽을 막는다) */
+    if (mobile() && d.open && !fromRender) [].forEach.call(document.querySelectorAll('details[data-grp]'), function (o) { if (o !== d && o.open) { o.open = false; st.grpOpen[o.dataset.grp] = false; } });
+  }, true);
   /* 폰 키보드가 올라오면(보이는 화면이 150px 넘게 줄면) 아래 막대를 숨긴다 — 글 칸과 겹치지 않게. 초점으로 숨기면 글을 쓰다 바로 「다음」을 못 누른다 */
   if (window.visualViewport) window.visualViewport.addEventListener('resize', function () { document.body.classList.toggle('kb', window.visualViewport.height < window.innerHeight - 150); });
   document.addEventListener('input', function (e) {

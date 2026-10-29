@@ -66,6 +66,17 @@ const OLD = {
   const br = await chromium.launch({ headless: true, ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox', '--disable-dev-shm-usage'] } : {}) });
   let checks = 0;
   const toDone = async (pg) => { if (await pg.locator('#panel [data-open="done"]').count()) return pg.click('#panel [data-open="done"]'); const m = pg.locator('[data-menu="rand"]'); if (await m.count()) await m.click(); await pg.click('#hbar [data-open="done"]'); };   // 「다 골랐다로」 — PC 는 판 밑, 폰은 🎲 메뉴 안
+  const innerHeightOf = vp => vp.height;
+  /* 기록 JSON — PC 는 #out 속 단추, 폰은 아래 막대 → 바닥 판(시트) */
+  const readRecord = async (pg) => {
+    const mob = await pg.locator('#hbar').isVisible();
+    if (mob) {   // 다 골랐으면 막대에 「기록 JSON」, 단계 중엔 「지시문 n」 시트 안에
+      if (await pg.locator('#hbar [data-act="record"]').isVisible()) await pg.click('#hbar [data-act="record"]');
+      else { await pg.click('#hbar [data-act="sheet"]'); await pg.click('#hsheet [data-act="record"]'); }
+      const v = await pg.locator('#hsheet textarea').inputValue(); await pg.click('#hsheet [data-act="sheet-close"]'); return JSON.parse(v);
+    }
+    await pg.click('#record'); return JSON.parse(await pg.locator('#record-text').inputValue());
+  };
   const randAll = async (pg, k) => { const m = pg.locator('[data-menu="rand"]'); if (await m.count()) await m.click(); await pg.click('[data-rand-all="' + k + '"]'); };   // 폰(≤768)에선 🎲 메뉴를 먼저 연다
   const open = async (url, store, viewport = { width: 390, height: 844 }) => {
     const ctx = await br.newContext({ viewport });
@@ -168,8 +179,7 @@ const OLD = {
     assert.equal(await p.evaluate(() => window.AtelierHubPrompt.state().open), 'done', '「다 골랐다로」 로 남은 단계를 건너뛴다');
     const t2 = await p.locator('#prompt').inputValue();
     assert(t2.includes(await p.evaluate(() => window.AtelierSpec.POSE_GUIDES.sitting[1])), '해방한 자세가 지시문에 남는다(트리가 고치지 않는다)');
-    await p.click('#record');
-    const rec = JSON.parse(await p.locator('#record-text').inputValue());
+    const rec = await readRecord(p);
     assert.deepEqual(rec.unlocked, ['pose'], '기록에 해방한 칸'); assert.equal(rec.atelier, 'pkm'); assert.equal(rec.prompt, t2);
     /* 앞을 바꾸면 맞지 않게 된 뒤 칸이 비고 그 단계가 열린다 */
     await p.click('[data-open="place"]'); await p.click('[data-pick="water_pool"]');
@@ -238,8 +248,7 @@ const OLD = {
       await p.click('[data-open="out"]'); await p.click('[data-out-mode="open"]');
       assert.equal(await now(), 'form');
       assert.match(await p.locator('#prompt').inputValue(), /OPEN/, '개방 지시문');
-      await p.click('#record');
-      const rec = JSON.parse(await p.locator('#record-text').inputValue());
+      const rec = await readRecord(p);
       assert.equal(rec.mode, 'open'); assert.equal(rec.form, 'middle'); assert.equal(rec.card.baseForm, 'title');
       /* 새로 고쳐도 남는다 — 갈래·카드 */
       await p.reload(); await p.waitForSelector('[data-open="out"]');
@@ -365,10 +374,20 @@ const OLD = {
         small: [...document.querySelectorAll('button, a.opt, a.home, select, input[type="search"]')].filter(e => e.offsetParent && e.getBoundingClientRect().height < 43.5).map(e => e.outerHTML.slice(0, 60)) }));
       assert(m.over <= 0, vp.width + ' 옆으로 넘친다 ' + m.over);
       assert.deepEqual(m.small, [], vp.width + ' 44px 안 되는 자리');
-      const mb = await v.page.evaluate(() => { const rail = document.getElementById('chips').getBoundingClientRect(), hb = document.getElementById('hbar'), r = hb.getBoundingClientRect();
-        return { rail: rail.height, bar: !hb.hidden, barIn: !hb.hidden && r.bottom <= innerHeight + 0.5 && r.top > innerHeight / 2, inPanel: document.querySelectorAll('#panel .bar, #panel [data-next], #panel [data-rand]').length, chips: document.querySelectorAll('.hchip').length }; });
-      if (vp.width <= 768) { assert(mb.rail <= 60, vp.width + ' 칩 레일이 한 줄이 아니다 ' + mb.rail); assert(mb.bar && mb.barIn, vp.width + ' 아래 막대가 화면 안에 없다'); assert.equal(mb.inPanel, 0, vp.width + ' 판 밑에 단추가 남아 있다'); }
-      else { assert(!mb.bar, '1280 에선 아래 막대가 없다'); assert(mb.inPanel > 0, '1280 은 판 밑 단추'); }
+      const mb = await v.page.evaluate(() => { const rail = (document.querySelector('.hrail') || document.getElementById('chips')).getBoundingClientRect(), hb = document.getElementById('hbar'), r = hb.getBoundingClientRect();
+        return { rail: rail.height, bar: !hb.hidden, barIn: !hb.hidden && r.bottom <= innerHeight + 0.5 && r.top > innerHeight / 2, inPanel: document.querySelectorAll('#panel .bar, #panel [data-next], #panel [data-rand]').length, chips: document.querySelectorAll('.hchip').length,
+          path: document.querySelectorAll('.hpath .hcrumb').length, lede: getComputedStyle(document.querySelector('.lede')).display, h1: document.querySelector('.head h1').getBoundingClientRect().height }; });
+      if (vp.width <= 768) { assert(mb.rail <= 60, vp.width + ' 칩 레일이 한 줄이 아니다 ' + mb.rail); assert(mb.bar && mb.barIn, vp.width + ' 아래 막대가 화면 안에 없다'); assert.equal(mb.inPanel, 0, vp.width + ' 판 밑에 단추가 남아 있다');
+        assert.equal(mb.path, 4, vp.width + ' 경로 한 줄(공방·화풍·대상·출력)'); assert.equal(mb.lede, 'none', vp.width + ' 설명 글은 접혀 있다'); assert(mb.h1 < 40, vp.width + ' 제목 한 줄 ' + mb.h1); }
+      else { assert(!mb.bar, '1280 에선 아래 막대가 없다'); assert(mb.inPanel > 0, '1280 은 판 밑 단추'); assert.equal(mb.path, 0, '1280 은 칩'); }
+      /* 폰 — 다 고르면 지시문이 판 첫 칸(첫 화면 안), #out 은 숨는다. 설명 「?」 */
+      if (vp.width <= 768) {
+        await v.page.click('[data-menu="rand"]'); await v.page.click('[data-rand-all="era"]'); await v.page.waitForSelector('.hres');
+        const dn = await v.page.evaluate(() => ({ top: document.querySelector('.hres').getBoundingClientRect().top, out: getComputedStyle(document.getElementById('out')).display, copy: !!document.querySelector('#hbar [data-act="copy"]'), chipsTop: document.getElementById('chips').getBoundingClientRect().top }));
+        assert(dn.top >= 0 && dn.top < innerHeightOf(vp), vp.width + ' 지시문이 첫 화면 안 ' + JSON.stringify(dn)); assert.equal(dn.out, 'none', vp.width + ' #out 숨김'); assert(dn.copy, vp.width + ' 복사 막대');
+        await v.page.click('[data-act="more"]'); assert((await v.page.locator('.hres-text').getAttribute('class')).includes('open'), '펼치기');
+        await v.page.click('#help'); assert.equal(await v.page.evaluate(() => getComputedStyle(document.querySelector('.lede')).display), 'block', '「?」 로 설명');
+      }
       assert.deepEqual(v.errors, []);
       await v.ctx.close(); checks++;
       /* 카드 갈래 외형(긴 고르개) — 게임 폼 · 신화 초상 · 포켓몬 액션, 옆으로 넘치지 않는다 */
@@ -379,6 +398,11 @@ const OLD = {
         const fm = await f.page.evaluate(() => ({ over: document.documentElement.scrollWidth - innerWidth, wide: [...document.querySelectorAll('.axis select')].filter(e => e.getBoundingClientRect().right > e.closest('.panel').getBoundingClientRect().right + 0.5).length,
           small: [...document.querySelectorAll('#panel button, #panel select, #panel summary')].filter(e => e.offsetParent && e.getBoundingClientRect().height < 43.5).length }));
         assert(fm.over <= 0 && !fm.wide && !fm.small, vp.width + ' ' + a + ' 외형 고르개 ' + JSON.stringify(fm));
+        if (vp.width <= 768) {   /* 폰 — 단계 중 아래 막대의 「지시문 n」 이 시트를 연다, 바깥을 누르면 닫힌다 */
+          await f.page.click('#hbar [data-act="sheet"]'); await f.page.waitForSelector('#hsheet:not([hidden]) textarea');
+          assert((await f.page.locator('#hsheet textarea').inputValue()).length > 200, a + ' 시트에 지시문');
+          await f.page.click('#hsheet [data-act="sheet-close"]'); assert.equal(await f.page.locator('#hsheet').isHidden(), true, '시트 닫힘');
+        }
         assert.deepEqual(f.errors, []);
         await f.ctx.close();
       }
