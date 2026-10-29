@@ -89,7 +89,11 @@ const CASES = [
     await p.fill('#find', '피카'); await p.click('[data-subject="피카츄"]');
     assert.equal(await p.locator('[data-out-mode="form"]').isDisabled(), true, '폼은 아직');
     await p.click('[data-out-mode="casual"]');
-    /* 시대는 기본(지금)으로 채워져 장소부터 열린다 */
+    /* 시대부터 연다 — 기본(지금)이 눌려 있고, 건너뛰지 않는다 */
+    assert.equal(await p.locator('.hchip.on').getAttribute('data-open'), 'era', '시대부터');
+    assert.equal(await p.locator('[data-pick="now"]').getAttribute('aria-pressed'), 'true', '지금이 기본');
+    assert.equal(await p.locator('.opt[data-pick]:not([data-out])').count(), 4, '시대 넷');
+    await p.click('[data-pick="now"]');
     assert.equal(await p.locator('.hchip.on').getAttribute('data-open'), 'place');
     await p.click('[data-pick="street_park"]'); await p.click('[data-pick="stroll"]'); await p.click('[data-pick="everyday"]'); await p.click('[data-pick=""]');
     await p.click('[data-pick="full_body"]'); await p.click('[data-pick="natural50"]'); await p.click('[data-pick=""]');

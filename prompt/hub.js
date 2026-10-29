@@ -52,7 +52,8 @@
       st.scene = Object.assign({ unlocked: [] }, mine.scene || {});
       st.scene.axes = Object.assign({}, H.FIXED, st.scene.axes || {});
       st.scene = repair(st.scene);
-      st.open = !st.subject ? 'subject' : firstOpen();
+      st.walked = !!mine.walked;
+      st.open = !st.subject ? 'subject' : begin();
       $('status').textContent = '';
       render();
     }).catch(function (e) { $('status').textContent = '읽지 못했다 — ' + e.message; });
@@ -65,13 +66,16 @@
     next.unlocked = (sc.unlocked || []).filter(function (k) { return next[k]; });
     return next;
   }
+  /* 단계를 처음 밟을 때는 시대부터 — 시대는 트리가 기본(지금)으로 채워 두지만 건너뛰지 않는다(2026-10-29 사용자 「시대는 선택 안되고 그냥 건너뛰어지네」).
+     한 칸이라도 고른 뒤(walked)에는 비어 있는 첫 칸 또는 다 골랐다 */
+  function begin() { return st.walked ? firstOpen() : 'era'; }
   function firstOpen() {
     for (var i = 0; i < STEPS.length; i++) if (STEPS[i].need && !st.scene[STEPS[i].key]) return STEPS[i].key;
     return 'done';
   }
   function save() {
     saved.last = st.a; saved.by = saved.by || {};
-    saved.by[st.a] = { style: st.style, subject: st.subject, scene: st.scene };
+    saved.by[st.a] = { style: st.style, subject: st.subject, scene: st.scene, walked: !!st.walked };
     writeStore(saved);
     try { var u = new URLSearchParams(location.search); u.set('a', st.a); if (st.subject) u.set('s', st.subject); history.replaceState(null, '', location.pathname + '?' + u + location.hash); } catch (e) { /* 주소만 못 바꿨다 */ }
   }
@@ -134,6 +138,7 @@
   }
 
   function choose(key, v, out) {
+    st.walked = true;
     var wasDone = st.seenDone, sc = Object.assign({}, st.scene), un = (sc.unlocked || []).filter(function (k) { return k !== key; });
     sc[key] = v; if (out && v) un.push(key); sc.unlocked = un;
     if (['era', 'place', 'act', 'ofam', 'item'].indexOf(key) >= 0) sc.preset = '';
@@ -155,6 +160,7 @@
       if (!opts.length) return;
       sc[k] = rnd(opts); sc = repair(sc);
     });
+    st.walked = true;
     st.scene = sc; st.open = all ? 'done' : (keys[i + 1] || 'done');
     var need = firstOpen(); if (need !== 'done') st.open = need;
     save(); render();
@@ -169,10 +175,12 @@
     out.push(chip('subject', '대상', st.subject ? (A.subjects(D).filter(function (x) { return x.key === st.subject; })[0] || {}).ko : '—'));
     if (!st.subject) return out.join('');
     out.push(chip('out', '출력', '일상컷'));
+    var keys = STEPS.map(function (x) { return x.key; }), at = st.open === 'done' ? keys.length : keys.indexOf(st.open);
     STEPS.forEach(function (s) {
+      /* 아직 안 온 단계는 칩을 안 띄운다(빈 칸이면). 한 번 다 골랐으면 다 띄운다 */
+      if (!st.seenDone && at >= 0 && keys.indexOf(s.key) > at && (s.key === 'axes' || !st.scene[s.key])) return;
       if (s.key === 'axes') { out.push(chip('axes', s.ko, (T.axes.filter(function (a) { return a.key === 'skin_exposure'; })[0] ? '피부 노출 ' + label((T.axes.filter(function (a) { return a.key === 'skin_exposure'; })[0] || {}).options, st.scene.axes.skin_exposure) : '…'))); return; }
       var v = st.scene[s.key];
-      if (!v && s.need && st.open !== s.key && STEPS.map(function (x) { return x.key; }).indexOf(s.key) > STEPS.map(function (x) { return x.key; }).indexOf(st.open)) return;
       out.push(chip(s.key, s.ko, shown(s.key, v), unl(st.scene, s.key)));
     });
     return out.join('');
@@ -248,11 +256,11 @@
     var b = e.target.closest('button,[data-open]'); if (!b) return;
     if (b.dataset.open) { st.open = b.dataset.open; render(); return; }
     if (b.dataset.subject != null) { st.subject = b.dataset.subject; st.scene = repair(st.scene); st.open = 'out'; save(); render(); return; }
-    if (b.dataset.outMode) { st.out = b.dataset.outMode; st.open = firstOpen() === 'done' ? 'done' : firstOpen(); render(); return; }
+    if (b.dataset.outMode) { st.out = b.dataset.outMode; st.open = begin(); render(); return; }
     if (b.dataset.rand) { randomFrom(b.dataset.rand, false); return; }
     if (b.dataset.randAll) { randomFrom(b.dataset.randAll, true); return; }
     if (b.dataset.pick != null) {
-      if (st.open === 'style') { st.style = b.dataset.pick; st.open = st.subject ? (firstOpen() === 'done' ? 'done' : firstOpen()) : 'subject'; save(); render(); return; }
+      if (st.open === 'style') { st.style = b.dataset.pick; st.open = st.subject ? begin() : 'subject'; save(); render(); return; }
       choose(st.open, b.dataset.pick, !!b.dataset.out); return;
     }
     if (b.id === 'copy') { navigator.clipboard && navigator.clipboard.writeText($('prompt').value).then(function () { $('copied').textContent = '복사했다'; }, function () { $('prompt').select(); $('copied').textContent = '자동 복사가 안 된다 — 글을 골라 두었다'; }); return; }
