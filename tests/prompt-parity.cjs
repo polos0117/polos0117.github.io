@@ -3,6 +3,7 @@
    ② 네 공방: 대상 모두가 기본 화풍으로 지어진다(SCENE 줄) · 트리 안 랜덤 장면 스물이 트리가 고칠 데 없이 지어진다 · 화풍마다 한 번.
    ③ game·book 폼 초상·개방: 대상·폼·인물 기준·노출 모두, 개방 장면마다, 엉망인 저장값 바로잡기, 랜덤 장면.
    ④ 신화 무기 초상·각성·저주·스킨: 무기 모두, 단계 표(prompt/steps.js), 자세 표, 스킨 없는 무기, 엉망인 저장값.
+   ⑤ 포켓몬 액션·폭주: 1025 마리 모두, 단계 표, 큰 자료(원작 외형·종별 얼굴) 있고 없고, 엉망인 저장값, 랜덤 장면.
    옛 생성기 화면과 글자 하나 다르지 않은지는 tests/prompt-screen.cjs(브라우저)가 본다.
    옆 저장소(../game-atelier · ../book-atelier · ../myth-atelier · ../pkm-atelier)가 있어야 한다. Run: node tests/prompt-parity.cjs */
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm'), path = require('node:path');
@@ -113,4 +114,30 @@ for (const k of H.ORDER.filter(x => H.get(x).forms)) {   // 폼·개방 받침(g
   console.log('  myth: 초상·각성·저주·스킨 지시문 ' + n + '(스킨 ' + skins + ') · 단계 표 · 카드 바로잡기');
   checks++;
 }
-console.log('PASS 통합 생성기 받침: game·book 계획기와 같은 글 · 네 공방 대상·랜덤·화풍 · game·book 폼·개방 · 신화 초상·각성·저주·스킨 — ' + checks + '가지');
+/* ⑤ 포켓몬(4단계) — 1025 마리 × 액션·폭주, 단계 표, 큰 자료(원작 외형·종별 얼굴)가 실리고 없으면 없이, 저장값 바로잡기 */
+{
+  const ST = require('../prompt/steps.js'), B = boot('pkm'), { a, d, S, w } = B, def = a.defaultStyle(d, S);
+  const word = (k, fb) => { const t = w.W ? w.W(k) : ''; return t && t !== k ? t : fb; };
+  const bare = a.buildCard(w, d, '피카츄', def, 'action', a.card(d, '피카츄', S, null));   // 큰 자료 없이(못 받았을 때)
+  for (const [n, f] of Object.entries(a.lazy)) d[n] = JSON.parse(fs.readFileSync(path.join(B.dir, f), 'utf8'));
+  const full = a.buildCard(w, d, '피카츄', def, 'action', a.card(d, '피카츄', S, null));
+  assert(bare.length > 200 && full.length > bare.length, '큰 자료가 있으면 원작 특징·종별 얼굴이 더 실린다');
+  let n = 0;
+  for (const s of a.subjects(d)) {
+    const g = a.subject(d, s.key);
+    for (const out of ['action', 'open']) {
+      const c = a.card(d, s.key, S, null), t = a.buildCard(w, d, s.key, def, out, c);
+      assert(t.length > 200 && t.includes(g.en), s.key + ' ' + out); n++;
+      ST.pkm(out, { A: a, D: d, S, P: w.AtelierPrompt, R: w.AtelierSceneRandom, w: word, subject: s.key, g, card: c, rnd: l => l[0] }).forEach(st => { st.shown(); st.parts.forEach(p => { if (typeof p.opts === 'function') p.opts(); }); });
+    }
+  }
+  const bad = a.card(d, '피카츄', S, { form: 'overdrive', identityMode: 'x', baseForm: 'nope', headFeature: 3, scenes: { action: 'x' } });
+  assert(bad.form === 'light' && bad.identityMode === 'create' && bad.baseForm === 'light' && bad.headFeature === '' && typeof bad.scenes.action === 'object', '포켓몬 카드 바로잡기 — 폭주는 개방 갈래가 붙인다');
+  const open = a.buildCard(w, d, '피카츄', def, 'open', { form: 'heavy', baseForm: 'mobility' });
+  assert.equal(open, a.buildCard(w, d, '피카츄', def, 'open', { form: 'light', baseForm: 'mobility' }), '개방은 카드의 액션 폼과 상관없다');
+  const R = w.AtelierSceneRandom;
+  for (let i = 0; i < 10; i++) { const c = a.card(d, '이상해씨', S, null); c.scenes.action = R.randomize({ ...c.scenes.action, randomLocks: {} }, 'action', null, Math.random); assert(a.buildCard(w, d, '이상해씨', def, 'action', c).length > 200, '랜덤 장면'); }
+  console.log('  pkm: 액션·폭주 지시문 ' + n + ' · 단계 표 · 큰 자료 있고 없고 · 카드 바로잡기 · 랜덤 장면 10');
+  checks++;
+}
+console.log('PASS 통합 생성기 받침: game·book 계획기와 같은 글 · 네 공방 대상·랜덤·화풍 · game·book 폼·개방 · 신화 초상·각성·저주·스킨 · 포켓몬 액션·폭주 — ' + checks + '가지');

@@ -38,7 +38,7 @@
   var A = null, D = null, S = null, CT = null, T = null, tree = null, saved = readStore();
   var st = { a: '', style: '', subject: '', out: 'casual', scene: { unlocked: [] }, card: null, open: 'a', unlock: {}, walked: {}, seen: {}, grpOpen: {} };
   /* 출력 갈래 — 받침의 표(off 는 준비 중). 일상컷 밖은 카드 갈래(단계 표 prompt/steps.js) */
-  var outList = function () { return A && A.outputs ? A.outputs(S) : [{ key: 'casual', ko: '일상컷' }]; };
+  var outList = function () { return A && A.outputs ? A.outputs(S, w) : [{ key: 'casual', ko: '일상컷' }]; };
   var outs = function () { return outList().filter(function (o) { return !o.off; }).map(function (o) { return o.key; }); };
   var formy = function () { return st.out !== 'casual'; };
 
@@ -69,6 +69,22 @@
     }).catch(function (e) { $('status').textContent = '읽지 못했다 — ' + e.message; });
   }
   function subj() { return st.subject ? A.subject(D, st.subject) : null; }
+  /* 큰 자료(A.lazy)는 카드 갈래에 들어갈 때 한 번만 받는다 — 못 받으면 null(옛 생성기처럼 없이 짓는다) */
+  var lazyState = '';
+  function needLazy() {
+    if (!A || !A.lazy || lazyState || !formy()) return;
+    lazyState = 'loading';
+    var base = '/' + A.repo + '/', names = Object.keys(A.lazy);
+    $('status').textContent = '큰 자료(' + names.length + ')를 받는 중…';
+    Promise.all(names.map(function (n) { return getJSON(base + A.lazy[n]).catch(function () { return null; }); })).then(function (vals) {
+      names.forEach(function (n, i) { D[n] = vals[i]; });
+      lazyState = 'done'; $('status').textContent = vals.some(function (v) { return !v; }) ? '큰 자료 일부를 못 받았다 — 그 몫 없이 짓는다' : '';
+      /* 받기 전엔 지시문이 없어 첫 단계를 열었다 — 밟아 본 갈래면 이제 제자리(다 골랐다)로 */
+      var first = (steps()[0] || {}).key;
+      if (st.walked[st.out] && st.open === first) st.open = begin();
+      render();
+    });
+  }
   /* 폼·개방 카드는 대상마다(옛 생성기도 게임·책마다 저장한다) */
   function loadCard() { st.card = A.card && st.subject ? A.card(D, st.subject, S, (((saved.by || {})[st.a] || {}).cards || {})[st.subject]) : null; }
   /* 앞을 바꾼 뒤 맞지 않게 된 칸은 비운다(꼭 있어야 하는 칸도 — 그 단계가 다시 열린다). 해방한 칸은 그대로 */
@@ -200,7 +216,7 @@
   function cardSteps() {
     var make = (window.AtelierHubSteps || {})[st.a];
     if (!make || !st.card) return [];
-    return make(st.out, { A: A, D: D, S: S, w: w, subject: st.subject, g: subj(), card: st.card, rnd: rnd2 });
+    return make(st.out, { A: A, D: D, S: S, P: window.AtelierPrompt, R: window.AtelierSceneRandom, w: w, subject: st.subject, g: subj(), card: st.card, rnd: rnd2 });
   }
   function stepOf(k) { return steps().filter(function (s) { return s.key === k; })[0]; }
   function partPick(stepKey, i, v) {
@@ -221,7 +237,7 @@
     return step.parts.map(function (p, i) {
       var at = ' data-part="' + i + '"';
       switch (p.type) {
-        case 'note': return p.text ? '<p class="note">' + esc(p.text) + '</p>' : '';
+        case 'note': return p.text ? '<p class="note">' + esc(p.text).replace(/\n/g, '<br>') + '</p>' : '';
         case 'facts': { var rows = p.rows().filter(function (r) { return r[1]; }); return rows.length ? '<dl class="facts">' + rows.map(function (r) { return '<dt>' + esc(r[0]) + '</dt><dd>' + esc(r[1]) + '</dd>'; }).join('') + '</dl>' : ''; }
         case 'pick': return (p.ko ? '<h4>' + esc(p.ko) + '</h4>' : '') + optButtons(p.opts().map(function (o) { return Object.assign({}, o, { attr: at, out: !!o.off }); }), p.get());
         case 'check': return '<label class="unlock"><input type="checkbox"' + at + (p.get() ? ' checked' : '') + '> ' + esc(p.ko) + '</label>' + (p.note ? '<p class="note">' + esc(p.note).replace(/\n/g, '<br>') + '</p>' : '');
@@ -337,7 +353,7 @@
   function prompt() {
     if (!A || !D || !st.subject) return '';
     try {
-      if (formy()) return st.card ? A.buildCard(window, D, st.subject, st.style, st.out, st.card) : '';
+      if (formy()) return st.card && !(A.lazy && lazyState !== 'done') ? A.buildCard(window, D, st.subject, st.style, st.out, st.card) : '';
       if (firstOpen() !== 'done') return '';
       return A.build(window, D, st.subject, st.style, st.scene);
     } catch (e) { return '(지시문을 못 지었다 — ' + e.message + ')'; }
@@ -350,6 +366,7 @@
     $('unlocked-note').textContent = un.length ? '🔓 트리 밖에서 고른 칸: ' + un.map(function (k) { return (STEPS.filter(function (s) { return s.key === k; })[0] || {}).ko || k; }).join(' · ') : '';
   }
   function render() {
+    needLazy();
     if (st.open === 'done') st.seen[st.out] = true;   /* 한 번 다 골랐으면 그 뒤 고침은 다 골랐다로 돌아온다(advance) */
     var was = st.shown; st.shown = st.open;
     /* 다시 그리기 전에 연 묶음을 읽어 둔다 — toggle 사건은 늦게 와서, 묶음을 열자마자 값을 바꾸면 닫힌 채 다시 그려졌다 */

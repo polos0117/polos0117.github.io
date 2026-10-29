@@ -44,13 +44,21 @@ const FORM_CASES = [
     params: { age: '30s', hairColor: '__custom__', hairColor_custom: 'ash pink', body: 'athletic' } } },
   { a: 'myth', subject: '티르핑', mode: 'awaken', card: { scene: 'thunder', params: { age: '30s' } } },
   { a: 'myth', subject: '묠니르', mode: 'cursed', card: {} },
-  { a: 'myth', subject: '티르핑', mode: 'skin', card: { skin: 'frost', skinState: 'cursed', scene: 'snowfield' } }
+  { a: 'myth', subject: '티르핑', mode: 'skin', card: { skin: 'frost', skinState: 'cursed', scene: 'snowfield' } },
+  /* 포켓몬(4단계) — 액션(경장·중장·고기동) · 개방(폭주 + 기준 장갑). 원작 외형·종별 얼굴 자료까지 실린다 */
+  { a: 'pkm', subject: '피카츄', mode: 'action', card: { form: 'heavy', identityMode: 'create', headFeature: 'ornament', faceDesignOn: true, formOverride: '왼쪽 어깨 패널만 개방', params: { 'apparent age': '30s', hairstyle: 'bob' },
+    scenes: { action: { expr: 'focused', pose: 'low_guard', orient: 'front_3q', frame: 'full_body', lens: 'natural50', aspect: '3:2', scene: '번개 치는 언덕', action: { category: 'melee', example: 'melee_counter' } } } } },
+  { a: 'pkm', subject: '이상해씨', mode: 'action', card: { form: 'mobility', identityMode: 'reference', motifs: '잎 망토', faceDesignOn: false, scenes: { action: { expr: 'calm', frame: 'three_quarter' } } } },
+  { a: 'pkm', subject: '피카츄', mode: 'open', card: { form: 'light', baseForm: 'heavy', formOverride: '가슴판만', scenes: { action: { custom: '번개가 둘레로' } } } },
+  { a: 'pkm', subject: '뮤츠', mode: 'open', card: { baseForm: 'reference' } }
 ];
 /* 옛 생성기 — 저장 열쇠·꼴·주소 */
 const OLD = {
   game: (c) => ['/game-atelier/prompt.html?game=' + c.subject + '&mode=' + c.mode, ['game_prompt_v1', { last: c.subject, cards: { [c.subject]: { ...c.card, mode: c.mode } } }]],
   book: (c) => ['/book-atelier/prompt.html?book=' + c.subject + '&mode=' + c.mode, ['book_prompt_v1', { last: c.subject, cards: { [c.subject]: { ...c.card, mode: c.mode } } }]],
-  myth: (c, style) => ['/myth-atelier/prompt.html', ['myth_prompt_v1', { __card: c.subject, [c.subject]: { ...c.card, output: c.mode, style } }]]
+  myth: (c, style) => ['/myth-atelier/prompt.html', ['myth_prompt_v1', { __card: c.subject, [c.subject]: { ...c.card, output: c.mode, style } }]],
+  /* 옛 pkm 생성기는 액션 한 갈래 — 개방은 폼 「폭주」 */
+  pkm: (c) => ['/pkm-atelier/prompt.html?mech=' + encodeURIComponent(c.subject), ['pkm_prompt_v2', { last: c.subject, cards: { [c.subject]: { ...c.card, mode: 'action', ...(c.mode === 'open' ? { form: 'overdrive' } : {}) } } }]]
 };
 
 (async () => {
@@ -104,6 +112,7 @@ const OLD = {
       await hub.ctx.close();
       if (!esm) continue;
       const [url, store] = OLD[c.a](c, 'game_keyart');
+      if (c.a === 'pkm') store[1].cards[c.subject].style = 'glossy_promo';
       const old = await open(url, store);
       await old.page.waitForFunction(() => (document.getElementById('prompt-output') || {}).value?.length > 200, null, { timeout: 20000 });
       assert.equal(got, await old.page.locator('#prompt-output').inputValue(), c.a + ' ' + c.mode + ' ' + c.card.form + ' — 허브와 옛 생성기의 지시문이 다르다');
@@ -124,7 +133,7 @@ const OLD = {
     assert(await p.evaluate(() => document.getElementById('panel').getBoundingClientRect().top >= 0), '끝에서 고르면 다음 단계가 보이게 올라간다');
     await p.click('[data-open="subject"]');
     await p.fill('#find', '피카'); await p.click('[data-subject="피카츄"]');
-    assert.equal(await p.locator('[data-out-mode="form"]').isDisabled(), true, '폼은 아직');
+    assert.equal(await p.locator('[data-out-mode="action"]').isDisabled(), false, '포켓몬 액션도 연다');
     await p.click('[data-out-mode="casual"]');
     /* 시대부터 연다 — 기본(지금)이 눌려 있고, 건너뛰지 않는다 */
     assert.equal(await p.locator('.hchip.on').getAttribute('data-open'), 'era', '시대부터');
@@ -214,10 +223,32 @@ const OLD = {
       assert.equal(await p.evaluate(() => window.AtelierHubPrompt.state().card.params.hairstyle), 'bob');
       assert.deepEqual(g.errors, [], '게임 폼 오류 없음');
       await g.ctx.close(); checks += 8;
-      /* 포켓몬은 아직 일상컷만 */
-      const k = await open('/prompt.html?a=pkm&s=' + encodeURIComponent('피카츄'));
-      await k.page.waitForSelector('[data-open="out"]'); await k.page.click('[data-open="out"]');
-      assert.equal(await k.page.locator('[data-out-mode="form"]').isDisabled(), true, '포켓몬 폼은 아직'); await k.ctx.close();
+      /* 포켓몬 — 액션: 장갑 폼 → 인물 기준 → 원작 특징(입는 법·머리 특징·종별 얼굴) → 외형 → 연출 …, 개방: 기준 장갑 → 폼 요청 → 덧붙임 */
+      const k = await open('/prompt.html?a=pkm&s=' + encodeURIComponent('피카츄')), q = k.page, at = () => q.evaluate(() => window.AtelierHubPrompt.state().open);
+      await q.waitForSelector('[data-open="out"]'); await q.click('[data-open="out"]');
+      assert.equal(await q.locator('[data-out-mode]:not([disabled])').count(), 3, '포켓몬 출력 셋');
+      await q.click('[data-out-mode="action"]'); assert.equal(await at(), 'form');
+      await q.waitForFunction(() => document.getElementById('prompt').value.length > 200, null, { timeout: 20000 });   // 큰 자료를 받은 뒤
+      await q.click('[data-pick="heavy"]'); assert.equal(await at(), 'ident');
+      await q.click('[data-pick="create"]'); assert.equal(await at(), 'design');
+      assert.match(await q.locator('#panel').textContent(), /lightning|tail/i, '원작 특징 — 자동 입는 법');
+      await q.selectOption('select[data-sel]', '__custom__');
+      await q.fill('[data-field="headCustom"]', 'yellow ear headband');
+      assert((await q.locator('#prompt').inputValue()).includes('yellow ear headband'), '머리 특징 직접 입력이 지시문에');
+      await q.click('[data-next="design"]'); assert.equal(await at(), 'look');
+      await q.click('[data-next="look"]'); assert.equal(await at(), 'action');
+      await q.click('[data-rand-all="action"]'); assert.equal(await at(), 'done');
+      assert((await q.evaluate(() => window.AtelierHubPrompt.state().card.scenes.action.action.category)), '연출 랜덤');
+      /* 이어가기면 원작 특징·외형 단계가 빠진다 */
+      await q.click('[data-open="ident"]'); await q.click('[data-pick="reference"]');
+      assert.equal(await q.locator('.hchip[data-open="look"]').count(), 0, '이어가기 — 외형 없음');
+      /* 개방 — 기준 장갑, 같은 카드 */
+      await q.click('[data-open="out"]'); await q.click('[data-out-mode="open"]'); assert.equal(await at(), 'base');
+      await q.click('[data-pick="mobility"]'); assert.equal(await at(), 'design');
+      assert.match(await q.locator('#prompt').inputValue(), /OVERDRIVE|overdrive/i, '폭주 지시문');
+      assert.equal(await q.evaluate(() => window.AtelierHubPrompt.state().card.form), 'heavy', '개방을 해도 액션 폼은 그대로');
+      assert.deepEqual(k.errors, [], '포켓몬 카드 갈래 오류 없음');
+      await k.ctx.close(); checks += 6;
     }
 
     /* ②-3 신화 무기 — 액션 한 장(설계 언어·붙일 문단·자세·외형·장면 메모) · 각성 · 스킨(스킨·상태) */
@@ -265,8 +296,8 @@ const OLD = {
       assert.deepEqual(m.small, [], vp.width + ' 44px 안 되는 자리');
       assert.deepEqual(v.errors, []);
       await v.ctx.close(); checks++;
-      /* 카드 갈래 외형(긴 고르개) — 게임 폼 · 신화 초상, 옆으로 넘치지 않는다 */
-      for (const [a, sj, o] of [['game', 'pacman', 'form'], ['myth', '티르핑', 'portrait']]) {
+      /* 카드 갈래 외형(긴 고르개) — 게임 폼 · 신화 초상 · 포켓몬 액션, 옆으로 넘치지 않는다 */
+      for (const [a, sj, o] of [['game', 'pacman', 'form'], ['myth', '티르핑', 'portrait'], ['pkm', '피카츄', 'action']]) {
         const f = await open('/prompt.html?a=' + a + '&s=' + encodeURIComponent(sj) + '&o=' + o, ['atelier_hub_prompt_v1', { last: a, by: { [a]: { subject: sj, out: o, walked: { [o]: true } } } }], vp);
         await f.page.waitForSelector('[data-open="look"]'); await f.page.click('[data-open="look"]');
         await f.page.evaluate(() => document.querySelectorAll('details.grp').forEach(d => { d.open = true; }));
@@ -277,6 +308,6 @@ const OLD = {
         await f.ctx.close();
       }
     }
-    console.log('PASS 통합 생성기: 옛 생성기와 같은 글(일상컷·폼·개방·신화 초상·각성·저주·스킨) · 게임 폼·개방 단계(이어가기 기준 폼·외형·연출 랜덤·기록·새로 고침) · 신화 단계(설계·문단·자세·외형 직접 입력·메모·각성·스킨·스킨 없는 무기) · 포켓몬 처음부터(공방·기본 화풍·대상·출력·단계·칩·해방 까닭·🔓 기록·앞 바꾸면 뒤 열기·랜덤·새로 고침) · 화면 셋 — ' + checks + '가지');
+    console.log('PASS 통합 생성기: 옛 생성기와 같은 글(일상컷·폼·개방·신화 초상·각성·저주·스킨·포켓몬 액션·폭주) · 게임 폼·개방 단계(이어가기 기준 폼·외형·연출 랜덤·기록·새로 고침) · 신화 단계(설계·문단·자세·외형 직접 입력·메모·각성·스킨·스킨 없는 무기) · 포켓몬 액션·폭주 단계(원작 특징·머리 직접 입력·이어가기·기준 장갑) · 포켓몬 처음부터(공방·기본 화풍·대상·출력·단계·칩·해방 까닭·🔓 기록·앞 바꾸면 뒤 열기·랜덤·새로 고침) · 화면 셋 — ' + checks + '가지');
   } finally { await br.close(); server.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

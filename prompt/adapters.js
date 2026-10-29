@@ -11,7 +11,8 @@
      카드 갈래를 여는 받침(2단계 game·book 폼·개방, 3단계 myth 초상·각성·저주·스킨)은 더:
        card(d, key, S, saved) → 카드(옛 생성기 저장값 꼴 — 없는 값은 기본으로). 갈래끼리 같이 쓴다(옛 생성기도 대상마다 하나)
        buildCard(w, d, key, style, 갈래, card) → 지시문(옛 생성기와 같은 입력)
-     game·book 은 또 forms(d) → [{key, stage}] · pilot(d, key) → {form, open}(폼 열쇠) · facts(d, key, 폼) → {look, pose, setting, role, open} */
+     game·book 은 또 forms(d) → [{key, stage}] · pilot(d, key) → {form, open}(폼 열쇠) · facts(d, key, 폼) → {look, pose, setting, role, open}
+     lazy({이름: 자료 파일}) — 카드 갈래에 들어갈 때만 받는 큰 자료(pkm 원작 외형·종별 얼굴, 2MB 넘게). 없으면 null(옛 생성기도 못 받으면 없이 짓는다) */
 (function (root) {
   'use strict';
   var FIXED = { overall_intensity: 'strong', skin_exposure: 'bold' };   /* 일상컷 고정값 — 네 공방 생성기가 처음부터 잠그는 값 */
@@ -146,9 +147,41 @@
     },
     pkm: {
       key: 'pkm', repo: 'pkm-atelier', ko: '포켓몬',
-      outputs: function () { return [{ key: 'casual', ko: '일상컷' }, { key: 'form', ko: '폼 초상', off: true }, { key: 'open', ko: '개방·각성', off: true }]; },
-      libs: ['lib/prompt-spec.js', 'lib/casual-tree.js', 'lib/prompt-anthro.js', 'lib/prompt-lifestyle.js'],
+      /* 옛 생성기는 액션 한 갈래에 폼 넷(경장·중장·고기동·폭주). 허브는 game·book 처럼 둘로 — 액션(경장·중장·고기동) · 개방(폭주 + 기준 장갑) */
+      outputs: function (S, w) { return [{ key: 'casual', ko: '일상컷' }, { key: 'action', ko: w ? w('prompt.action', '액션') : '액션', note: w ? w('prompt.action.note', '') : '' },
+        { key: 'open', ko: (w ? w('form.overdrive', '폭주') : '폭주') + ' · 개방', note: w ? w('prompt.overdrive.note', '') : '' }]; },
+      /* 낱말(lib/words.js) — 단계 이름을 옛 생성기와 같게, 랜덤(lib/prompt-random.js) — 액션 장면 칸 목록 */
+      libs: ['lib/words.js', 'lib/prompt-spec.js', 'lib/casual-tree.js', 'lib/prompt-anthro.js', 'lib/prompt-lifestyle.js', 'lib/prompt-random.js'],
       data: { cards: 'data/card.json', tree: 'data/casual-tree.json' },
+      lazy: { appearance: 'data/source-appearance.json', faces: 'data/face-design.json' },
+      FORMS: ['light', 'heavy', 'mobility'],
+      appearance: function (d, c) { return d.appearance ? (d.appearance.entries || {})[String(c.no)] : undefined; },
+      face: function (d, c) { return d.faces ? (d.faces.faces || {})[String(c.no)] || null : null; },
+      /* 옛 생성기 normalize 의 액션 몫. 폭주는 개방 갈래가 붙이니 카드의 폼은 경장·중장·고기동 하나 */
+      card: function (d, k, S, saved) {
+        var x = obj(saved), c = { identityMode: 'create', form: 'light', baseForm: 'light', motifs: '', formOverride: '', headFeature: '', faceDesignOn: true, params: {}, locks: {} };
+        Object.keys(c).forEach(function (f) { if (x[f] !== undefined) c[f] = x[f]; });
+        if (this.FORMS.indexOf(c.form) < 0) c.form = 'light';
+        if (['create', 'reference'].indexOf(c.identityMode) < 0) c.identityMode = 'create';
+        if (['reference', 'light', 'heavy', 'mobility'].indexOf(c.baseForm) < 0) c.baseForm = 'light';
+        ['motifs', 'formOverride', 'headFeature'].forEach(function (f) { if (typeof c[f] !== 'string') c[f] = ''; });
+        if (typeof c.faceDesignOn !== 'boolean') c.faceDesignOn = true;
+        c.params = Object.assign({}, obj(c.params)); c.locks = Object.assign({}, obj(c.locks));
+        var sc = Object.assign(formBlank(), obj(obj(x.scenes).action)); sc.action = Object.assign({}, obj(sc.action));
+        c.scenes = { action: sc };
+        return c;
+      },
+      buildCard: function (w, d, k, style, out, card) {
+        var P = w.AtelierPrompt, ch = this.subject(d, k);
+        if (!ch || ['action', 'open'].indexOf(out) < 0) return '';
+        var c = this.card(d, k, w.AtelierSpec, card), od = out === 'open';
+        if (od) c.form = 'overdrive';
+        /* 옛 생성기 lib/prompt-ui.js 의 result — 개방은 늘 그 폼 그림을 첨부한다(이어가기) */
+        var input = Object.assign({}, c, { style: style, mode: 'action' }, c.scenes.action, { mech: ch.name, sourceName: ch.en, sourceAppearance: this.appearance(d, ch), faceDesign: this.face(d, ch), tree: d.tree, gen: ch.gen,
+          series: [ch.element, ch.element2].filter(Boolean).join(' / '), outputMode: 'action', identityMode: od || c.identityMode === 'reference' ? 'reference' : 'create',
+          params: Object.keys(c.params).map(function (p) { return [p, c.params[p]]; }) });
+        return P.buildPrompt(input);
+      },
       subjects: function (d) { return d.cards.cards.character.map(function (c) { return { key: c.name, ko: c.name, sub: String(c.no).padStart(4, '0') + ' · ' + c.en }; }); },
       styles: function (d, S) { return S.ART_STYLES.map(function (r) { return { key: r[0], ko: r[1] }; }); },
       defaultStyle: function (d, S) { return S.DEFAULT_STYLE; },
