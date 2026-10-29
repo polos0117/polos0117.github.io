@@ -160,7 +160,10 @@ const OLD = {
     await p.click('[data-pick="sitting"][data-out]');
     assert.match(await p.locator('[data-open="pose"]').textContent(), /🔓/, '칩에 🔓');
     assert.match(await p.locator('#unlocked-note').textContent(), /자세/);
-    assert.equal(await p.evaluate(() => window.AtelierHubPrompt.state().open), 'done', '다 고른 뒤 고치면 다 골랐다로 돌아온다');
+    /* 다 고른 뒤 고쳐도 건너뛰지 않는다 — 바로 다음 칸(방향). 남은 단계는 「다 골랐다로」 로 건너뛴다(2026-10-29 사용자 「다다음 칸으로 건너뛰어지는게 많네」) */
+    assert.equal(await p.evaluate(() => window.AtelierHubPrompt.state().open), 'orient', '고친 뒤엔 바로 다음 칸');
+    await p.click('#panel [data-open="done"]');
+    assert.equal(await p.evaluate(() => window.AtelierHubPrompt.state().open), 'done', '「다 골랐다로」 로 남은 단계를 건너뛴다');
     const t2 = await p.locator('#prompt').inputValue();
     assert(t2.includes(await p.evaluate(() => window.AtelierSpec.POSE_GUIDES.sitting[1])), '해방한 자세가 지시문에 남는다(트리가 고치지 않는다)');
     await p.click('#record');
@@ -169,8 +172,12 @@ const OLD = {
     /* 앞을 바꾸면 맞지 않게 된 뒤 칸이 비고 그 단계가 열린다 */
     await p.click('[data-open="place"]'); await p.click('[data-pick="water_pool"]');
     assert.equal(await p.locator('.hchip.on').getAttribute('data-open'), 'act', '하는 일이 다시 열린다');
+    /* 그 뒤로도 한 칸씩 — 하는 일 → 의상 계열 → 옷 → 프레이밍 … (건너뛰지 않는다) */
+    const walk = [];
+    for (let i = 0; i < 4; i++) { await p.locator('#panel .opt[data-pick]:not([data-out])').first().click(); walk.push(await p.evaluate(() => window.AtelierHubPrompt.state().open)); }
+    assert.deepEqual(walk, ['ofam', 'item', 'frame', 'lens'], '고친 뒤 한 칸씩: ' + walk.join(' > '));
     /* 랜덤 — 트리 안에서만, 다 고르면 지시문 */
-    await p.click('[data-rand-all="act"]');
+    await p.click('[data-open="act"]'); await p.click('[data-rand-all="act"]');
     const sc = await p.evaluate(() => window.AtelierHubPrompt.state().scene);
     assert(sc.place === 'water_pool' && sc.act && sc.ofam && sc.frame && sc.orient, '랜덤으로 다 채운다');
     assert(await p.evaluate(sc => window.AtelierHubPrompt.settled(sc), sc), '랜덤한 장면은 트리가 고칠 데가 없다');
@@ -356,6 +363,6 @@ const OLD = {
         await f.ctx.close();
       }
     }
-    console.log('PASS 통합 생성기: 옛 생성기와 같은 글(일상컷·폼·개방·신화 초상·각성·저주·스킨·포켓몬 액션·폭주) · 게임 폼·개방 단계(이어가기 기준 폼·외형·연출 랜덤·기록·새로 고침) · 신화 단계(설계·문단·자세·외형 직접 입력·메모·각성·스킨·스킨 없는 무기) · 포켓몬 액션·폭주 단계(원작 특징·머리 직접 입력·이어가기·기준 장갑) · 일상컷 계획기 주소(채우기·📌·주소 지우기·덧붙임·랜덤이 안 바꿈·풀기·새로 고침·틀린 값) · 포켓몬 처음부터(공방·기본 화풍·대상·출력·단계·칩·해방 까닭·🔓 기록·앞 바꾸면 뒤 열기·랜덤·새로 고침) · 화면 셋 — ' + checks + '가지');
+    console.log('PASS 통합 생성기: 옛 생성기와 같은 글(일상컷·폼·개방·신화 초상·각성·저주·스킨·포켓몬 액션·폭주) · 게임 폼·개방 단계(이어가기 기준 폼·외형·연출 랜덤·기록·새로 고침) · 신화 단계(설계·문단·자세·외형 직접 입력·메모·각성·스킨·스킨 없는 무기) · 포켓몬 액션·폭주 단계(원작 특징·머리 직접 입력·이어가기·기준 장갑) · 일상컷 계획기 주소(채우기·📌·주소 지우기·덧붙임·랜덤이 안 바꿈·풀기·새로 고침·틀린 값) · 포켓몬 처음부터(공방·기본 화풍·대상·출력·단계·칩·해방 까닭·🔓 기록·앞 바꾸면 뒤 열기·고친 뒤 한 칸씩·다 골랐다로·랜덤·새로 고침) · 화면 셋 — ' + checks + '가지');
   } finally { await br.close(); server.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

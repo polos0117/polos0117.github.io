@@ -142,13 +142,14 @@
     writeStore(saved);
     try { var u = new URLSearchParams(location.search); u.set('a', st.a); if (st.subject) u.set('s', st.subject); u.set('o', st.out); u.delete('casual'); u.delete('mech'); history.replaceState(null, '', location.pathname + '?' + u + location.hash); } catch (e) { /* 주소만 못 바꿨다 */ }
   }
-  /* 다음 단계 — 다 고른 뒤 칩으로 돌아와 고친 것이면 비게 된 칸 또는 다 골랐다로 */
+  /* 다음 단계 — 늘 바로 다음 칸(앞에 비게 된 꼭 있어야 하는 칸이 있으면 그 칸). 다 고른 뒤 고쳐도 건너뛰지 않는다 —
+     비어 있는 꼭 칸으로 뛰었더니 옷·프레이밍·렌즈·자세를 건너뛰었다(2026-10-29 사용자 「다다음이나 다다다음 칸으로 건너뛰어지는게 많네」).
+     남은 단계를 건너뛰고 싶으면 단계마다 「다 골랐다로」(skipBtn) */
   function advance(key) {
-    var ks = keysOf(), i = ks.indexOf(key), wasDone = st.seen[st.out];
+    var ks = keysOf(), i = ks.indexOf(key);
     st.walked[st.out] = true;
     st.open = ks[i + 1] || 'done';
     var need = firstOpen(); if (need !== 'done' && ks.indexOf(need) < i) st.open = need;
-    if (wasDone) st.open = need;
   }
 
   /* 단계마다의 선택지 — [{v, ko, sub, why}] (why 가 있으면 트리 밖) */
@@ -287,7 +288,7 @@
   function cardPanel(k) {
     var step = stepOf(k);
     if (!step) return '';
-    return '<h3>' + esc(step.ko) + '</h3>' + partsHTML(step) + (step.random ? '<div class="bar"><span></span>' + randomBar(k) + '</div>' : '') + (step.next ? nextBtn(k) : '');
+    return '<h3>' + esc(step.ko) + '</h3>' + partsHTML(step) + (step.random ? '<div class="bar"><span></span>' + randomBar(k) + '</div>' : (skipBtn() ? '<div class="bar"><span></span><span class="rand">' + skipBtn() + '</span></div>' : '')) + (step.next ? nextBtn(k) : '');
   }
 
   /* ── 그리기 ── */
@@ -374,8 +375,10 @@
     return '<label class="axis" for="f-' + id + '">' + esc(labelText) + (multi ? '<textarea id="f-' + id + '" data-field="' + id + '"' + at + ' rows="3" placeholder="' + esc(ph || '') + '">' + esc(value || '') + '</textarea>' :
       '<input type="text" id="f-' + id + '" data-field="' + id + '"' + at + ' value="' + esc(value || '') + '" placeholder="' + esc(ph || '') + '">') + (help ? '<small>' + esc(help) + '</small>' : '') + '</label>';
   }
-  function nextBtn(k) { var ks = keysOf(), n = ks[ks.indexOf(k) + 1]; return '<p><button type="button" class="btn" data-next="' + k + '">' + (n && !st.seen[st.out] ? '다음' : '다 골랐다') + '</button></p>'; }
-  function randomBar(k) { return '<span class="rand"><button type="button" class="btn" data-rand="' + k + '">이 칸 랜덤</button><button type="button" class="btn" data-rand-all="' + k + '">여기부터 다 랜덤</button></span>'; }
+  function nextBtn(k) { var ks = keysOf(), n = ks[ks.indexOf(k) + 1]; return '<p class="rand"><button type="button" class="btn" data-next="' + k + '">' + (n ? '다음' : '다 골랐다') + '</button>' + (n ? skipBtn() : '') + '</p>'; }
+  /* 한 번 다 골랐고 지금도 다 찼으면 — 남은 단계를 건너뛰어 다 골랐다로 */
+  function skipBtn() { return st.seen[st.out] && firstOpen() === 'done' && prompt() ? '<button type="button" class="btn" data-open="done">다 골랐다로</button>' : ''; }
+  function randomBar(k) { return '<span class="rand"><button type="button" class="btn" data-rand="' + k + '">이 칸 랜덤</button><button type="button" class="btn" data-rand-all="' + k + '">여기부터 다 랜덤</button>' + skipBtn() + '</span>'; }
   function subjectsHTML() {
     var f = (st.find || '').trim().toLowerCase(), list = A.subjects(D).filter(function (x) { return !f || (x.ko + ' ' + x.sub).toLowerCase().indexOf(f) >= 0; });
     /* 다 그린다(포켓몬 1025) — 앞 120 만 그렸더니 그 밑으로 못 내려갔다 */
