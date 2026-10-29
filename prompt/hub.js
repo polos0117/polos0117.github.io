@@ -387,8 +387,8 @@
     }).join('');
   }
   /* 여기부터 다시 — 지금 단계 뒤의 칸을 다 비우고 이 단계부터 다시 고른다(2026-10-29 사용자). 비운 칸 수를 돌려준다 */
-  function restartFrom(key) {
-    var ks = keysOf(), i = ks.indexOf(key), later = ks.slice(i + 1), n = 0;
+  function restartFrom(key, all) {
+    var ks = keysOf(), i = ks.indexOf(key), later = ks.slice(all ? i : i + 1), n = 0;
     if (i < 0) return 0;
     if (!formy()) {
       var sc = Object.assign({}, st.scene);
@@ -419,11 +419,15 @@
       });
     }
     st.seen[st.out] = false;   // 뒤 칸은 아직 안 온 단계 — 칩도 다시 숨는다
+    if (all) { st.walked[st.out] = false; st.unlock = {}; }   // 처음 상태 — 아직 한 칸도 안 밟은 것처럼, 해방도 끈다
     st.open = key; st.menu = false;
     save(); render();
-    $('status').textContent = n ? '여기부터 다시 — 뒤 ' + n + '칸을 비웠다. 이 단계부터 고른다.' : '여기부터 다시 — 뒤에 비울 칸이 없다.';
+    $('status').textContent = all ? '처음부터 다시 — ' + n + '칸을 비웠다. 첫 단계부터 고른다.' : n ? '여기부터 다시 — 뒤 ' + n + '칸을 비웠다. 이 단계부터 고른다.' : '여기부터 다시 — 뒤에 비울 칸이 없다.';
     return n;
   }
+  /* 처음부터 다시 — 다 고른 뒤에도 모든 칸을 비우고 첫 단계로(2026-10-29 사용자 「다 골랐을 때도 처음 상태로」). 공방·화풍·대상·출력은 그대로(경로 줄로 바꾼다) */
+  function resetAll() { var ks = keysOf(); if (ks.length) restartFrom(ks[0], true); }
+  function resetBtn() { return keysOf().length ? '<button type="button" class="btn" data-reset="1" title="모든 칸을 비우고 첫 단계부터 다시">↺ 처음부터 다시</button>' : ''; }
   function restartBtn(k) { var ks = keysOf(); return ks.indexOf(k) >= 0 && ks.indexOf(k) < ks.length - 1 ? '<button type="button" class="btn" data-restart="' + k + '" title="뒤 단계를 다 비우고 이 단계부터 다시">↺ 여기부터 다시</button>' : ''; }
   function panelHTML() {
     var k = st.open;
@@ -449,8 +453,8 @@
       var plan = !formy() && (st.scene.planned || []).length;
       return (mobile() ? hresHTML() : '') + '<h3>다 골랐다</h3><p class="note">칩을 누르면 그 단계로 돌아간다. ' + (mobile() ? '위 지시문을 아래 「복사」로 쓴다.' : '아래 지시문을 복사해 쓴다.') + (formy() && canRand ? ' 랜덤은 랜덤 단추가 있는 단계만 — 나머지는 그대로.' : '') +
         (plan ? ' 📌 계획기 칸 ' + plan + '개는 랜덤이 안 바꾼다.' : '') + '</p>' +
-        /* 폰에선 「처음부터 다 랜덤」이 아래 막대에 있다 — 여기엔 계획 칸 풀기만 */
-        (canRand && ss.length ? '<span class="rand">' + (mobile() ? '' : '<button type="button" class="btn" data-rand-all="' + ss[0].key + '">처음부터 다 랜덤</button>') + (plan ? '<button type="button" class="btn" data-act="unplan">계획 칸 풀기</button>' : '') + '</span>' : '');
+        /* 폰에선 「처음부터 다 랜덤」·「처음부터 다시」가 아래 막대에 있다 — 여기엔 계획 칸 풀기만 */
+        '<span class="rand">' + (mobile() || !canRand || !ss.length ? '' : '<button type="button" class="btn" data-rand-all="' + ss[0].key + '">처음부터 다 랜덤</button>') + (mobile() ? '' : resetBtn()) + (plan ? '<button type="button" class="btn" data-act="unplan">계획 칸 풀기</button>' : '') + '</span>';
     }
     if (formy()) return cardPanel(k);
     if (k === 'axes') {
@@ -480,8 +484,9 @@
     var k = st.open, ks = keysOf(), i = ks.indexOf(k);
     if (k === 'done') {
       var ss = steps(), canRand = !formy() || ss.some(function (x) { return x.random; });
-      return (canRand && ss.length ? '<button type="button" class="btn" data-rand-all="' + ss[0].key + '">🎲 처음부터</button>' : '') +
-        '<button type="button" class="btn" data-act="record">기록 JSON</button><button type="button" class="btn pri" data-act="copy">📋 복사</button>';
+      /* ↺ 처음(모든 칸 비우고 첫 단계) · 🎲 랜덤(처음부터 다 랜덤) · 기록 · 📋 복사 — 넷이라 글은 짧게(344px 에서 「처음부터」도 잘렸다) */
+      return resetBtn().replace('↺ 처음부터 다시', '↺ 처음') + (canRand && ss.length ? '<button type="button" class="btn" data-rand-all="' + ss[0].key + '">🎲 랜덤</button>' : '') +
+        '<button type="button" class="btn" data-act="record">기록</button><button type="button" class="btn pri" data-act="copy">📋 복사</button>';
     }
     if (i < 0) return '';
     var cs = formy() ? stepOf(k) : STEPS[i], last = i === ks.length - 1;
@@ -594,6 +599,7 @@
     if (b.dataset.prev) { var pk = keysOf(), pi = pk.indexOf(b.dataset.prev); st.open = pi > 0 ? pk[pi - 1] : 'out'; render(); return; }
     if (b.dataset.skip) { advance(b.dataset.skip); save(); render(); return; }
     if (b.dataset.restart) { restartFrom(b.dataset.restart); return; }
+    if (b.dataset.reset) { resetAll(); return; }
     if (b.dataset.gtab != null) { st.tab[b.dataset.gtabKey] = b.dataset.gtab; render(); return; }
     if (b.dataset.menu) { st.menu = !st.menu; var hb2 = $('hbar'); hb2.innerHTML = hbarHTML(); hb2.hidden = !hb2.innerHTML; return; }
     if (b.dataset.act === 'copy') { copyText($('prompt').value, b); return; }
