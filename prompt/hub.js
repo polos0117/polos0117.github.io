@@ -222,7 +222,8 @@
   function randomBar(k) { return '<span class="rand"><button type="button" class="btn" data-rand="' + k + '">이 칸 랜덤</button><button type="button" class="btn" data-rand-all="' + k + '">여기부터 다 랜덤</button></span>'; }
   function subjectsHTML() {
     var f = (st.find || '').trim().toLowerCase(), list = A.subjects(D).filter(function (x) { return !f || (x.ko + ' ' + x.sub).toLowerCase().indexOf(f) >= 0; });
-    return '<p class="note">' + list.length + '명</p><div class="opts people">' + list.slice(0, 120).map(function (x) {
+    /* 다 그린다(포켓몬 1025) — 앞 120 만 그렸더니 그 밑으로 못 내려갔다 */
+    return '<p class="note">' + list.length + '명</p><div class="opts people">' + list.map(function (x) {
       return '<button type="button" class="opt" data-subject="' + esc(x.key) + '" aria-pressed="' + (st.subject === x.key) + '"><b>' + esc(x.ko) + '</b><span>' + esc(x.sub) + '</span></button>'; }).join('') + '</div>';
   }
   function prompt() {
@@ -231,8 +232,11 @@
   }
   function render() {
     if (st.open === 'done') st.seenDone = true;   /* 한 번 다 골랐으면 그 뒤 고침은 다 골랐다로 돌아온다(choose) */
+    var was = st.shown; st.shown = st.open;
     $('chips').innerHTML = chipsHTML();
     $('panel').innerHTML = panelHTML();
+    /* 단계가 바뀌었는데 새 단계 윗머리가 화면 위로 가 있으면(긴 대상 목록 끝에서 골랐을 때) 그 단계로 올린다 */
+    if (was && was !== st.open && $('panel').getBoundingClientRect().top < 0) $('panel').scrollIntoView({ block: 'start' });
     var t = prompt();
     $('out').hidden = !t; $('prompt').value = t;
     $('count').textContent = t ? (t.match(/\S+/g) || []).length + '낱말' : '';

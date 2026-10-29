@@ -78,6 +78,14 @@ const CASES = [
     await p.waitForSelector('.opt[href="?a=pkm"]'); await p.click('.opt[href="?a=pkm"]');
     await p.waitForSelector('[data-open="style"]');
     assert.match(await p.locator('[data-open="style"]').textContent(), /글로시 프로모/, '화풍은 그 공방 기본');
+    /* 대상은 다 있고 페이지 스크롤로 끝까지 — 안에 따로 스크롤하는 상자가 없다(앞 120 만 그려 못 내려갔다) */
+    assert.equal(await p.locator('[data-subject]').count(), 1025, '포켓몬 1025 다');
+    assert(await p.evaluate(() => { const e = document.querySelector('.opts.people'); return e.scrollHeight <= e.clientHeight + 1 && getComputedStyle(e).overflowY === 'visible'; }), '대상 목록 안 스크롤 상자 없음');
+    await p.locator('[data-subject]').last().scrollIntoViewIfNeeded();
+    assert(await p.evaluate(() => { const r = document.querySelector('[data-subject]:last-child').getBoundingClientRect(); return r.bottom <= innerHeight && r.top >= 0; }), '마지막 대상까지 내려간다');
+    await p.locator('[data-subject]').last().click();
+    assert(await p.evaluate(() => document.getElementById('panel').getBoundingClientRect().top >= 0), '끝에서 고르면 다음 단계가 보이게 올라간다');
+    await p.click('[data-open="subject"]');
     await p.fill('#find', '피카'); await p.click('[data-subject="피카츄"]');
     assert.equal(await p.locator('[data-out-mode="form"]').isDisabled(), true, '폼은 아직');
     await p.click('[data-out-mode="casual"]');
