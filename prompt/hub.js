@@ -427,6 +427,8 @@
   }
   /* 처음부터 다시 — 다 고른 뒤에도 모든 칸을 비우고 첫 단계로(2026-10-29 사용자 「다 골랐을 때도 처음 상태로」). 공방·화풍·대상·출력은 그대로(경로 줄로 바꾼다) */
   function resetAll() { var ks = keysOf(); if (ks.length) restartFrom(ks[0], true); }
+  /* 폰 탭 줄(묶음·첫 글자) — 켜진 탭이 줄 가운데 오게(오른쪽 끝 탭을 고르면 안 보인 채 남았다) */
+  function centerTabs() { [].forEach.call(document.querySelectorAll('#panel .gtabs'), function (tb) { var on = tb.querySelector('.gtab.on'); if (on) tb.scrollLeft = Math.max(0, on.offsetLeft - (tb.clientWidth - on.offsetWidth) / 2); }); }
   function resetBtn() { return keysOf().length ? '<button type="button" class="btn" data-reset="1" title="모든 칸을 비우고 첫 단계부터 다시">↺ 처음부터 다시</button>' : ''; }
   function restartBtn(k) { var ks = keysOf(); return ks.indexOf(k) >= 0 && ks.indexOf(k) < ks.length - 1 ? '<button type="button" class="btn" data-restart="' + k + '" title="뒤 단계를 다 비우고 이 단계부터 다시">↺ 여기부터 다시</button>' : ''; }
   function panelHTML() {
@@ -578,6 +580,7 @@
       /* 칩 레일 — 지금 칸을 가운데로(세로는 안 움직인다). 경로 줄도 지금 칸이 보이게 */
       var rail = $('chips').querySelector('.hrail') || $('chips'), on = rail.querySelector('.hchip.on');
       if (on) rail.scrollLeft = Math.max(0, on.offsetLeft - (rail.clientWidth - on.offsetWidth) / 2);
+      centerTabs();
       var path = $('chips').querySelector('.hpath'), cr = path && path.querySelector('.hcrumb.on'); if (path) path.scrollLeft = cr ? Math.max(0, cr.offsetLeft - 24) : path.scrollWidth;   // 지금 칸이 없으면(단계·끝) 끝으로 — n/N 이 마지막 조각을 덮지 않게
       /* 단계가 바뀌면 새 단계 윗머리를 레일 바로 아래로 — 긴 목록 중간에서 골랐을 때 새 단계가 화면 밖에서 시작하지 않게 */
       if (was && was !== st.open) window.scrollTo({ top: Math.max(0, $('panel').getBoundingClientRect().top + window.scrollY - $('chips').offsetHeight - 8), behavior: 'auto' });
@@ -617,6 +620,7 @@
     if (b.dataset.ini != null) {   // 첫 글자 거르개 — 목록만 다시 그리고, 거른 목록 머리가 붙는 머리 바로 아래 오게
       st.ini = b.dataset.ini; $('subjects').innerHTML = subjectsHTML();
       var tb = $('subjects').querySelector('.gtabs.ini'); if (tb) window.scrollTo({ top: Math.min(window.scrollY, tb.getBoundingClientRect().top + window.scrollY - $('chips').offsetHeight - 4), behavior: 'auto' });
+      centerTabs();
       return;
     }
     if (b.id === 'help') { st.help = !st.help; render(); return; }
