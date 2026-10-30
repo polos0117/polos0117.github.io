@@ -331,7 +331,7 @@ const OLD = {
       const t = await p.locator('#prompt').inputValue();
       assert(t.startsWith('CONCEPT: a citizen of the Iron Nation, of the Steel House.') && t.includes('MECHA DESIGN') && t.includes('SCENE NOTE: a windy ridge'), '원소 세계 지시문');
       assert(t.includes('EXPOSURE (low)') && t.includes('hair color: silver') && t.includes('FACE (') && !t.includes('brushed-steel silver hair'), '설계 줄·외형 칸이 지시문에 ' + t.slice(0, 120));
-      assert(t.includes('SETTING: this card is set the orbital foundry floor') && t.includes('TIME & WEATHER: night') && t.includes('Mid-stride') && t.includes('EXPRESSION: level brow'), '장면·시간대·자세·표정이 지시문에');
+      assert(t.includes('SETTING (this card): the orbital foundry floor') && t.includes('TIME & WEATHER: night') && t.includes('Mid-stride') && t.includes('EXPRESSION: level brow'), '장면·시간대·자세·표정이 지시문에');
       assert.match(await p.locator('[data-open="scene"]').textContent(), /궤도 주조소 · 밤/, '장면 칩');
       assert.match(await p.locator('[data-open="look"]').textContent(), /1칸/, '외형 칩');
       assert.match(await p.locator('[data-open="world"]').textContent(), /메카/, '세계 칩');
