@@ -316,7 +316,9 @@ const OLD = {
       assert.match(await p.locator('a.opt[href*="element-atelier/prompt.html"]').getAttribute('href'), /card=fe-steel-bridge&o=casual/, '일상컷은 원소 공방 생성기로');
       await p.click('[data-out-mode="world"]'); assert.equal(await now(), 'world');
       assert.equal(await p.locator('#panel .opt[data-pick]').count(), 2, '철교는 판타지에 안 산다 — 세계 둘');
-      await p.click('[data-pick="mecha"]'); assert.equal(await now(), 'design', '세계 다음 설계 줄');
+      await p.click('[data-pick="mecha"]'); assert.equal(await now(), 'scene', '세계 다음 장면');
+      await p.selectOption('#panel select[data-sel]', 'night'); await p.click('[data-pick="foundry"]'); assert.equal(await now(), 'pose', '장면 다음 자세');
+      await p.selectOption('#panel select[data-sel]', 'confident'); await p.click('[data-pick="stride"]'); assert.equal(await now(), 'design', '자세 다음 설계 줄');
       assert.equal(await p.locator('#panel input[type="checkbox"]').count(), 2, '실루엣·얼굴 싣기');
       await p.selectOption('#panel select[data-sel]', 'low');
       await p.click('[data-next="design"]'); assert.equal(await now(), 'look', '설계 줄 다음 외형');
@@ -329,12 +331,14 @@ const OLD = {
       const t = await p.locator('#prompt').inputValue();
       assert(t.startsWith('CONCEPT: a citizen of the Iron Nation, of the Steel House.') && t.includes('MECHA DESIGN') && t.includes('SCENE NOTE: a windy ridge'), '원소 세계 지시문');
       assert(t.includes('EXPOSURE (low)') && t.includes('hair color: silver') && t.includes('FACE (') && !t.includes('brushed-steel silver hair'), '설계 줄·외형 칸이 지시문에 ' + t.slice(0, 120));
+      assert(t.includes('SETTING: this card is set the orbital foundry floor') && t.includes('TIME & WEATHER: night') && t.includes('Mid-stride') && t.includes('EXPRESSION: level brow'), '장면·시간대·자세·표정이 지시문에');
+      assert.match(await p.locator('[data-open="scene"]').textContent(), /궤도 주조소 · 밤/, '장면 칩');
       assert.match(await p.locator('[data-open="look"]').textContent(), /1칸/, '외형 칩');
       assert.match(await p.locator('[data-open="world"]').textContent(), /메카/, '세계 칩');
       await p.reload(); await p.waitForSelector('[data-open="out"]');
       assert.equal(await now(), 'done'); assert.equal(await p.locator('#prompt').inputValue(), t, '새로 고쳐도 남는다');
       assert.deepEqual(e.errors, []);
-      await e.ctx.close(); checks += 9;
+      await e.ctx.close(); checks += 13;
     }
 
     /* ②-3 신화 무기 — 액션 한 장(설계 언어·붙일 문단·자세·외형·장면 메모) · 각성 · 스킨(스킨·상태) */

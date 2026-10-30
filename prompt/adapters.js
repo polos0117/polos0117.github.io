@@ -245,7 +245,7 @@
     /* 카드 — 세계 하나, 설계 줄(실루엣·얼굴 싣기 · 노출), 외형 칸(game 과 같은 외형 선택지 — S 는 그 공방 표, lib/look-spec.js 가 붙어 있다), 덧붙임 글 셋(장소·상황 · 의상·소품 · 추가 연출).
        외형 칸은 세계마다 사람이 다르니 세계마다 따로(looks[세계]) */
     card: function (d, k, S, saved) {
-      var x = obj(saved), ws = this.worlds(d, k), c = { world: typeof x.world === 'string' && ws.indexOf(x.world) >= 0 ? x.world : '', notes: {}, looks: {} };
+      var x = obj(saved), ws = this.worlds(d, k), c = { world: typeof x.world === 'string' && ws.indexOf(x.world) >= 0 ? x.world : '', notes: {}, looks: {}, shots: {} };
       var nn = obj(x.notes); ['scene', 'outfit', 'custom'].forEach(function (f) { c.notes[f] = typeof nn[f] === 'string' ? nn[f] : ''; });
       var lk = obj(x.looks), norm = function (raw) {
         raw = obj(raw); var o = { faceDesignOn: raw.faceDesignOn !== false, silhouetteOn: raw.silhouetteOn !== false, exposure: (S.EXPOSURE_KEYS || ['']).indexOf(raw.exposure) >= 0 ? raw.exposure : (S.EXPOSURE_DEFAULT || ''), params: {}, locks: {} };
@@ -253,17 +253,20 @@
         return o;
       };
       ws.forEach(function (wk) { if (lk[wk]) c.looks[wk] = norm(lk[wk]); });
+      /* 장면·시간대·자세·표정 — 세계마다(열쇠 검사는 그 공방 normShot 이 지시문을 지을 때) */
+      var sh = obj(x.shots); ws.forEach(function (wk) { if (sh[wk]) { var o = obj(sh[wk]), r = {}; ['scene', 'time', 'pose', 'expr'].forEach(function (f) { if (typeof o[f] === 'string' && o[f]) r[f] = o[f]; }); c.shots[wk] = r; } });
       /* 지금 세계의 외형 칸은 늘 있다 — 단계 표가 바로 고친다 */
       if (c.world && !c.looks[c.world]) c.looks[c.world] = norm(null);
       return c;
     },
     /* 지금 세계의 외형 칸 — 세계를 바꾸면 그 세계 것(없으면 새 칸) */
+    shot: function (c) { if (!c.world) return null; if (!c.shots[c.world]) c.shots[c.world] = {}; return c.shots[c.world]; },
     look: function (c, S) { if (!c.world) return null; if (!c.looks[c.world]) c.looks[c.world] = { faceDesignOn: true, silhouetteOn: true, exposure: S.EXPOSURE_DEFAULT || '', params: {}, locks: {} }; return c.looks[c.world]; },
     buildCard: function (w, d, k, style, out, card) {
       if (out !== 'world') return '';
       var c = this.card(d, k, w.AtelierSpec, card); if (!c.world) return '';
       if (!d.style.styles[style]) style = this.defaultStyle(d);
-      return w.AtelierPrompt.build(d.design, d.style, k, c.world, { style: style, notes: c.notes, look: c.looks[c.world] });
+      return w.AtelierPrompt.build(d.design, d.style, k, c.world, { style: style, notes: c.notes, look: c.looks[c.world], shot: c.shots[c.world] });
     },
     build: function () { return ''; }
   };

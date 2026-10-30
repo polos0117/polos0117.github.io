@@ -157,35 +157,42 @@ for (const k of H.ORDER.filter(x => H.get(x).forms)) {   // 폼·개방 받침(g
     }
     const card = a.card(d, s.key, S, { world: ws[0] });
     const steps = ST.element('world', { A: a, D: d, S, P: w.AtelierPrompt, w: word, subject: s.key, g, card, rnd: l => l[0] });
-    assert.deepEqual(steps.map(x => x.key), ['world', 'design', 'look', 'notes'], s.key + ' 단계 표');
+    assert.deepEqual(steps.map(x => x.key), ['world', 'scene', 'pose', 'design', 'look', 'notes'], s.key + ' 단계 표');
+    assert(steps[1].parts[1].opts().length >= 3 && steps[2].parts[1].opts().length === 1 + S.WORLD_POSES.length, s.key + ' 장면·자세 선택지');
     assert.equal(steps[0].parts[1].opts().length, ws.length, s.key + ' 세계 선택지');
     steps.forEach(st => { st.shown(); st.parts.forEach(p => { if (typeof p.opts === 'function') p.opts(); }); });
     /* 설계 줄 — 체크의 메모가 설계표 look 의 어휘, 노출 고르개는 표의 열쇠. 외형 — 네 묶음 */
-    const design = steps[1], look = steps[2];
+    const design = steps[3], look = steps[4];
     assert(design.parts[1].note.includes(S.VOCAB_EN.hair_color[w.AtelierPrompt.lookOf(g).silhouette.hair_color]), s.key + ' 실루엣 메모에 설계 머리색');
     assert.equal(JSON.stringify(design.parts[3].opts.map(o => o[0])), JSON.stringify(S.EXPOSURE_KEYS), s.key + ' 노출 고르개');   // vm 영역 배열은 deepEqual 이 못 견준다
     assert.equal(JSON.stringify(look.parts[2].groups.map(gr => gr.key)), JSON.stringify(['base', 'build', 'face', 'hair']), s.key + ' 외형 네 묶음');
   }
   /* 외형 칸이 지시문에 — 세계마다 따로, 직접 고른 머리색이 실루엣을 이기고 IDENTITY 에, 끄면 빠진다, 노출 */
   {
-    const c = a.card(d, 'fe', S, { world: 'mecha', looks: { mecha: { params: { 'hair color': 'silver', bogus: 'x' }, exposure: 'low' }, fantasy: { faceDesignOn: false } } });
+    const c = a.card(d, 'fe', S, { world: 'mecha', looks: { mecha: { params: { 'hair color': 'silver', bogus: 'x' }, exposure: 'low' }, fantasy: { faceDesignOn: false } }, shots: { mecha: { scene: 'foundry', time: 'night', pose: 'stride', expr: 'confident', zz: 1 }, fantasy: { scene: 'foundry' } } });
+    assert.equal(JSON.stringify(c.shots.mecha), '{"scene":"foundry","time":"night","pose":"stride","expr":"confident"}', '장면 칸 바로잡기');
     assert.equal(JSON.stringify(Object.keys(c.looks).sort()), '["fantasy","mecha"]'); assert.equal(JSON.stringify(c.looks.mecha.params), '{"hair color":"silver"}', '모르는 열쇠는 버린다');
     const t = a.buildCard(w, d, 'fe', def, 'world', c);
     assert(t.includes('IDENTITY (chosen details override the automatic look)\nhair color: silver') && !t.includes('iron-grey hair') && t.includes('EXPOSURE (low)') && t.includes('FACE ('), '메카 외형 ' + t.slice(0, 80));
+    assert(t.includes('SETTING: this card is set the orbital foundry floor') && t.includes('TIME & WEATHER: night') && t.includes('Mid-stride') && t.includes('EXPRESSION: level brow'), '메카 장면·시간대·자세·표정');
     c.world = 'fantasy';
     const t2 = a.buildCard(w, d, 'fe', def, 'world', c);
-    assert(!t2.includes('FACE (') && t2.includes('iron-grey hair') && t2.includes('EXPOSURE (bold)') && !t2.includes('IDENTITY ('), '판타지는 그 세계의 외형 칸');
+    assert(!t2.includes('FACE (') && t2.includes('iron-grey hair') && t2.includes('EXPOSURE (bold)') && !t2.includes('IDENTITY (') && !t2.includes('SETTING: ') && t2.includes('Standing, card-ready pose'), '판타지는 그 세계의 외형·장면 칸(메카 장면 열쇠는 판타지에 없다)');
+    const steps0 = ST.element('world', { A: a, D: d, S, P: w.AtelierPrompt, w: word, subject: 'fe', g: a.subject(d, 'fe'), card: c, rnd: l => l[0] });
+    steps0[1].parts[1].set('forge'); steps0[1].parts[2].set('dawn'); steps0[2].parts[1].set('kneel');
+    const t3 = a.buildCard(w, d, 'fe', def, 'world', c); assert(t3.includes('SETTING: this card is set inside the great forge') && t3.includes('TIME & WEATHER: first light of dawn') && t3.includes('Down on one knee'), '장면·자세 단계가 그 세계 칸을 고친다');
+    assert.match(steps0[1].shown(), /대장간 안 · 새벽/); assert.match(steps0[2].shown(), /한쪽 무릎/);
     const steps = ST.element('world', { A: a, D: d, S, P: w.AtelierPrompt, w: word, subject: 'fe', g: a.subject(d, 'fe'), card: c, rnd: l => l[0] });
-    steps[1].parts[2].set(true); assert(a.buildCard(w, d, 'fe', def, 'world', c).includes('FACE ('), '설계 줄 체크가 그 세계 칸을 고친다');
-    steps[2].parts[1].items[0].run(); assert(Object.keys(c.looks.fantasy.params).length > 5 && !c.looks.fantasy.params['hair color'] && !c.looks.fantasy.params['face shape'], '외형 무작위는 설계가 쥔 칸을 비워 둔다');
-    steps[2].parts[1].items[1].run(); assert.equal(JSON.stringify(c.looks.fantasy.params), '{}', '외형 초기화');
+    steps[3].parts[2].set(true); assert(a.buildCard(w, d, 'fe', def, 'world', c).includes('FACE ('), '설계 줄 체크가 그 세계 칸을 고친다');
+    steps[4].parts[1].items[0].run(); assert(Object.keys(c.looks.fantasy.params).length > 5 && !c.looks.fantasy.params['hair color'] && !c.looks.fantasy.params['face shape'], '외형 무작위는 설계가 쥔 칸을 비워 둔다');
+    steps[4].parts[1].items[1].run(); assert.equal(JSON.stringify(c.looks.fantasy.params), '{}', '외형 초기화');
   }
   assert.equal(a.buildCard(w, d, 'fe', def, 'world', a.card(d, 'fe', S, null)), '', '세계를 안 고르면 지시문이 없다');
   assert.equal(a.buildCard(w, d, 'fe', def, 'casual', { world: 'fantasy' }), '', '일상컷은 허브 갈래가 아니다');
   assert(a.outputs().some(o => o.key === 'casual' && /element-atelier\/prompt\.html/.test(o.href)), '일상컷은 그 공방 생성기로 가는 문');
   const bad = a.card(d, 'fe-steel-bridge', S, { world: 'fantasy', notes: 'x' });
   assert.equal(bad.world, '', '철교는 판타지에 안 산다 — 비운다'); assert.deepEqual(bad.notes, { scene: '', outfit: '', custom: '' }, '덧붙임 바로잡기');
-  console.log('  element: 세계 지시문 ' + n + ' · 카드 ' + subs.length + ' · 단계 표(세계·설계 줄·외형·덧붙임) · 외형 칸(세계마다·이김·끄기·노출·무작위) · 일상컷 문 · 카드 바로잡기');
+  console.log('  element: 세계 지시문 ' + n + ' · 카드 ' + subs.length + ' · 단계 표(세계·장면·자세·설계 줄·외형·덧붙임) · 장면·시간대·자세·표정(세계마다) · 외형 칸(세계마다·이김·끄기·노출·무작위) · 일상컷 문 · 카드 바로잡기');
   checks++;
 }
 console.log('PASS 통합 생성기 받침: game·book 계획기와 같은 글 · 네 공방 대상·랜덤·화풍 · game·book 폼·개방 · 신화 초상·각성·저주·스킨 · 포켓몬 액션·폭주 · 원소 세계 그림 — ' + checks + '가지');
