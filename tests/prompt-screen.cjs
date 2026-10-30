@@ -388,6 +388,14 @@ const OLD = {
       assert.match(await b.page.locator('#status').textContent(), /act/);
       assert.equal(await b.page.evaluate(() => window.AtelierHubPrompt.state().open), 'act', '비운 칸부터 다시 연다');
       await b.ctx.close(); checks += 9;
+      /* 버전2 계획 컷(treeV 2 — pkm 계획기 기본) — 허브 단계는 버전1 칸이라 pkm 생성기로 같은 값을 넘긴다 */
+      const v2cut = { treeV: 2, era: 'now', place: 'home_living', ofam: 'everyday', posture: 'stand', support: 'none', frame: 'waist_up', body: 'front', head: 'with_body', camera: 'eye', aspect: '2:3', axes: cut.axes };
+      const v2q = CP.generatorQuery('피카츄', v2cut), h = await open('/prompt.html?a=pkm&' + v2q);
+      await h.page.waitForURL(/\/pkm-atelier\/prompt\.html\?/, { timeout: 15000 });
+      const went = new URL(h.page.url());
+      assert.equal(went.searchParams.get('mech'), '피카츄'); assert.equal(JSON.parse(went.searchParams.get('casual')).treeV, 2, '버전2 값 그대로');
+      assert.equal(went.searchParams.get('casual'), new URLSearchParams(v2q).get('casual'), '계획기 값 그대로 넘긴다');
+      await h.ctx.close(); checks += 3;
     }
 
     /* ③ 화면 크기 */

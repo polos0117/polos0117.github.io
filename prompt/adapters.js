@@ -13,6 +13,7 @@
        buildCard(w, d, key, style, 갈래, card) → 지시문(옛 생성기와 같은 입력)
      game·book 은 또 forms(d) → [{key, stage}] · pilot(d, key) → {form, open}(폼 열쇠) · facts(d, key, 폼) → {look, pose, setting, role, open}
      casualTexts — 일상컷 덧붙임 글 칸(없으면 옷·장소·추가 요청). planFrom(w, d, raw, 대상) — 일상컷 계획기 주소를 받는 공방(pkm)만.
+     planHome(대상, raw) — 버전2 계획 컷(treeV 2)을 넘길 그 공방 생성기 주소(허브 단계가 버전1 칸이라).
      lazy({이름: 자료 파일}) — 카드 갈래에 들어갈 때만 받는 큰 자료(pkm 원작 외형·종별 얼굴, 2MB 넘게). 없으면 null(옛 생성기도 못 받으면 없이 짓는다) */
 (function (root) {
   'use strict';
@@ -155,6 +156,8 @@
       /* 낱말(lib/words.js) — 단계 이름을 옛 생성기와 같게, 랜덤(lib/prompt-random.js) — 액션 장면 칸 목록 */
       libs: ['lib/words.js', 'lib/prompt-spec.js', 'lib/casual-tree.js', 'lib/prompt-anthro.js', 'lib/prompt-lifestyle.js', 'lib/prompt-random.js', 'lib/casual-plan.js'],
       /* 일상컷 계획기 주소(tools/casual-plan.cjs — ?mech=&casual=)를 받는다. 옛 생성기 lib/prompt-ui.js planned 와 같은 몫: 트리 위의 값만 {scene, locks, bad} */
+      /* 버전2 계획 컷은 허브 단계가 아직 못 받는다 — pkm 생성기(lib/prompt-state.js plannedV2 가 잠근다)로 같은 값을 넘긴다 */
+      planHome: function (mech, raw) { return '/pkm-atelier/prompt.html?mech=' + encodeURIComponent(mech) + '&casual=' + encodeURIComponent(raw); },
       planFrom: function (w, d, raw, c) { var CP = w.AtelierCasualPlan; return CP && c ? CP.fromQuery(w.AtelierSpec, raw, d.tree, { gen: c.gen }) : null; },
       data: { cards: 'data/card.json', tree: 'data/casual-tree.json' },
       lazy: { appearance: 'data/source-appearance.json', faces: 'data/face-design.json' },

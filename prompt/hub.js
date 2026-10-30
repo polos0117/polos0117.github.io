@@ -86,6 +86,9 @@
   function takePlan() {
     var raw = q('casual');
     if (!raw || !st.subject || !A.planFrom) return;
+    /* 버전2 계획 컷(treeV 2 — pkm 계획기 기본, 2026-10-30) — 허브의 일상컷 단계는 아직 버전1 칸이라 그 공방 생성기(버전2 화면)로 넘긴다 */
+    var v2 = null; try { v2 = JSON.parse(raw); } catch (e) { v2 = null; }
+    if (v2 && v2.treeV === 2 && A.planHome) { $('status').textContent = '버전2 계획 컷 — ' + A.ko + ' 생성기로 넘긴다.'; location.replace(A.planHome(st.subject, raw)); return; }
     var got = A.planFrom(window, D, raw, subj());
     if (!got) { $('status').textContent = '계획기 주소를 못 읽었다 — tools/casual-plan.cjs 로 다시 낸다.'; save(); return; }
     st.out = 'casual';
