@@ -208,7 +208,7 @@
      일상컷은 그 공방 생성기가 트리 버전2 로 고른다(허브 일상컷 단계는 버전1 칸) — 허브에선 그 생성기로 가는 문(href)만 둔다(noCasual). */
   A.element = {
     key: 'element', repo: 'element-atelier', ko: '원소', noCasual: true,
-    libs: ['lib/words.js', 'lib/prompt-spec.js', 'lib/casual-tree.js', 'lib/prompt-element.js'],
+    libs: ['lib/words.js', 'lib/prompt-spec.js', 'lib/look-spec.js', 'lib/casual-tree.js', 'lib/prompt-element.js'],
     data: { design: 'data/element-design.json', style: 'data/style.json', tree: 'data/casual-tree.json' },
     outputs: function () { return [{ key: 'world', ko: '세계 그림', note: '판타지 · 스팀펑크 · 메카 한 장 — 설계표가 짓고 덧붙임만 더한다' },
       { key: 'casual', ko: '일상컷', note: '트리 버전2 — 원소 공방 생성기에서 고른다', href: '/element-atelier/prompt.html?card={s}&o=casual' }]; },
@@ -242,17 +242,28 @@
     /* 일상컷 단계는 허브에 없다 — 표는 뼈대만(허브가 장면을 바로잡을 때 close 를 본다) */
     tables: function (S) { return { frames: [], lenses: [], poses: [], orients: [], exprs: rows(S.EXPRESSION_OPTIONS || []), axes: axesStd(S), close: S.CLOSE_FRAMES || [] }; },
     worlds: function (d, k) { var c = this.subject(d, k), all = (d.design.vocab || {}).worlds || []; if (!c) return []; return c.tier === 'citizen' ? all.filter(function (w) { return (c.citizen.worlds || []).indexOf(w) >= 0; }) : all.slice(); },
-    /* 카드 — 세계 하나와 덧붙임 글 셋(장소·상황 · 의상·소품 · 추가 연출) */
+    /* 카드 — 세계 하나, 설계 줄(실루엣·얼굴 싣기 · 노출), 외형 칸(game 과 같은 외형 선택지 — S 는 그 공방 표, lib/look-spec.js 가 붙어 있다), 덧붙임 글 셋(장소·상황 · 의상·소품 · 추가 연출).
+       외형 칸은 세계마다 사람이 다르니 세계마다 따로(looks[세계]) */
     card: function (d, k, S, saved) {
-      var x = obj(saved), ws = this.worlds(d, k), c = { world: typeof x.world === 'string' && ws.indexOf(x.world) >= 0 ? x.world : '', notes: {} };
+      var x = obj(saved), ws = this.worlds(d, k), c = { world: typeof x.world === 'string' && ws.indexOf(x.world) >= 0 ? x.world : '', notes: {}, looks: {} };
       var nn = obj(x.notes); ['scene', 'outfit', 'custom'].forEach(function (f) { c.notes[f] = typeof nn[f] === 'string' ? nn[f] : ''; });
+      var lk = obj(x.looks), norm = function (raw) {
+        raw = obj(raw); var o = { faceDesignOn: raw.faceDesignOn !== false, silhouetteOn: raw.silhouetteOn !== false, exposure: (S.EXPOSURE_KEYS || ['']).indexOf(raw.exposure) >= 0 ? raw.exposure : (S.EXPOSURE_DEFAULT || ''), params: {}, locks: {} };
+        var p = obj(raw.params); Object.keys(p).forEach(function (pk) { var base = pk.replace(/_custom$/, ''); if ((S.PARAM_DEFS || []).some(function (df) { return df.key === base; }) && typeof p[pk] === 'string' && p[pk]) o.params[pk] = p[pk]; });
+        return o;
+      };
+      ws.forEach(function (wk) { if (lk[wk]) c.looks[wk] = norm(lk[wk]); });
+      /* 지금 세계의 외형 칸은 늘 있다 — 단계 표가 바로 고친다 */
+      if (c.world && !c.looks[c.world]) c.looks[c.world] = norm(null);
       return c;
     },
+    /* 지금 세계의 외형 칸 — 세계를 바꾸면 그 세계 것(없으면 새 칸) */
+    look: function (c, S) { if (!c.world) return null; if (!c.looks[c.world]) c.looks[c.world] = { faceDesignOn: true, silhouetteOn: true, exposure: S.EXPOSURE_DEFAULT || '', params: {}, locks: {} }; return c.looks[c.world]; },
     buildCard: function (w, d, k, style, out, card) {
       if (out !== 'world') return '';
       var c = this.card(d, k, w.AtelierSpec, card); if (!c.world) return '';
       if (!d.style.styles[style]) style = this.defaultStyle(d);
-      return w.AtelierPrompt.build(d.design, d.style, k, c.world, { style: style, notes: c.notes });
+      return w.AtelierPrompt.build(d.design, d.style, k, c.world, { style: style, notes: c.notes, look: c.looks[c.world] });
     },
     build: function () { return ''; }
   };

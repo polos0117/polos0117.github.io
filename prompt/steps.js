@@ -200,17 +200,33 @@
     return list.concat(sceneSteps(x, sc, 'action'));
   }
 
-  /* ── element: 세계 그림 ── 세계(판타지·스팀펑크·메카 — 주민은 사는 세계만) → 덧붙임. 지시문은 그 공방 lib/prompt-element.js build 가 짓는다 */
+  /* ── element: 세계 그림 ── 세계(판타지·스팀펑크·메카 — 주민은 사는 세계만) → 설계 줄(실루엣·얼굴 싣기 · 노출) → 외형(game 과 같은 외형 선택지 — 그 공방 lib/look-spec.js) → 덧붙임.
+     외형은 세계마다 사람이 다르니 세계마다 따로(card.looks[세계]). 지시문은 그 공방 lib/prompt-element.js build 가 짓는다 */
   function element(out, x) {
-    var A = x.A, D = x.D, w = x.w, c = x.card, g = x.g || {}, n = g.nation || {};
+    var A = x.A, D = x.D, S = x.S, P = x.P, w = x.w, c = x.card, g = x.g || {}, n = g.nation || {};
     if (out !== 'world') return [];
     var WK = { fantasy: '판타지', steampunk: '스팀펑크', mecha: '메카' };
     var worlds = function () { return A.worlds(D, x.subject).map(function (k) { return { v: k, ko: w('world.' + k, WK[k] || k), sub: ((n.worlds || {})[k] || {}).ko || '' }; }); };
+    var lk = function () { return A.look(c, S) || { faceDesignOn: true, silhouetteOn: true, exposure: '', params: {}, locks: {} }; };
+    var dz = P && P.lookOf && g.nation ? P.lookOf(g) : { face: {}, silhouette: {} }, KO = S.LOOK_KO || { face: {}, sil: {} };
+    var vocab = function (box, pre) { return Object.keys(box || {}).filter(function (k) { return box[k]; }).map(function (k) { return w('look.' + pre + '.' + k, KO[pre][k] || k) + ' · ' + (((S.VOCAB_EN || {})[k] || {})[box[k]] || box[k]); }).join('\n'); };
+    var designed = function (k) { var l = lk(); return (l.faceDesignOn && Object.keys(S.FACE_PARAM || {}).some(function (f) { return S.FACE_PARAM[f] === k; })) || (l.silhouetteOn && Object.keys(S.SIL_PARAM || {}).some(function (f) { return S.SIL_PARAM[f] === k; })); };
+    var why = (g.family && g.family.look && g.family.look.why) || (n.look || {}).why || '';
+    var look = lookStep(x, lk(), designed, w('studio.look.design', '설계표대로'));
+    look.parts[0] = { type: 'note', text: w('studio.note.look', '자동 항목은 설계표와 모델이 정한다. 직접 고른 값이 설계 줄을 이긴다. 세계마다 사람이 다르니 세계마다 따로 고른다.') };
     return [
       { key: 'world', ko: '세계', shown: function () { return c.world ? w('world.' + c.world, WK[c.world] || c.world) : '—'; },
         parts: [{ type: 'note', text: g.tier === 'citizen' ? '주민은 사는 세계만. 얼굴·생김새·자세는 세계마다 따로 뽑는다.' : '얼굴·생김새·자세는 세계마다 따로 뽑는다.' },
           { type: 'pick', opts: worlds, get: function () { return c.world; }, set: function (v) { c.world = v; } }],
         random: function () { var o = worlds().map(function (r) { return r.v; }).filter(function (v) { return v !== c.world; }); if (o.length) c.world = x.rnd(o); } },
+      { key: 'design', ko: w('studio.step.design', '설계 줄'), next: true,
+        shown: function () { var l = lk(); return [l.silhouetteOn ? w('studio.design.sil', '실루엣') : w('studio.design.sil.off', '실루엣 끔'), l.faceDesignOn ? w('studio.design.face', '얼굴') : w('studio.design.face.off', '얼굴 끔'), w('studio.exposure.' + (l.exposure || 'auto'), l.exposure || '노출 자동')].join(' · '); },
+        parts: [{ type: 'note', text: w('studio.note.design', '설계표의 외형 성향(팔레트 색 → 머리·눈 색)을 싣는다. 끄면 그 묶음을 빼고, 외형에서 직접 고른 항목이 이긴다.') + (why ? '\n' + w('studio.design.why', '왜 이 외형인가 — {why}').replace('{why}', why) : '') },
+          { type: 'check', ko: w('studio.design.sil.use', '실루엣 싣기'), note: lk().silhouetteOn ? vocab(dz.silhouette, 'sil') : '', get: function () { return lk().silhouetteOn; }, set: function (v) { lk().silhouetteOn = v; } },
+          { type: 'check', ko: w('studio.design.face.use', '얼굴 설계 싣기'), note: lk().faceDesignOn ? vocab(dz.face, 'face') : '', get: function () { return lk().faceDesignOn; }, set: function (v) { lk().faceDesignOn = v; } },
+          { type: 'select', id: 'exposure', ko: w('studio.exposure', '노출'), opts: (S.EXPOSURE_KEYS || ['']).map(function (k) { return [k, w('studio.exposure.' + (k || 'auto'), k || '자동')]; }),
+            help: w('studio.exposure.help.' + (lk().exposure || 'auto'), ''), get: function () { return lk().exposure; }, set: function (v) { lk().exposure = v; } }] },
+      look,
       { key: 'notes', ko: '덧붙임', next: true, shown: function () { var k = Object.keys(c.notes).filter(function (f) { return (c.notes[f] || '').trim(); }).length; return k ? k + '칸' : '없음'; },
         parts: [{ type: 'note', text: '비워도 된다 — 설계표가 지시문을 짓는다. 쓰면 그 글이 더해진다.' }].concat([['scene', 'studio.notes.scene', '장소·상황'], ['outfit', 'studio.notes.outfit', '의상·소품'], ['custom', 'studio.notes.custom', '추가 연출 요청']].map(function (f) {
           return { type: 'text', id: f[0], ko: w(f[1], f[2]), multi: true, get: function () { return c.notes[f[0]]; }, set: function (t) { var nn = Object.assign({}, c.notes); nn[f[0]] = t; c.notes = nn; } }; })) }];
