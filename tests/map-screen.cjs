@@ -1,7 +1,7 @@
-/* 공방 지도 — 방 여섯이 서고, 올리면 빛나고 이름·미리보기가 뜨고, 누르면 다가가며 문들이 보이고, Esc·뒤로 가기로 돌아온다.
+/* 공방 지도(대미궁, 방 여덟 — 2026-10-30 도트 공방·이미지 공방) — 방 여덟이 서고, 올리면 빛나고 이름·미리보기가 뜨고, 누르면 다가가며 문들이 보이고, Esc·뒤로 가기로 돌아온다.
    오늘 기록(atelier_today_v1:<방> — 각 공방이 적는다)을 읽어 오늘 판을 둔 방에 불(빛·이름표 아래 줄)을 켜고, 문 패널·목록에 「오늘의 판」을 두고,
    공방 첫 화면의 Last-Modified 가 마지막으로 다녀간 뒤면 이름표에 새 소식 점을 찍는다. 문을 누르면 다녀간 자국(seen)이 남는다.
-   휴대폰 세로(390×844)·가로(844×390)·PC(1280×900)에서 가로로 넘치지 않고, 가로에선 지도가 화면 높이에 든다.
+   휴대폰 세로(390×844)·가로(844×390)·PC(1280×900)에서 가로로 넘치지 않는다. 지도가 세로로 길어(2:3) 가로 화면에선 너비를 정해 두고 굴려 본다.
    아래 "모든 공방" 목록의 링크가 지도의 문들과 같다. 바깥 그림(각 공방의 그림 저장소)은 받지 않는다 — 404 로 돌린다.
    Run: CHROMIUM_PATH=<chrome> node tests/map-screen.cjs   (playwright 가 require 되는 자리에서 — NODE_PATH) */
 const assert = require('node:assert/strict'), http = require('node:http'), fs = require('node:fs'), path = require('node:path');
@@ -17,7 +17,7 @@ const server = http.createServer((q, s) => {
   const f = path.join(ROOT, decodeURIComponent(url.pathname.replace(/\/$/, '/index.html')));
   fs.readFile(f, (e, d) => { if (e) { s.writeHead(404); return s.end(); } s.setHeader('Content-Type', MIME[path.extname(f)] || 'application/octet-stream'); s.setHeader('Last-Modified', LM.toUTCString()); s.end(d); });
 }).listen(PORT);
-const ROOMS = ['gundam', 'book', 'samguk', 'pokemon', 'myth', 'game'];
+const ROOMS = ['gundam', 'book', 'samguk', 'pokemon', 'myth', 'game', 'dot', 'image'];
 /* 오늘 기록 — 서재는 오늘 2판 1승에 오늘의 판을 끝냈고 방금(앞으로 한 시간 뒤까지) 다녀갔다, 대장간은 1판, 격납고는 판은 없고 하루 전에 다녀갔다(그 뒤 배포 → 새 소식) */
 const NOW = Date.now(), SEED = {
   'atelier_today_v1:book': { d: T.today(), n: 2, w: 1, daily: true, at: NOW, seen: NOW + 3600e3 },
@@ -38,8 +38,8 @@ const NOW = Date.now(), SEED = {
       const noOverflow = async () => assert(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), name + ' 가로 넘침');
       await p.goto(BASE + '/'); await p.waitForSelector('.room'); await p.waitForFunction(() => document.querySelector('#stage img').complete);
       /* 방 여섯 — 다각형·이름표·카드 */
-      assert.deepEqual(await p.locator('.room').evaluateAll(es => es.map(e => e.dataset.key)), ROOMS, name + ' 방 여섯');
-      assert.equal(await p.locator('.pin').count(), 6, '이름표 여섯'); assert.equal(await p.locator('.card').count(), 6, '카드 여섯');
+      assert.deepEqual(await p.locator('.room').evaluateAll(es => es.map(e => e.dataset.key)), ROOMS, name + ' 방 여덟');
+      assert.equal(await p.locator('.pin').count(), 8, '이름표 여덟'); assert.equal(await p.locator('.card').count(), 8, '카드 여덟');
       /* 오락실(게임의 공방)은 오늘의 판이 아직 없다 — 그 문을 두지 않는다 */
       assert.equal(await p.locator('.card[data-key="game"] a.daily').count(), 0, name + ' 오락실에 오늘의 판 문이 없다');
       assert.equal(await p.locator('.card[data-key="book"] a.daily').count(), 1, name + ' 서재에는 오늘의 판 문');
@@ -61,8 +61,8 @@ const NOW = Date.now(), SEED = {
       await p.waitForSelector('.pin[data-key="gundam"].news');
       assert.deepEqual(await p.locator('.pin.news').evaluateAll(es => es.map(e => e.dataset.key)), ['gundam'], name + ' 새 소식은 다녀간 뒤 배포된 방에만');
       const stage = await p.locator('#stage').boundingBox();
-      assert(Math.abs(stage.width / stage.height - 1448 / 1086) < .02, name + ' 무대는 그림 비율');
-      if (vp.width > vp.height) assert(stage.y + stage.height <= vp.height + 1, name + ' 가로 — 지도가 화면 높이에 든다: ' + JSON.stringify(stage));
+      assert(Math.abs(stage.width / stage.height - 1024 / 1536) < .02, name + ' 무대는 그림 비율');
+      if (vp.width > vp.height) assert(stage.width <= (vp.height <= 500 ? 521 : 721), name + ' 가로 — 지도 폭을 정해 둔다(세로로 긴 그림): ' + JSON.stringify(stage));
       /* 이름표가 제 방 안에 있다 — 다각형의 중심과 가깝다 */
       for (const k of ROOMS) {
         const inside = await p.evaluate(k => { const poly = document.querySelector(`.room[data-key="${k}"] polygon`), pin = document.querySelector(`.pin[data-key="${k}"]`);
@@ -100,7 +100,10 @@ const NOW = Date.now(), SEED = {
       const cardLinks = await p.locator('.card .links a:not(.daily)').evaluateAll(es => es.map(e => e.getAttribute('href')));
       const doorLinks = await p.evaluate(() => ROOMS.flatMap(r => r.links.map(l => l[1])));
       assert.deepEqual(cardLinks, doorLinks, '목록의 링크 = 방의 문들');
-      assert(cardLinks.every(h => /^\/[a-z-]+\/([a-z]+\.html)?$/.test(h)), '링크 꼴');
+      assert(cardLinks.every(h => /^\/([a-z-]+\/)?([a-z]+\.html)?$/.test(h)), '링크 꼴');
+      /* 도트 공방·이미지 공방 — 허브 안의 쪽으로 가는 문 하나씩, 오늘의 판은 없다 */
+      assert.deepEqual(await p.evaluate(() => ROOMS.filter(r => r.key === 'dot' || r.key === 'image').map(r => r.links.map(l => l[1]))), [['/dot.html'], ['/prompt.html']], name + ' 새 방 둘의 문');
+      assert.equal(await p.locator('.card[data-key="dot"] a.daily, .card[data-key="image"] a.daily').count(), 0, name + ' 새 방 둘엔 오늘의 판이 없다');
       assert.deepEqual(await p.locator('.card a.daily').evaluateAll(es => es.map(e => e.getAttribute('href'))), await p.evaluate(() => ROOMS.filter(r => r.daily).map(r => r.daily)), '목록에도 오늘의 판(있는 방만)');
       assert.doesNotMatch(await p.locator('.card[data-key="myth"] a.daily').textContent(), /끝냈다/, '끝내지 않은 방은 표 없음');
       /* 새 소식 방에 다가가면 문 패널에 말이, 문을 누르면 다녀간 자국이 남아 다음엔 새 소식이 아니다 */
@@ -115,6 +118,6 @@ const NOW = Date.now(), SEED = {
       assert.deepEqual(errors, [], name + ' 오류 없음');
       await ctx.close();
     }
-    console.log('PASS 공방 지도: 방 여섯·이름표·카드 · 빛나기·미리보기 · 다가가기·문·주소·Esc·뒤로 가기 · 오늘 불·오늘 줄·오늘의 판·새 소식·다녀간 자국 · 세로/가로/PC 넘침 없음, 가로는 화면 높이에');
+    console.log('PASS 공방 지도: 방 여덟(도트·이미지 공방까지)·이름표·카드 · 빛나기·미리보기 · 다가가기·문·주소·Esc·뒤로 가기 · 오늘 불·오늘 줄·오늘의 판·새 소식·다녀간 자국 · 세로/가로/PC 넘침 없음, 가로는 폭을 정해 굴린다');
   } finally { await br.close(); server.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

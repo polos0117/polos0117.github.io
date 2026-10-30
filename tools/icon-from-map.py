@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""앱 아이콘 — 공방 지도 그림(img/map.webp)에서 건물을 잘라 만든다(2026-10-26, 방 여섯 지도부터).
+"""앱 아이콘 — 공방 지도 그림(img/map.webp)에서 가운데를 잘라 만든다(2026-10-26 방 여섯 지도부터, 2026-10-30 대미궁 지도 — 호수와 방 여덟을 네모로).
 
   python3 tools/icon-from-map.py
 
@@ -13,8 +13,8 @@ import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 src = Image.open(os.path.join(ROOT, 'img', 'map.webp')).convert('RGB')
-k = src.size[0] / 1448                                   # 좌표는 1448 기준(ROOMS 와 같다)
-crop = src.crop((int(15 * k), int(10 * k), int(1435 * k), int(1060 * k)))
+k = src.size[0] / 1024                                   # 좌표는 1024 기준(ROOMS 와 같다)
+crop = src.crop((int(0 * k), int(60 * k), int(1024 * k), int(1084 * k)))   # 세로 그림 — 방 여덟과 호수가 든 위쪽 네모
 a = np.array(src)
 corners = np.concatenate([a[:40, :40].reshape(-1, 3), a[:40, -40:].reshape(-1, 3), a[-40:, :40].reshape(-1, 3), a[-40:, -40:].reshape(-1, 3)])
 BG = tuple(int(x) for x in np.median(corners, axis=0))

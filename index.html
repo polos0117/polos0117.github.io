@@ -6,9 +6,9 @@
 <title>공방 모음</title>
 <meta name="description" content="건담 · 삼국지 · 포켓몬 · 신화 무기 · 책 — 공방 지도에서 방을 골라 들어간다.">
 <meta name="theme-color" content="#0f0e12">
-<link rel="icon" href="icon-192.png?v=2">
+<link rel="icon" href="icon-192.png?v=3">
 <link rel="manifest" href="app.webmanifest">
-<link rel="apple-touch-icon" href="icon-180.png?v=2">
+<link rel="apple-touch-icon" href="icon-180.png?v=3">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -17,7 +17,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&display=swap">
 <!--
-  첫 화면 = 공방 지도 한 장(img/map.webp 2896×2172 — 지붕을 걷어낸 큰 건물, 방 여섯 — 위 셋·아래 셋). 방 자리는 ROOMS 표의 다각형(1448×1086 기준 좌표 — 그림은 그 2배라 비율로 맞는다)이고
+  첫 화면 = 공방 지도 한 장(img/map.webp 2048×3072 세로 — 산속 드워프 대미궁, 2026-10-30). 절벽 폭포 옆 동굴 입구 → 계단 → 가운데 둥근 지하 호수를 도는 길 → 왼쪽 넷·오른쪽 넷의 방 여덟.
+  방 자리는 ROOMS 표의 다각형(1024×1536 기준 좌표 — 그림은 그 2배라 비율로 맞는다)이고
   SVG viewBox 가 그림 크기라 화면이 바뀌어도 같이 늘어난다. 글자는 그림에 없다 — 이름표·미리보기는 화면이 얹는다.
   방에 올리면 빛나고 이름·대표 그림이 뜬다. 누르면 지도가 그 방으로 다가가고(transform) 그 공방의 문들(하위 링크)이 보인다.
   주소에 #gundam 처럼 남아 뒤로 가기·공유가 된다. 등불이 복도를 오간다(SMIL). 지도 아래 "모든 공방" 목록은 지도가 불편한 사람·화면 읽기 프로그램의 길.
@@ -50,7 +51,7 @@ a { color: inherit; }
 
 /* ── 지도 ── */
 .map { position: relative; max-width: 1280px; margin: 0 auto; padding: 0 8px; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
-.stage { position: relative; aspect-ratio: 1448 / 1086; width: 100%; overflow: hidden; border-radius: 14px; background: #06070b radial-gradient(70% 60% at 50% 45%, #1b1726, #06070b 70%); isolation: isolate; }
+.stage { position: relative; aspect-ratio: 1024 / 1536; width: 100%; overflow: hidden; border-radius: 14px; background: #06070b radial-gradient(70% 60% at 50% 45%, #1b1726, #06070b 70%); isolation: isolate; }
 .inner { position: absolute; inset: 0; transform-origin: 0 0; transition: transform .7s cubic-bezier(.2, .8, .2, 1); will-change: transform; }
 .inner > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; display: block; }
 .inner > svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
@@ -103,11 +104,12 @@ a { color: inherit; }
 .links a.main:hover { color: #111; filter: brightness(1.08); }
 .doors .back { margin-top: 12px; }
 .hint { max-width: 1280px; margin: 6px auto 0; padding: 0 16px; color: #6f6973; font-size: 12px; text-align: center; }
-/* 가로 — 지도가 화면 높이에 들어가게(4:3 그대로, 너비를 줄인다). 다가가면 문 패널이 오른쪽에 */
+/* 가로 — 세로로 긴 지도(2:3)라 화면 높이에 넣으면 너무 작다(2026-10-30) — 너비를 정해 두고 굴려 본다. 다가가면 문 패널이 오른쪽에 */
 @media (orientation: landscape) {
-  .stage { width: min(100%, calc((100dvh - 96px) * 1448 / 1086)); margin: 0 auto; }
+  .stage { width: min(100%, 720px); margin: 0 auto; }
   .map.zoomed { grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); align-items: start; }
-  .map.zoomed .stage { width: 100%; }
+  .map.zoomed .stage { width: min(100%, 720px); }
+  .map.zoomed .doors { position: sticky; top: 12px; }   /* 다가간 방은 긴 무대 가운데 — 굴려 내려와도 문 패널이 화면 위에 남는다 */
 }
 @media (orientation: landscape) and (max-height: 500px) {
   /* 제목·안내를 지도 위에 겹쳐 지도가 높이를 다 쓴다 */
@@ -116,15 +118,12 @@ a { color: inherit; }
   .head p, .head h1 { pointer-events: auto; text-shadow: 0 2px 8px #000; }
   .head h1 { font-size: 18px; } .head h1 small { display: none; }
   .map { padding-top: calc(4px + env(safe-area-inset-top)); }
-  .stage { width: min(100%, calc((100dvh - 8px - env(safe-area-inset-top)) * 1448 / 1086)); }
+  .stage { width: min(100%, 520px); }
+  .map.zoomed .stage { width: min(100%, 520px); }
   .hint { display: none; }
   body.zoomed .head { display: none; }   /* 다가가면 제목·안내 글이 확대된 그림·문 패널과 겹친다 — 숨긴다("← 지도로" 가 길) */
   .doors { padding: 10px 12px 12px; } .doors h2 { font-size: 22px; } .doors p { margin: 6px 0 10px; font-size: 13px; }
   .links a, .links button { min-height: 38px; padding: 0 12px; font-size: 13px; }
-}
-/* 폰 세로 — 다가가면 무대를 조금 키워(4:3 보다 높게) 방이 크게 보이게 */
-@media (max-width: 760px) and (orientation: portrait) {
-  .map.zoomed .stage { aspect-ratio: auto; height: 58vh; }
 }
 
 /* ── 맨 아래 — 모든 공방 한눈에. 지도가 불편할 때의 길이라 짧게: 한 공방 = 한 줄(작은 그림 · 이름 · 문들) ──
@@ -184,15 +183,15 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
 <section class="map" id="map" aria-label="공방 지도">
   <div class="stage" id="stage">
     <div class="inner" id="inner">
-      <img src="img/map.webp" alt="지붕을 걷어낸 큰 건물 안에 방 여섯 — 격납고·서재·군막·연구소·오락실·대장간" decoding="async" fetchpriority="high">
-      <svg id="svg" viewBox="0 0 1448 1086" aria-hidden="true" focusable="false">
+      <img src="img/map.webp?v=3" alt="산속 대미궁 — 절벽 폭포 옆 동굴 입구에서 계단을 올라 가운데 지하 호수를 도는 길, 왼쪽에 격납고·연구소·오락실·도트 공방, 오른쪽에 서재·군막·대장간·이미지 공방" decoding="async" fetchpriority="high">
+      <svg id="svg" viewBox="0 0 1024 1536" aria-hidden="true" focusable="false">
         <defs>
           <filter id="glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
           <filter id="lamp" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-          <!-- 복도 — 등불이 다니는 길. 그림을 바꾸면 같이 다시 긋는다(2026-10-26 오락실이 옛 복도 자리에 들어와 첫 길은 입구에서 오락실을 지나 뒤 복도로) -->
-          <path id="way1" d="M 615 905 C 630 760, 640 600, 660 470 C 700 440, 800 440, 900 450 C 980 455, 1000 480, 960 500"/>
-          <path id="way2" d="M 660 470 C 640 420, 600 420, 560 410 C 480 395, 300 400, 150 420 C 280 405, 500 410, 630 430"/>
-          <path id="way3" d="M 1300 560 C 1200 540, 1100 520, 980 500 C 900 480, 760 460, 690 480 C 760 500, 900 520, 1300 560"/>
+          <!-- 길 — 등불이 다니는 길(1024×1536). 동굴 입구 계단을 올라 호수 앞 길로, 호수를 왼쪽·오른쪽으로 돌아 뒤에서 만난다. 그림을 바꾸면 같이 다시 긋는다 -->
+          <path id="way1" d="M 555 1475 C 560 1380, 575 1300, 585 1240 C 600 1150, 570 1050, 545 975 C 520 905, 440 865, 340 840"/>
+          <path id="way2" d="M 340 840 C 300 760, 290 640, 300 520 C 310 440, 360 400, 450 380 C 500 370, 560 370, 600 380"/>
+          <path id="way3" d="M 690 830 C 730 760, 745 640, 725 520 C 705 440, 660 400, 600 380 C 560 370, 500 372, 450 380"/>
         </defs>
         <g id="rooms"></g>
         <g id="glows"></g>
@@ -214,51 +213,62 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
   <p>바로 들어가기</p>
   <div class="grid" id="cards"></div>
   <p class="all-fav"><a href="favorites.html" id="fav-all"><span aria-hidden="true">♡</span> 내 즐겨찾기 <i id="fav-all-n">공방 도감에서 하트로 담은 그림을 한곳에서</i></a>
-    <a href="dot.html" id="dot-all"><span aria-hidden="true">▦</span> 도트 공방 <i>다섯 공방 인물의 도트 — 지시문·그리기·정리기</i></a>
-    <a href="prompt.html" id="prompt-all"><span aria-hidden="true">✎</span> 통합 생성기 <i>네 공방 일상컷 지시문 — 트리대로 한 단계씩</i></a></p>
+</p>
 </section>
 <footer>polos0117 · 개인 공방 · 홈 화면에 추가하면 앱처럼 열린다</footer>
 
 <script src="today.js"></script>
 <script src="favorites.js"></script>
 <script>
-/* 방 표 — 다각형은 img/map.webp 의 픽셀 좌표(1448×1086). 꼭짓점은 방을 두른 벽 윗면의 안쪽 모서리(그림 위에 겹쳐 따 맞춘다 — 2026-10-20 처음 것은 기울기가 반대로 돌아 있었다). 그림을 바꾸면 여기만 다시 잰다.
+/* 방 표 — 다각형은 img/map.webp 의 픽셀 좌표(1024×1536 기준). 꼭짓점은 바위에 판 방의 벽 테두리(그림 위에 겹쳐 따 맞춘다). 그림을 바꾸면 여기만 다시 잰다.
+   대미궁 지도(2026-10-30) — 왼쪽 위에서부터 격납고·연구소·오락실·도트 공방, 오른쪽 위에서부터 서재·군막·대장간·이미지 공방.
    at: 이름표 자리, peek: 미리보기 그림(각 공방의 그림 저장소), links: 문들(첫 번째가 큰 문), daily: 오늘의 판(날짜가 씨앗 — 그 공방이 ?daily 를 읽는다) */
 const ROOMS = [
   { key: 'gundam', name: '건담 격납고', title: '건담 드래프트', sub: '기동전사 · 3D 격납고', num: '01 / HANGAR', c: '#7fb3ff', tint: '#151a21',
-    poly: [[232, 48], [578, 62], [505, 388], [92, 358]], at: [380, 230],
+    poly: [[90, 110], [300, 95], [330, 270], [300, 295], [85, 285], [60, 200]], at: [200, 190],
     peek: '/atelier/img/thumb/RX-78-2_건담_f.webp', cover: '/atelier/img/thumb/RX-78-2_건담_f.webp',
     desc: '3D 격납고를 걸어 다니며 기체를 둘러보고, 드래프트로 출격한다.',
     links: [['격납고', '/atelier/'], ['드래프트', '/atelier/play.html'], ['도감', '/atelier/dex.html'], ['프롬프트', '/atelier/prompt.html']], daily: '/atelier/play.html?daily' },
   { key: 'book', name: '책의 서재', title: '책의 공방', sub: '고전 · 발단 · 전개 · 결말', num: '02 / LIBRARY', c: '#e39b6b', tint: '#1c1210',
-    poly: [[615, 65], [952, 108], [885, 440], [548, 400]], at: [770, 270],
+    poly: [[720, 120], [960, 110], [980, 230], [960, 310], [720, 310], [700, 210]], at: [840, 210],
     peek: '/book-atelier-img/img/thumb/don_quixote_middle_literary_fantasy_f.webp', cover: '/book-atelier-img/img/thumb/don_quixote_middle_literary_fantasy_f.webp',
     desc: '도서관에서 깨어난 책들이, 자신의 이야기를 세상에 남기기 위해 싸운다. 책 한 권이 한 사람이 된다. 결투 한 판, 서고를 아홉 층 내려가는 탐험.',
     links: [['서재', '/book-atelier/'], ['서가', '/book-atelier/dex.html'], ['결투', '/book-atelier/duel.html'], ['탐험', '/book-atelier/run.html'], ['프롬프트', '/book-atelier/prompt.html']], daily: '/book-atelier/duel.html?daily' },
   { key: 'samguk', name: '삼국지 군막', title: '삼국지 쟁탈전', sub: '장수를 뽑아 진영을 꾸린다', num: '03 / 竹簡', c: '#c9a227', tint: '#17130f',
-    poly: [[962, 112], [1340, 172], [1300, 548], [898, 462]], at: [1150, 320],
+    poly: [[780, 330], [990, 340], [1000, 450], [980, 540], [760, 540], [740, 430]], at: [870, 440],
     peek: '/sam-atelier/images/large/관우.jpg', cover: '/sam-atelier/images/large/관우.jpg',
     desc: '위·촉·오의 장수들을 드래프트로 모아 한 진영을 짠다.',
     links: [['들어가기', '/sam-atelier/']], daily: '/sam-atelier/?daily' },
   { key: 'pokemon', name: '포켓몬 연구소', title: '포켓몬 메카 연구소', sub: '메카 의인화 · 연구소', num: '04 / LAB', c: '#f4c542', tint: '#2a2718',
-    poly: [[95, 425], [470, 450], [405, 748], [105, 700]], at: [280, 580],
+    poly: [[40, 320], [270, 300], [295, 420], [270, 490], [60, 480], [15, 400]], at: [155, 400],
     peek: '/pkm-atelier-img/img/thumb/피카츄_heavy_cinematic_semi_real_f.webp', cover: '/pkm-atelier-img/img/thumb/피카츄_heavy_cinematic_semi_real_f.webp',
     desc: '포켓몬을 메카로 의인화한 도감과 전투, 일곱 판 달리기, 진화 결투, 폼 결투.',
     links: [['연구소', '/pkm-atelier/'], ['도감', '/pkm-atelier/dex.html'], ['전투', '/pkm-atelier/battle.html'], ['런', '/pkm-atelier/run.html'], ['결투', '/pkm-atelier/lane.html'], ['폼 결투', '/pkm-atelier/gwent.html'], ['프롬프트', '/pkm-atelier/prompt.html']], daily: '/pkm-atelier/survey.html?daily' },
   { key: 'myth', name: '신화 무기 대장간', title: '신화 무기 공방', sub: '열한 권 · 백여든일곱 자루', num: '05 / FORGE', c: '#d9b45a', tint: '#121016',
-    poly: [[950, 535], [1342, 605], [1305, 878], [885, 848]], at: [1110, 710],
+    poly: [[770, 560], [990, 560], [1010, 660], [990, 750], [760, 750], [745, 660]], at: [875, 655],
     peek: '/myth-atelier-img/img/thumb/묠니르_game_keyart_f.webp', cover: '/myth-atelier-img/img/thumb/묠니르_game_keyart_f.webp',
     desc: '신화 속 무기가 사람이 되어 싸운다. 오토 배틀러·결투와 3D 박물관.',
     links: [['공방', '/myth-atelier/'], ['오토 배틀', '/myth-atelier/auto.html'], ['박물관', '/myth-atelier/museum.html'], ['도감', '/myth-atelier/dex.html'], ['드래프트', '/myth-atelier/draft.html'], ['던전', '/myth-atelier/run.html'], ['결투', '/myth-atelier/duel.html'], ['프롬프트', '/myth-atelier/prompt.html']], daily: '/myth-atelier/duel.html?daily' },
   /* 오락실(2026-10-26) — 옛 아래 가운데 복도 자리, 앞 계단 입구가 이리로 열린다. 미리보기는 테트리스 타이틀 폼(시범 그림, 2026-10-26).
      오늘의 판(daily)은 결투가 붙으면 적는다 — 없으면 문 패널에 그 문을 두지 않는다 */
   { key: 'game', name: '게임 오락실', title: '게임의 공방', sub: '게임 의인화 · 타이틀 · 중반 · 엔딩', num: '06 / ARCADE', c: '#ff6ad5', tint: '#1d1020',
-    poly: [[505, 488], [935, 528], [868, 838], [425, 785]], at: [680, 660],
+    poly: [[20, 505], [250, 505], [275, 610], [255, 690], [15, 690], [0, 600]], at: [135, 600],
     peek: '/game-atelier-img/img/thumb/tetris_title_glossy_kr_game_f.webp', cover: '/game-atelier-img/img/thumb/tetris_title_glossy_kr_game_f.webp',
     desc: '게임 한 편이 한 사람이 되고, 그 게임의 조작이 그녀의 능력이 된다. 첫 묶음 열 편의 도감과 그림 프롬프트.',
     links: [['첫 화면', '/game-atelier/'], ['도감', '/game-atelier/dex.html'], ['프롬프트', '/game-atelier/prompt.html']] },
+  /* 도트 공방·이미지 공방(2026-10-30) — 대미궁 지도의 앞 두 방. 허브 안의 쪽이라 문은 하나씩, 미리보기는 지도의 그 방 */
+  { key: 'dot', name: '도트 공방', title: '도트 공방', sub: '다섯 공방 인물의 도트', num: '07 / PIXEL', c: '#5fe3c0', tint: '#0f1c1a',
+    poly: [[30, 720], [290, 720], [310, 850], [290, 990], [110, 1000], [20, 880]], at: [165, 860],
+    peek: 'img/room-dot.webp', cover: 'img/room-dot.webp',
+    desc: '다섯 공방 인물을 도트로 — 지시문을 만들고, 그리고, 격자에 맞춰 정리한다.',
+    links: [['도트 공방', '/dot.html']] },
+  { key: 'image', name: '이미지 공방', title: '이미지 공방', sub: '통합 생성기 · 네 공방 그림 지시문', num: '08 / STUDIO', c: '#f3b8a6', tint: '#1e1514',
+    poly: [[720, 775], [980, 775], [1000, 900], [970, 1030], [760, 1030], [700, 900]], at: [850, 905],
+    peek: 'img/room-image.webp', cover: 'img/room-image.webp',
+    desc: '게임·책·신화·포켓몬 네 공방의 그림 지시문을 한곳에서 — 고르면 다음 단계로, 계획을 불러와 한 단계씩.',
+    links: [['통합 생성기', '/prompt.html']] },
 ];
-const IW = 1448, IH = 1086;
+const IW = 1024, IH = 1536;
 const $ = s => document.querySelector(s);
 const map = $('#map'), stage = $('#stage'), inner = $('#inner'), rooms = $('#rooms'), pins = $('#pins'), doors = $('#doors'), cards = $('#cards'), glows = $('#glows');
 const T = window.AtelierToday;   /* 오늘 기록(today.js) — 각 공방이 적고 지도가 읽는다 */
@@ -367,7 +377,8 @@ function enter(k, push) {
   $('#back').addEventListener('click', () => leave(true));
   if (push && location.hash !== '#' + k) history.pushState({ room: k }, '', '#' + k);
   requestAnimationFrame(fit);
-  if (innerWidth < 900 || innerHeight < innerWidth) stage.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  /* 세로로 긴 지도 — 무대가 화면보다 크면 다가간 방(무대 가운데)이 보이게 가운데로, 아니면 무대 위로 */
+  if (innerWidth < 900 || innerHeight < innerWidth) stage.scrollIntoView({ block: stage.offsetHeight > innerHeight ? 'center' : 'start', behavior: 'smooth' });
 }
 function leave(push) {
   on = null; setHot(null);
