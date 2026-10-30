@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&display=swap">
 <!--
-  첫 화면 = 공방 지도 한 장(img/map.webp 2048×3072 세로 — 산속 드워프 대미궁, 2026-10-30). 절벽 폭포 옆 동굴 입구 → 계단 → 가운데 둥근 지하 호수를 도는 길 → 왼쪽 넷·오른쪽 넷의 방 여덟.
+  첫 화면 = 공방 지도 한 장(img/map.webp 2048×3072 세로 — 산속 드워프 대미궁, 2026-10-30). 절벽 폭포 옆 동굴 입구 → 계단 → 가운데 둥근 지하 호수를 도는 길 → 왼쪽 넷·오른쪽 넷의 방 여덟, 가운데 호수에 원소의 섬(2026-10-30 — 그림은 그대로, 다각형만).
   방 자리는 ROOMS 표의 다각형(1024×1536 기준 좌표 — 그림은 그 2배라 비율로 맞는다)이고
   SVG viewBox 가 그림 크기라 화면이 바뀌어도 같이 늘어난다. 글자는 그림에 없다 — 이름표·미리보기는 화면이 얹는다.
   방에 올리면 빛나고 이름·대표 그림이 뜬다. 누르면 지도가 그 방으로 다가가고(transform) 그 공방의 문들(하위 링크)이 보인다.
@@ -183,7 +183,7 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
 <section class="map" id="map" aria-label="공방 지도">
   <div class="stage" id="stage">
     <div class="inner" id="inner">
-      <img src="img/map.webp?v=3" alt="산속 대미궁 — 절벽 폭포 옆 동굴 입구에서 계단을 올라 가운데 지하 호수를 도는 길, 왼쪽에 격납고·연구소·오락실·도트 공방, 오른쪽에 서재·군막·대장간·이미지 공방" decoding="async" fetchpriority="high">
+      <img src="img/map.webp?v=3" alt="산속 대미궁 — 절벽 폭포 옆 동굴 입구에서 계단을 올라 가운데 지하 호수를 도는 길, 왼쪽에 격납고·연구소·오락실·도트 공방, 오른쪽에 서재·군막·대장간·이미지 공방, 호수 가운데 바위섬이 원소의 섬" decoding="async" fetchpriority="high">
       <svg id="svg" viewBox="0 0 1024 1536" aria-hidden="true" focusable="false">
         <defs>
           <filter id="glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
@@ -262,11 +262,17 @@ const ROOMS = [
     peek: 'img/room-dot.webp', cover: 'img/room-dot.webp',
     desc: '다섯 공방 인물을 도트로 — 지시문을 만들고, 그리고, 격자에 맞춰 정리한다.',
     links: [['도트 공방', '/dot.html']] },
-  { key: 'image', name: '이미지 공방', title: '이미지 공방', sub: '통합 생성기 · 네 공방 그림 지시문', num: '08 / STUDIO', c: '#f3b8a6', tint: '#1e1514',
+  { key: 'image', name: '이미지 공방', title: '이미지 공방', sub: '통합 생성기 · 다섯 공방 그림 지시문', num: '08 / STUDIO', c: '#f3b8a6', tint: '#1e1514',
     poly: [[720, 775], [980, 775], [1000, 900], [970, 1030], [760, 1030], [700, 900]], at: [850, 905],
     peek: 'img/room-image.webp', cover: 'img/room-image.webp',
-    desc: '게임·책·신화·포켓몬 네 공방의 그림 지시문을 한곳에서 — 고르면 다음 단계로, 계획을 불러와 한 단계씩.',
+    desc: '게임·책·신화·포켓몬·원소 다섯 공방의 그림 지시문을 한곳에서 — 고르면 다음 단계로, 계획을 불러와 한 단계씩.',
     links: [['통합 생성기', '/prompt.html']] },
+  /* 원소의 섬(2026-10-30) — 가운데 지하 호수의 바위섬들. 원소 공방(element-atelier)은 주기율표 끝의 「안정의 섬」 이야기를 가졌으니 호수 가운데가 그 자리다. 그림은 그대로 두고 다각형만 호수에 */
+  { key: 'element', name: '원소의 섬', title: '원소의 공방', sub: '원소 · 가문 · 주민 · 판타지·스팀펑크·메카', num: '09 / ELEMENT', c: '#5fd3e8', tint: '#0e1a22',
+    poly: [[400, 330], [625, 330], [695, 480], [640, 685], [395, 685], [330, 480]], at: [512, 520],
+    peek: '/element-atelier-img/img/thumb/fe_mecha_game_keyart_f.webp', cover: '/element-atelier-img/img/thumb/fe_fantasy_game_keyart_f.webp',
+    desc: '원소 하나가 나라가 되고, 물질이 가문이 되고, 물건이 주민이 된다. 근본·가문주·주민이 판타지·스팀펑크·메카 세 세계에서 선다.',
+    links: [['첫 화면', '/element-atelier/'], ['도감', '/element-atelier/dex.html'], ['프롬프트', '/element-atelier/prompt.html']] },
 ];
 const IW = 1024, IH = 1536;
 const $ = s => document.querySelector(s);

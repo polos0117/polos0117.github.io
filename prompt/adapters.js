@@ -204,8 +204,60 @@
       }
     }
   };
+  /* 원소(element-atelier, 2026-10-30) — 대상은 카드(근본 `fe` · 가문주 `fe-steel` · 주민 `fe-steel-sword`), 갈래는 세계 그림(판타지·스팀펑크·메카) 하나.
+     일상컷은 그 공방 생성기가 트리 버전2 로 고른다(허브 일상컷 단계는 버전1 칸) — 허브에선 그 생성기로 가는 문(href)만 둔다(noCasual). */
+  A.element = {
+    key: 'element', repo: 'element-atelier', ko: '원소', noCasual: true,
+    libs: ['lib/words.js', 'lib/prompt-spec.js', 'lib/casual-tree.js', 'lib/prompt-element.js'],
+    data: { design: 'data/element-design.json', style: 'data/style.json', tree: 'data/casual-tree.json' },
+    outputs: function () { return [{ key: 'world', ko: '세계 그림', note: '판타지 · 스팀펑크 · 메카 한 장 — 설계표가 짓고 덧붙임만 더한다' },
+      { key: 'casual', ko: '일상컷', note: '트리 버전2 — 원소 공방 생성기에서 고른다', href: '/element-atelier/prompt.html?card={s}&o=casual' }]; },
+    /* 카드 열쇠 → {tier, nation, family, citizen, ko, en, element} — 그 공방 lib/prompt-element.js card() 와 같은 규칙(여기선 창 없이 설계표만으로) */
+    subject: function (d, k) {
+      var p = String(k || '').split('-'), n = (d.design.nations || []).filter(function (x) { return x.key === p[0]; })[0], e = (d.design.elements || []).filter(function (x) { return x.key === p[0]; })[0];
+      if (!n || !e) return null;
+      var out = { key: k, tier: 'root', nation: n, element: e, family: null, citizen: null, ko: e.ko, en: e.en };
+      if (p.length === 1) return out;
+      var f = (n.families || []).filter(function (x) { return x.key === p[1]; })[0]; if (!f) return null;
+      out.family = f; out.tier = 'lord'; out.ko = f.ko; out.en = f.en;
+      if (p.length === 2) return out;
+      var c = (f.citizens || []).filter(function (x) { return x.key === p[2]; })[0]; if (!c || p.length > 3) return null;
+      out.citizen = c; out.tier = 'citizen'; out.ko = c.ko; out.en = c.en;
+      return out;
+    },
+    subjects: function (d) {
+      var out = [], TIER = { root: '근본', lord: '가문주', citizen: '주민' };
+      (d.design.nations || []).forEach(function (n) {
+        var e = (d.design.elements || []).filter(function (x) { return x.key === n.key; })[0] || {}, head = e.symbol + ' ' + e.ko;
+        out.push({ key: n.key, ko: e.ko, sub: head + ' · ' + TIER.root });
+        (n.families || []).forEach(function (f) {
+          out.push({ key: n.key + '-' + f.key, ko: f.ko + ' 가문주', sub: head + ' · ' + TIER.lord });
+          (f.citizens || []).forEach(function (c) { out.push({ key: n.key + '-' + f.key + '-' + c.key, ko: c.ko, sub: head + ' · ' + f.ko + ' · ' + TIER.citizen }); });
+        });
+      });
+      return out;
+    },
+    styles: function (d) { return Object.keys(d.style.styles).map(function (k) { return { key: k, ko: d.style.styles[k].name }; }); },
+    defaultStyle: function (d) { return d.style['default'] && d.style.styles[d.style['default']] ? d.style['default'] : Object.keys(d.style.styles)[0]; },
+    /* 일상컷 단계는 허브에 없다 — 표는 뼈대만(허브가 장면을 바로잡을 때 close 를 본다) */
+    tables: function (S) { return { frames: [], lenses: [], poses: [], orients: [], exprs: rows(S.EXPRESSION_OPTIONS || []), axes: axesStd(S), close: S.CLOSE_FRAMES || [] }; },
+    worlds: function (d, k) { var c = this.subject(d, k), all = (d.design.vocab || {}).worlds || []; if (!c) return []; return c.tier === 'citizen' ? all.filter(function (w) { return (c.citizen.worlds || []).indexOf(w) >= 0; }) : all.slice(); },
+    /* 카드 — 세계 하나와 덧붙임 글 셋(장소·상황 · 의상·소품 · 추가 연출) */
+    card: function (d, k, S, saved) {
+      var x = obj(saved), ws = this.worlds(d, k), c = { world: typeof x.world === 'string' && ws.indexOf(x.world) >= 0 ? x.world : '', notes: {} };
+      var nn = obj(x.notes); ['scene', 'outfit', 'custom'].forEach(function (f) { c.notes[f] = typeof nn[f] === 'string' ? nn[f] : ''; });
+      return c;
+    },
+    buildCard: function (w, d, k, style, out, card) {
+      if (out !== 'world') return '';
+      var c = this.card(d, k, w.AtelierSpec, card); if (!c.world) return '';
+      if (!d.style.styles[style]) style = this.defaultStyle(d);
+      return w.AtelierPrompt.build(d.design, d.style, k, c.world, { style: style, notes: c.notes });
+    },
+    build: function () { return ''; }
+  };
   /* 대상 → 트리가 보는 것(장소의 해 거르기). pkm 은 세대 — 카드 그대로 넘기면 gen 을 읽는다 */
-  var api = { ORDER: ['game', 'book', 'myth', 'pkm'], FIXED: FIXED, formBlank: formBlank, all: A, get: function (k) { return A[k] || null; } };
+  var api = { ORDER: ['game', 'book', 'myth', 'pkm', 'element'], FIXED: FIXED, formBlank: formBlank, all: A, get: function (k) { return A[k] || null; } };
   root.AtelierHubAdapters = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -1,4 +1,4 @@
-/* 공방 지도(대미궁, 방 여덟 — 2026-10-30 도트 공방·이미지 공방) — 방 여덟이 서고, 올리면 빛나고 이름·미리보기가 뜨고, 누르면 다가가며 문들이 보이고, Esc·뒤로 가기로 돌아온다.
+/* 공방 지도(대미궁, 방 아홉 — 2026-10-30 도트 공방·이미지 공방·원소의 섬) — 방 아홉이 서고, 올리면 빛나고 이름·미리보기가 뜨고, 누르면 다가가며 문들이 보이고, Esc·뒤로 가기로 돌아온다.
    오늘 기록(atelier_today_v1:<방> — 각 공방이 적는다)을 읽어 오늘 판을 둔 방에 불(빛·이름표 아래 줄)을 켜고, 문 패널·목록에 「오늘의 판」을 두고,
    공방 첫 화면의 Last-Modified 가 마지막으로 다녀간 뒤면 이름표에 새 소식 점을 찍는다. 문을 누르면 다녀간 자국(seen)이 남는다.
    휴대폰 세로(390×844)·가로(844×390)·PC(1280×900)에서 가로로 넘치지 않는다. 지도가 세로로 길어(2:3) 가로 화면에선 너비를 정해 두고 굴려 본다.
@@ -17,7 +17,7 @@ const server = http.createServer((q, s) => {
   const f = path.join(ROOT, decodeURIComponent(url.pathname.replace(/\/$/, '/index.html')));
   fs.readFile(f, (e, d) => { if (e) { s.writeHead(404); return s.end(); } s.setHeader('Content-Type', MIME[path.extname(f)] || 'application/octet-stream'); s.setHeader('Last-Modified', LM.toUTCString()); s.end(d); });
 }).listen(PORT);
-const ROOMS = ['gundam', 'book', 'samguk', 'pokemon', 'myth', 'game', 'dot', 'image'];
+const ROOMS = ['gundam', 'book', 'samguk', 'pokemon', 'myth', 'game', 'dot', 'image', 'element'];
 /* 오늘 기록 — 서재는 오늘 2판 1승에 오늘의 판을 끝냈고 방금(앞으로 한 시간 뒤까지) 다녀갔다, 대장간은 1판, 격납고는 판은 없고 하루 전에 다녀갔다(그 뒤 배포 → 새 소식) */
 const NOW = Date.now(), SEED = {
   'atelier_today_v1:book': { d: T.today(), n: 2, w: 1, daily: true, at: NOW, seen: NOW + 3600e3 },
@@ -38,8 +38,8 @@ const NOW = Date.now(), SEED = {
       const noOverflow = async () => assert(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), name + ' 가로 넘침');
       await p.goto(BASE + '/'); await p.waitForSelector('.room'); await p.waitForFunction(() => document.querySelector('#stage img').complete);
       /* 방 여섯 — 다각형·이름표·카드 */
-      assert.deepEqual(await p.locator('.room').evaluateAll(es => es.map(e => e.dataset.key)), ROOMS, name + ' 방 여덟');
-      assert.equal(await p.locator('.pin').count(), 8, '이름표 여덟'); assert.equal(await p.locator('.card').count(), 8, '카드 여덟');
+      assert.deepEqual(await p.locator('.room').evaluateAll(es => es.map(e => e.dataset.key)), ROOMS, name + ' 방 아홉');
+      assert.equal(await p.locator('.pin').count(), 9, '이름표 아홉'); assert.equal(await p.locator('.card').count(), 9, '카드 아홉');
       /* 오락실(게임의 공방)은 오늘의 판이 아직 없다 — 그 문을 두지 않는다 */
       assert.equal(await p.locator('.card[data-key="game"] a.daily').count(), 0, name + ' 오락실에 오늘의 판 문이 없다');
       assert.equal(await p.locator('.card[data-key="book"] a.daily').count(), 1, name + ' 서재에는 오늘의 판 문');
@@ -118,6 +118,6 @@ const NOW = Date.now(), SEED = {
       assert.deepEqual(errors, [], name + ' 오류 없음');
       await ctx.close();
     }
-    console.log('PASS 공방 지도: 방 여덟(도트·이미지 공방까지)·이름표·카드 · 빛나기·미리보기 · 다가가기·문·주소·Esc·뒤로 가기 · 오늘 불·오늘 줄·오늘의 판·새 소식·다녀간 자국 · 세로/가로/PC 넘침 없음, 가로는 폭을 정해 굴린다');
+    console.log('PASS 공방 지도: 방 아홉(도트·이미지 공방·원소의 섬까지)·이름표·카드 · 빛나기·미리보기 · 다가가기·문·주소·Esc·뒤로 가기 · 오늘 불·오늘 줄·오늘의 판·새 소식·다녀간 자국 · 세로/가로/PC 넘침 없음, 가로는 폭을 정해 굴린다');
   } finally { await br.close(); server.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

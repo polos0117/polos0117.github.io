@@ -51,8 +51,8 @@ for (const [k, subjectKey] of [['game', 'source_influence'], ['book', 'source_in
   console.log('  ' + k + ': 대상 ' + B.a.subjects(B.d).length + ' × 장면 ' + scenes.length + ' = record() 와 같은 글 ' + n);
   checks++;
 }
-/* ② */
-for (const k of H.ORDER) {
+/* ② — 일상컷 단계를 허브에 두는 공방만(원소는 그 공방 생성기가 트리 버전2 로 — noCasual) */
+for (const k of H.ORDER.filter(x => !H.get(x).noCasual)) {
   const B = boot(k), { a, d, S, w } = B, subs = a.subjects(d), def = a.defaultStyle(d, S);
   assert(a.styles(d, S).some(x => x.key === def), k + ' 기본 화풍이 화풍 목록에 있다');
   const base = randomScene(B, a.subject(d, subs[0].key));
@@ -142,4 +142,30 @@ for (const k of H.ORDER.filter(x => H.get(x).forms)) {   // 폼·개방 받침(g
   console.log('  pkm: 액션·폭주 지시문 ' + n + ' · 단계 표 · 큰 자료 있고 없고 · 카드 바로잡기 · 랜덤 장면 10');
   checks++;
 }
-console.log('PASS 통합 생성기 받침: game·book 계획기와 같은 글 · 네 공방 대상·랜덤·화풍 · game·book 폼·개방 · 신화 초상·각성·저주·스킨 · 포켓몬 액션·폭주 — ' + checks + '가지');
+/* ⑥ 원소(5단계) — 카드 55 × 사는 세계, 단계 표(세계 · 덧붙임), 일상컷은 허브 갈래가 아니다(그 공방 생성기로 가는 문), 엉망인 저장값 */
+{
+  const ST = require('../prompt/steps.js'), B = boot('element'), { a, d, S, w } = B, def = a.defaultStyle(d, S);
+  const word = (k, fb) => { const t = w.W ? w.W(k) : ''; return t && t !== k ? t : fb; };
+  const subs = a.subjects(d); assert(subs.length >= 40, '원소 카드 수 ' + subs.length);
+  let n = 0;
+  for (const s of subs) {
+    const g = a.subject(d, s.key); assert(g && g.ko === s.ko.replace(' 가문주', ''), s.key + ' 대상');
+    const ws = a.worlds(d, s.key); assert(ws.length >= 1 && ws.length <= 3, s.key + ' 세계 수');
+    for (const wk of ws) {
+      const t = a.buildCard(w, d, s.key, def, 'world', { world: wk, notes: { scene: 'a windy ridge' } });
+      assert(t.startsWith('CONCEPT: ') && t.includes(g.element.en) && t.includes('SCENE NOTE: a windy ridge') && (wk !== 'mecha' || t.includes('MECHA DESIGN')), s.key + ' ' + wk); n++;
+    }
+    const steps = ST.element('world', { A: a, D: d, S, P: w.AtelierPrompt, w: word, subject: s.key, g, card: a.card(d, s.key, S, null), rnd: l => l[0] });
+    assert.deepEqual(steps.map(x => x.key), ['world', 'notes'], s.key + ' 단계 표');
+    assert.equal(steps[0].parts[1].opts().length, ws.length, s.key + ' 세계 선택지');
+    steps.forEach(st => { st.shown(); st.parts.forEach(p => { if (typeof p.opts === 'function') p.opts(); }); });
+  }
+  assert.equal(a.buildCard(w, d, 'fe', def, 'world', a.card(d, 'fe', S, null)), '', '세계를 안 고르면 지시문이 없다');
+  assert.equal(a.buildCard(w, d, 'fe', def, 'casual', { world: 'fantasy' }), '', '일상컷은 허브 갈래가 아니다');
+  assert(a.outputs().some(o => o.key === 'casual' && /element-atelier\/prompt\.html/.test(o.href)), '일상컷은 그 공방 생성기로 가는 문');
+  const bad = a.card(d, 'fe-steel-bridge', S, { world: 'fantasy', notes: 'x' });
+  assert.equal(bad.world, '', '철교는 판타지에 안 산다 — 비운다'); assert.deepEqual(bad.notes, { scene: '', outfit: '', custom: '' }, '덧붙임 바로잡기');
+  console.log('  element: 세계 지시문 ' + n + ' · 카드 ' + subs.length + ' · 단계 표 · 일상컷 문 · 카드 바로잡기');
+  checks++;
+}
+console.log('PASS 통합 생성기 받침: game·book 계획기와 같은 글 · 네 공방 대상·랜덤·화풍 · game·book 폼·개방 · 신화 초상·각성·저주·스킨 · 포켓몬 액션·폭주 · 원소 세계 그림 — ' + checks + '가지');

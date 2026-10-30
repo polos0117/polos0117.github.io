@@ -200,6 +200,22 @@
     return list.concat(sceneSteps(x, sc, 'action'));
   }
 
-  root.AtelierHubSteps = { game: design, book: design, myth: myth, pkm: pkm };
+  /* ── element: 세계 그림 ── 세계(판타지·스팀펑크·메카 — 주민은 사는 세계만) → 덧붙임. 지시문은 그 공방 lib/prompt-element.js build 가 짓는다 */
+  function element(out, x) {
+    var A = x.A, D = x.D, w = x.w, c = x.card, g = x.g || {}, n = g.nation || {};
+    if (out !== 'world') return [];
+    var WK = { fantasy: '판타지', steampunk: '스팀펑크', mecha: '메카' };
+    var worlds = function () { return A.worlds(D, x.subject).map(function (k) { return { v: k, ko: w('world.' + k, WK[k] || k), sub: ((n.worlds || {})[k] || {}).ko || '' }; }); };
+    return [
+      { key: 'world', ko: '세계', shown: function () { return c.world ? w('world.' + c.world, WK[c.world] || c.world) : '—'; },
+        parts: [{ type: 'note', text: g.tier === 'citizen' ? '주민은 사는 세계만. 얼굴·생김새·자세는 세계마다 따로 뽑는다.' : '얼굴·생김새·자세는 세계마다 따로 뽑는다.' },
+          { type: 'pick', opts: worlds, get: function () { return c.world; }, set: function (v) { c.world = v; } }],
+        random: function () { var o = worlds().map(function (r) { return r.v; }).filter(function (v) { return v !== c.world; }); if (o.length) c.world = x.rnd(o); } },
+      { key: 'notes', ko: '덧붙임', next: true, shown: function () { var k = Object.keys(c.notes).filter(function (f) { return (c.notes[f] || '').trim(); }).length; return k ? k + '칸' : '없음'; },
+        parts: [{ type: 'note', text: '비워도 된다 — 설계표가 지시문을 짓는다. 쓰면 그 글이 더해진다.' }].concat([['scene', 'studio.notes.scene', '장소·상황'], ['outfit', 'studio.notes.outfit', '의상·소품'], ['custom', 'studio.notes.custom', '추가 연출 요청']].map(function (f) {
+          return { type: 'text', id: f[0], ko: w(f[1], f[2]), multi: true, get: function () { return c.notes[f[0]]; }, set: function (t) { var nn = Object.assign({}, c.notes); nn[f[0]] = t; c.notes = nn; } }; })) }];
+  }
+
+  root.AtelierHubSteps = { game: design, book: design, myth: myth, pkm: pkm, element: element };
   if (typeof module !== 'undefined' && module.exports) module.exports = root.AtelierHubSteps;
 })(typeof window !== 'undefined' ? window : globalThis);

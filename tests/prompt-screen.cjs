@@ -9,7 +9,7 @@ const assert = require('node:assert/strict'), http = require('node:http'), fs = 
 const { chromium } = require('playwright');
 const ROOT = path.resolve(__dirname, '..'), SIB = path.resolve(ROOT, '..'), PORT = +(process.env.HUB_PORT || 8783), BASE = 'http://127.0.0.1:' + PORT;
 const MIME = { '.html': 'text/html; charset=utf-8', '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.json': 'application/json', '.js': 'text/javascript', '.wasm': 'application/wasm', '.css': 'text/css' };
-const REPOS = ['game-atelier', 'book-atelier', 'myth-atelier', 'pkm-atelier'];
+const REPOS = ['game-atelier', 'book-atelier', 'myth-atelier', 'pkm-atelier', 'element-atelier'];
 if (REPOS.some(r => !fs.existsSync(path.join(SIB, r, 'data/casual-tree.json')))) { console.log('(옆에 네 공방 저장소가 없어 건너뜀)'); process.exit(0); }
 const server = http.createServer((q, s) => {
   const p = decodeURIComponent(new URL(q.url, BASE).pathname), seg = p.split('/')[1];
@@ -306,6 +306,26 @@ const OLD = {
       assert.equal(await q.evaluate(() => window.AtelierHubPrompt.state().card.form), 'heavy', '개방을 해도 액션 폼은 그대로');
       assert.deepEqual(k.errors, [], '포켓몬 카드 갈래 오류 없음');
       await k.ctx.close(); checks += 6;
+    }
+
+    /* ②-5 원소 — 세계 그림: 대상(주민) → 세계(사는 세계만) → 덧붙임 → 지시문. 일상컷은 그 공방 생성기로 가는 문(href) */
+    {
+      const e = await open('/prompt.html?a=element&s=fe-steel-bridge'), p = e.page, now = () => p.evaluate(() => window.AtelierHubPrompt.state().open);
+      await p.waitForSelector('[data-open="out"]'); await p.click('[data-open="out"]');
+      assert.equal(await p.locator('[data-out-mode]').count(), 1, '허브 갈래는 세계 그림 하나');
+      assert.match(await p.locator('a.opt[href*="element-atelier/prompt.html"]').getAttribute('href'), /card=fe-steel-bridge&o=casual/, '일상컷은 원소 공방 생성기로');
+      await p.click('[data-out-mode="world"]'); assert.equal(await now(), 'world');
+      assert.equal(await p.locator('#panel .opt[data-pick]').count(), 2, '철교는 판타지에 안 산다 — 세계 둘');
+      await p.click('[data-pick="mecha"]'); assert.equal(await now(), 'notes');
+      await p.fill('[data-field="scene"]', 'a windy ridge');
+      await p.click('[data-next="notes"]'); assert.equal(await now(), 'done');
+      const t = await p.locator('#prompt').inputValue();
+      assert(t.startsWith('CONCEPT: a citizen of the Iron Nation, of the Steel House.') && t.includes('MECHA DESIGN') && t.includes('SCENE NOTE: a windy ridge'), '원소 세계 지시문');
+      assert.match(await p.locator('[data-open="world"]').textContent(), /메카/, '세계 칩');
+      await p.reload(); await p.waitForSelector('[data-open="out"]');
+      assert.equal(await now(), 'done'); assert.equal(await p.locator('#prompt').inputValue(), t, '새로 고쳐도 남는다');
+      assert.deepEqual(e.errors, []);
+      await e.ctx.close(); checks += 5;
     }
 
     /* ②-3 신화 무기 — 액션 한 장(설계 언어·붙일 문단·자세·외형·장면 메모) · 각성 · 스킨(스킨·상태) */

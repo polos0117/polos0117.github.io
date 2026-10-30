@@ -48,7 +48,7 @@
   var shortLabel = function (v) { v = String(v == null ? '' : v); var i = v.indexOf(' — '); return mobile() && i > 0 ? v.slice(i + 3) : v; };
   /* 출력 갈래 — 받침의 표(off 는 준비 중). 일상컷 밖은 카드 갈래(단계 표 prompt/steps.js) */
   var outList = function () { return A && A.outputs ? A.outputs(S, w) : [{ key: 'casual', ko: '일상컷' }]; };
-  var outs = function () { return outList().filter(function (o) { return !o.off; }).map(function (o) { return o.key; }); };
+  var outs = function () { return outList().filter(function (o) { return !o.off && !o.href; }).map(function (o) { return o.key; }); };   // href 는 그 공방 생성기로 가는 문 — 허브 갈래가 아니다
   var formy = function () { return st.out !== 'casual'; };
 
   function boot() {
@@ -72,7 +72,7 @@
       st.scene = repair(st.scene);
       /* 1단계 저장값은 walked 가 참/거짓 하나(일상컷) */
       st.walked = typeof mine.walked === 'object' && mine.walked ? mine.walked : { casual: !!mine.walked };
-      var o = q('o') || mine.out; st.out = outs().indexOf(o) >= 0 ? o : 'casual';
+      var o = q('o') || mine.out; st.out = outs().indexOf(o) >= 0 ? o : (outs().indexOf('casual') >= 0 ? 'casual' : outs()[0] || 'casual');
       loadCard();
       st.open = !st.subject ? 'subject' : begin();
       $('status').textContent = '';
@@ -451,7 +451,9 @@
     if (k === 'out') {
       var list = outList(), any = list.some(function (o) { return o.off; });
       return '<h3>출력 갈래</h3><p class="note">일상컷은 트리대로, 나머지는 그 공방 설계대로 — 옛 생성기와 같은 지시문이다.' + (any ? ' 준비 중인 갈래는 다음 단계에서 연다.' : '') + '</p><div class="opts">' +
-        list.map(function (o) { return '<button type="button" class="opt" data-out-mode="' + o.key + '"' + (o.off ? ' disabled' : '') + ' aria-pressed="' + (st.out === o.key) + '"><b>' + esc(o.ko) + '</b>' + (o.off ? '<span>준비 중</span>' : o.note ? '<span>' + esc(o.note) + '</span>' : '') + '</button>'; }).join('') + '</div>';
+        list.map(function (o) {
+          if (o.href) return '<a class="opt" href="' + esc(o.href.replace('{s}', encodeURIComponent(st.subject))) + '"><b>' + esc(o.ko) + ' ↗</b>' + (o.note ? '<span>' + esc(o.note) + '</span>' : '') + '</a>';   /* 그 공방 생성기로 가는 문 */
+          return '<button type="button" class="opt" data-out-mode="' + o.key + '"' + (o.off ? ' disabled' : '') + ' aria-pressed="' + (st.out === o.key) + '"><b>' + esc(o.ko) + '</b>' + (o.off ? '<span>준비 중</span>' : o.note ? '<span>' + esc(o.note) + '</span>' : '') + '</button>'; }).join('') + '</div>';
     }
     if (k === 'done') {
       var ss = steps(), canRand = !formy() || ss.some(function (x) { return x.random; });
