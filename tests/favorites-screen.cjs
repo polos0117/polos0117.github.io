@@ -42,7 +42,7 @@ const memory = () => { const m = {}; return { getItem: k => (k in m ? m[k] : nul
 /* 지도의 방 색 — favorites.html 의 ROOM 이 같아야 한다(즐겨찾기의 pkm = 지도의 pokemon) */
 const index = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8'), favHTML = fs.readFileSync(path.join(ROOT, 'favorites.html'), 'utf8');
 const mapColor = {}; for (const m of index.matchAll(/\{ key: '(\w+)', name: '([^']+)'[^\n]*? c: '(#[0-9a-f]{6})'/g)) mapColor[m[1]] = { name: m[2], c: m[3] };
-const ROOM_OF = { gundam: 'gundam', book: 'book', pkm: 'pokemon', myth: 'myth', game: 'game' };
+const ROOM_OF = { gundam: 'gundam', book: 'book', pkm: 'pokemon', myth: 'myth', game: 'game', element: 'element' };
 for (const [a, room] of Object.entries(ROOM_OF)) {
   const m = favHTML.match(new RegExp(`\\b${a}: \\{ room: '${room}', name: '([^']+)', c: '(#[0-9a-f]{6})'`));
   assert(m && mapColor[room], a + ' 공방 표가 있다');
@@ -205,7 +205,7 @@ const SIZES = [['344', { width: 344, height: 882 }, true], ['390', { width: 390,
       const { ctx, p, errors } = await page(vp, mobile);
       await p.goto(BASE + '/favorites.html'); await p.waitForSelector('#empty');
       assert.equal(await p.locator('.tile').count(), 0); assert(await p.locator('#tools').isHidden(), name + ' 빈 자리엔 칩이 없다');
-      assert.deepEqual(await p.locator('#empty .doors a').evaluateAll(es => es.map(e => e.getAttribute('href'))), ['/atelier/dex.html', '/book-atelier/dex.html', '/pkm-atelier/dex.html', '/myth-atelier/dex.html', '/game-atelier/dex.html'], name + ' 공방 도감으로 가는 문');
+      assert.deepEqual(await p.locator('#empty .doors a').evaluateAll(es => es.map(e => e.getAttribute('href'))), ['/atelier/dex.html', '/book-atelier/dex.html', '/pkm-atelier/dex.html', '/myth-atelier/dex.html', '/game-atelier/dex.html', '/element-atelier/dex.html'], name + ' 공방 도감으로 가는 문');
       await targets(p, '#empty .doors a', name); await noOverflow(p, name + ' 빈 자리');
       /* 다른 탭에서 담으면 곧바로 뜬다 */
       await p.evaluate(([k, v]) => { localStorage.setItem(k, v); dispatchEvent(new StorageEvent('storage', { key: k })); }, [KEY, JSON.stringify(SEED.slice(0, 2))]);
@@ -225,7 +225,7 @@ const SIZES = [['344', { width: 344, height: 882 }, true], ['390', { width: 390,
       assert.equal(await p.locator('#fav-link').textContent(), '즐겨찾기 8', name + ' 머리의 즐겨찾기 수');
       assert.equal(await p.locator('#fav-link').getAttribute('href'), 'favorites.html');
       assert.equal(await p.locator('#fav-all').getAttribute('href'), 'favorites.html'); assert.match(await p.locator('#fav-all').textContent(), /내 즐겨찾기.*8장/, name + ' 목록 아래 줄');
-      assert.equal(await p.locator('.card').count(), 8, name + ' 공방 줄은 여덟 그대로');
+      assert.equal(await p.locator('.card').count(), 9, name + ' 공방 줄은 아홉 그대로(2026-10-30 원소의 섬)');
       const r = await p.locator('#fav-link').boundingBox(); assert(r.height >= 44, name + ' 머리 링크 누르는 자리');
       await noOverflow(p, name + ' 지도');
       await p.locator('#fav-all').click(); await p.waitForURL(/favorites\.html/); await p.waitForSelector('.tile');

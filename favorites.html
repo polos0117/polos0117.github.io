@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>내 즐겨찾기</title>
-<meta name="description" content="공방 넷의 도감에서 하트로 담은 그림을 한곳에서 — 새것부터, 공방마다 거르고 크게 본다.">
+<meta name="description" content="공방들의 도감에서 하트로 담은 그림을 한곳에서 — 새것부터, 공방마다 거르고 크게 본다.">
 <meta name="theme-color" content="#0f0e12">
 <link rel="icon" href="icon-192.png">
 <link rel="manifest" href="app.webmanifest">
@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&display=swap">
 <!--
-  내 즐겨찾기 — 공방 넷(건담·책·포켓몬·신화)의 도감 상세에서 하트로 담은 그림을 모아 본다.
+  내 즐겨찾기 — 공방들(건담·책·포켓몬·신화·게임·원소)의 도감 상세(원소는 크게 보기)에서 하트로 담은 그림을 모아 본다.
   담는 쪽은 각 공방의 lib/favorites.js, 읽는 쪽은 여기 favorites.js(원본 — 다섯 곳이 같은 파일). 열쇠 atelier_favorites_v1, 약속은 README 「즐겨찾기」절.
   새것부터 2:3 썸네일. 공방 칩으로 거른다(주소 ?a=book). 누르면 크게 보기 — ← → 키·밀기·Esc, 「그 공방에서 보기」(칸의 link), 빼기.
   감상 모드는 6초마다 천천히 겹쳐 넘어가고, 손을 대면 멈춘다. 움직임 줄이기면 잠긴다. 저장이 막힌 브라우저면 그렇다고 말한다.
@@ -205,8 +205,9 @@ const ROOM = {
   pkm: { room: 'pokemon', name: '포켓몬 연구소', c: '#f4c542', dex: '/pkm-atelier/dex.html' },
   myth: { room: 'myth', name: '신화 무기 대장간', c: '#d9b45a', dex: '/myth-atelier/dex.html' },
   game: { room: 'game', name: '게임 오락실', c: '#ff6ad5', dex: '/game-atelier/dex.html' },
+  element: { room: 'element', name: '원소의 섬', c: '#5fd3e8', dex: '/element-atelier/dex.html' },
 };
-const ORDER = ['gundam', 'book', 'pkm', 'myth', 'game'];
+const ORDER = ['gundam', 'book', 'pkm', 'myth', 'game', 'element'];
 const SLIDE_MS = 6000;
 const F = window.AtelierFavorites;
 const $ = s => document.querySelector(s);

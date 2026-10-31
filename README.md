@@ -45,15 +45,15 @@ https://polos0117.github.io/ — 건담 · 삼국지 · 포켓몬 · 신화 무�
 
 ## 즐겨찾기 — 네 공방이 같이 쓰는 그림 목록
 
-도구는 `favorites.js` 한 파일이고, **같은 파일을 다섯 저장소(atelier · pkm-atelier · myth-atelier · book-atelier · game-atelier)의 `lib/favorites.js` 에 글자 하나 다르지 않게 복사해 둔다**(여기 것이 원본, 맨 위 줄에 판). 고치면 다섯 곳을 같이 고친다 — 각 공방의 도감 검사가 옆에 받아 둔 이 파일과 견준다. 화면 말은 없다.
+도구는 `favorites.js` 한 파일이고, **같은 파일을 여섯 저장소(atelier · pkm-atelier · myth-atelier · book-atelier · game-atelier · element-atelier)의 `lib/favorites.js` 에 글자 하나 다르지 않게 복사해 둔다**(여기 것이 원본, 맨 위 줄에 판). 고치면 다섯 곳을 같이 고친다 — 각 공방의 도감 검사가 옆에 받아 둔 이 파일과 견준다. 화면 말은 없다.
 
 | 열쇠 | 값 |
 |---|---|
 | `atelier_favorites_v1` | 칸의 JSON 목록. 새것이 앞, 500칸까지(넘치면 오래된 것부터 빠진다). 같은 그림 = 같은 `(a, file)` |
-| `a` | 공방 — `gundam` · `book` · `pkm` · `myth` · `game` (지도의 방 열쇠와 하나 다르다: `pkm` ↔ `pokemon`) |
+| `a` | 공방 — `gundam` · `book` · `pkm` · `myth` · `game` · `element` (지도의 방 열쇠와 하나 다르다: `pkm` ↔ `pokemon`) |
 | `key` · `title` · `sub` | 카드 열쇠 · 보이는 이름 · 짧은 이름표(폼·컷 — "중장 오버드라이브", "각성", "전개") |
 | `file` · `thumb` · `full` | 그림 파일 이름 · 썸네일과 원본의 절대 주소 |
-| `link` | 그 공방 도감에서 이 그림을 여는 절대 경로 — 건담·포켓몬 `?mech=&pic=`, 신화 `?card=&pic=`, 책 `?book=&pic=` |
+| `link` | 그 공방 도감에서 이 그림을 여는 절대 경로 — 건담·포켓몬 `?mech=&pic=`, 신화 `?card=&pic=`, 책 `?book=&pic=`, 원소 `?nation=&card=&pic=`(크게 보기로 연다) |
 | `at` | 담은 때(ISO) |
 
 API(`window.AtelierFavorites`): `has(a, file)` · `toggle(칸)` → 담겼으면 참 · `list()` · `count(a?)` · `remove(a, file)` · `onChange(cb)`(다른 탭의 storage 사건 + 같은 탭의 `atelier-favorites` 사건, 그만두는 함수를 돌려준다) · `available()`.
