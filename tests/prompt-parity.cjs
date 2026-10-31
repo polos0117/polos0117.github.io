@@ -163,7 +163,7 @@ for (const k of H.ORDER.filter(x => H.get(x).forms)) {   // 폼·개방 받침(g
     steps.forEach(st => { st.shown(); st.parts.forEach(p => { if (typeof p.opts === 'function') p.opts(); }); });
     /* 설계 줄 — 체크의 메모가 설계표 look 의 어휘, 노출 고르개는 표의 열쇠. 외형 — 네 묶음 */
     const design = steps[3], look = steps[4];
-    assert(design.parts[1].note.includes(S.VOCAB_EN.hair_color[w.AtelierPrompt.lookOf(g).silhouette.hair_color]), s.key + ' 실루엣 메모에 설계 머리색');
+    assert(design.parts[1].note.includes(S.VOCAB_EN.hair_color[w.AtelierPrompt.lookOf(g, card.world).silhouette.hair_color]), s.key + ' 실루엣 메모에 설계 머리색');
     assert.equal(JSON.stringify(design.parts[3].opts.map(o => o[0])), JSON.stringify(S.EXPOSURE_KEYS), s.key + ' 노출 고르개');   // vm 영역 배열은 deepEqual 이 못 견준다
     assert.equal(JSON.stringify(look.parts[2].groups.map(gr => gr.key)), JSON.stringify(['base', 'build', 'face', 'hair']), s.key + ' 외형 네 묶음');
   }

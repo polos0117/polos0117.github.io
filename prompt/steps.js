@@ -208,7 +208,7 @@
     var WK = { fantasy: '판타지', steampunk: '스팀펑크', mecha: '메카' };
     var worlds = function () { return A.worlds(D, x.subject).map(function (k) { return { v: k, ko: w('world.' + k, WK[k] || k), sub: ((n.worlds || {})[k] || {}).ko || '' }; }); };
     var lk = function () { return A.look(c, S) || { faceDesignOn: true, silhouetteOn: true, exposure: '', params: {}, locks: {} }; };
-    var dz = P && P.lookOf && g.nation ? P.lookOf(g) : { face: {}, silhouette: {} }, KO = S.LOOK_KO || { face: {}, sil: {} };
+    var dz = P && P.lookOf && g.nation ? P.lookOf(g, c.world) : { face: {}, silhouette: {} }, KO = S.LOOK_KO || { face: {}, sil: {} };
     var vocab = function (box, pre) { return Object.keys(box || {}).filter(function (k) { return box[k]; }).map(function (k) { return w('look.' + pre + '.' + k, KO[pre][k] || k) + ' · ' + (((S.VOCAB_EN || {})[k] || {})[box[k]] || box[k]); }).join('\n'); };
     var designed = function (k) { var l = lk(); return (l.faceDesignOn && Object.keys(S.FACE_PARAM || {}).some(function (f) { return S.FACE_PARAM[f] === k; })) || (l.silhouetteOn && Object.keys(S.SIL_PARAM || {}).some(function (f) { return S.SIL_PARAM[f] === k; })); };
     var why = (g.family && g.family.look && g.family.look.why) || (n.look || {}).why || '';
