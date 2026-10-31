@@ -330,6 +330,10 @@ function sourceHash() {
       const pk = list.find(c => c.key === '피카츄'); assert.equal(pk.id, 'pikachu');
       const doc2 = doc.where && Object.keys(doc.where)[0];
       if (doc2) { const f = list.flatMap(c => c.files).find(f => f.file === doc2); assert(f.url.startsWith('/pkm-atelier-img-2/img/'), '둘째 저장소 그림'); }
+      /* 그림 저장소를 더하면 pkm-atelier 의 BASES 와 같은 차례로 붙인다 — 빠지면 그 저장소 그림이 첫 저장소 주소로 깨진다(2026-10-31 넷째) */
+      const imgjs = path.join(ROOT, '..', 'pkm-atelier', 'lib', 'img.js');
+      if (fs.existsSync(imgjs)) assert.deepEqual(A.bases, (fs.readFileSync(imgjs, 'utf8').match(/var BASES = \[([^\]]*)\]/)[1].match(/'[^']+'/g) || []).map(s => s.slice(1, -1).replace('https://polos0117.github.io', '')), 'pkm 그림 저장소 차례');
+      assert.equal(A.put.repo, A.bases[A.bases.length - 1].split('/')[1], 'pkm 새 도트는 열린 저장소에');
     }
     if (A.key === 'samguk') assert(list[0].files[0].url.startsWith('/sam-atelier/images/portraits/'));
   }

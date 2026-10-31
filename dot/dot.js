@@ -353,7 +353,7 @@
   var ATELIERS = [
     /* put — 정리본을 올릴 그림 저장소(sprites/<이름>/)와 인물 칸을 넣을 자료(sprites.json 의 actors). base — 그 저장소가 sprites.json 의 base 와 다르면 인물 칸에 넣을 그림 주소 앞 */
     { key: 'book', name: '책', data: '/book-atelier/data/img.json', names: '/book-atelier/data/book-design.json', bases: ['/book-atelier-img/img/'], subject: 'woman', put: { repo: 'book-atelier-img', data: 'book-atelier/data/sprites.json' } },
-    { key: 'pkm', name: '포켓몬', data: '/pkm-atelier/data/img.json', names: '/pkm-atelier/data/card.json', bases: ['/pkm-atelier-img/img/', '/pkm-atelier-img-2/img/', '/pkm-atelier-img-3/img/'], subject: 'woman', put: { repo: 'pkm-atelier-img-3', data: 'pkm-atelier/data/sprites.json', base: 'https://polos0117.github.io/pkm-atelier-img-3/sprites/' } },
+    { key: 'pkm', name: '포켓몬', data: '/pkm-atelier/data/img.json', names: '/pkm-atelier/data/card.json', bases: ['/pkm-atelier-img/img/', '/pkm-atelier-img-2/img/', '/pkm-atelier-img-3/img/', '/pkm-atelier-img-4/img/'], subject: 'woman', put: { repo: 'pkm-atelier-img-4', data: 'pkm-atelier/data/sprites.json', base: 'https://polos0117.github.io/pkm-atelier-img-4/sprites/' } },
     { key: 'myth', name: '신화 무기', data: '/myth-atelier/data/img.json', names: '/myth-atelier/data/card.json', bases: ['/myth-atelier-img/img/'], subject: 'woman', put: { repo: 'myth-atelier-img', data: 'myth-atelier/data/sprites.json' } },
     { key: 'gundam', name: '건담', data: '/atelier/data/img.json', bases: ['/atelier/img/'], subject: 'woman', put: { repo: 'atelier', data: 'atelier/data/sprites.json' } },
     { key: 'samguk', name: '삼국지', data: '/sam-atelier/images/manifest.json', bases: ['/sam-atelier/'], subject: 'person', noThumb: true, put: { repo: 'sam-atelier', data: 'sam-atelier/data/sprites.json' } },
