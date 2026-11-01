@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>그림 현황</title>
+<meta name="description" content="공방 여섯의 그림 작업 현황을 글로만 — 대상마다 어느 칸이 찼고 무엇이 비었는지.">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0f0e12">
+<link rel="icon" href="icon-192.png">
+<link rel="manifest" href="app.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&display=swap">
+<!--
+  그림 현황 — 공방 여섯(건담·책·포켓몬·신화·게임·원소)의 설계표와 그림 등록부(data/img.json)를 견주어, 대상마다 어느 칸이 찼는지 글로만 보인다(2026-11-01).
+  그림은 받지 않는다 — 등록부 JSON 만 읽는다(계산은 status.js). 위 표에서 공방마다 다 참·일부·없음, 아래에서 공방 하나의 대상 목록.
+  거르기: 공방(?a=) · 상태(?f= all·gap·full·none) · 이름 찾기. 「글로 복사」 는 보이는 목록을 한 줄씩 옮긴다.
+  색과 이름은 공방 지도(index.html)의 ROOMS 와 같다.
+-->
+<style>
+:root {
+  --bg: #0b0a0e; --card: #18161d; --line: #ffffff1a; --text: #f1ece2; --muted: #a8a09a; --gold: #d9b45a; --ok: #8fd9a8; --miss: #ff8f8f;
+  --serif: 'Noto Serif KR', 'Apple Myungjo', 'Nanum Myeongjo', Georgia, serif;
+  --sans: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  --mono: ui-monospace, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 15px/1.55 var(--sans); overflow-x: hidden; min-height: 100vh; min-height: 100dvh;
+  background-image: radial-gradient(90% 50% at 50% -10%, #1b1726 0%, transparent 70%); background-repeat: no-repeat; }
+a { color: inherit; }
+button, input { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: calc(16px + env(safe-area-inset-top)) 16px 8px; max-width: 1100px; margin: 0 auto; }
+.head h1 { margin: 0; font: 900 clamp(24px, 3.6vw, 36px)/1.1 var(--serif); letter-spacing: -.02em;
+  background: linear-gradient(180deg, #fff 30%, var(--gold) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.head h1 small { display: block; margin-bottom: 6px; -webkit-text-fill-color: var(--gold); color: var(--gold); font: 700 11px/1 var(--serif); letter-spacing: .4em; }
+.home { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid #ffffff33; border-radius: 99px; background: #000b;
+  color: var(--text); text-decoration: none; font: 600 13px/1 var(--sans); white-space: nowrap; }
+.home:hover { border-color: var(--gold); color: var(--gold); }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px calc(40px + env(safe-area-inset-bottom)); }
+.lede { margin: 2px 0 14px; color: var(--muted); font-size: 13px; word-break: keep-all; }
+
+/* 공방마다 한 줄 — 누르면 아래 목록이 그 공방으로 */
+.sum { width: 100%; border-collapse: collapse; margin: 0 0 18px; font-size: 14px; }
+.sum th, .sum td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.sum th:first-child, .sum td:first-child { text-align: left; }
+.sum thead th { color: var(--muted); font-weight: 600; font-size: 12px; }
+.sum td { font-family: var(--mono); font-size: 13px; }
+.sum td:first-child { font-family: var(--sans); }
+.sum button { --c: var(--gold); display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; margin: -6px 0 -6px -10px; border: 1px solid transparent; border-radius: 99px; background: none; cursor: pointer; font-weight: 700; font-size: 14px; }
+.sum button::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.sum button[aria-pressed="true"] { border-color: var(--c); background: color-mix(in srgb, var(--c) 14%, #000); }
+.sum .full { color: var(--ok); } .sum .none { color: var(--muted); } .sum .part { color: var(--gold); }
+.sum .bar { display: block; height: 3px; margin-top: 4px; border-radius: 2px; background: #ffffff14; overflow: hidden; }
+.sum .bar i { display: block; height: 100%; background: var(--ok); }
+.sum-wrap { overflow-x: auto; margin: 0 -16px; padding: 0 16px; }
+
+.tools { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0 -16px 10px; padding: 8px 16px; background: color-mix(in srgb, var(--bg) 94%, transparent); border-bottom: 1px solid var(--line); backdrop-filter: blur(6px); }
+.seg { display: inline-flex; border: 1px solid #ffffff2b; border-radius: 99px; overflow: hidden; }
+.seg button { min-height: 40px; padding: 0 12px; border: 0; background: none; cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.seg button + button { border-left: 1px solid #ffffff2b; }
+.seg button[aria-pressed="true"] { background: var(--gold); color: #1a1408; }
+.find { flex: 1 1 160px; min-width: 0; min-height: 40px; padding: 0 12px; border: 1px solid #ffffff2b; border-radius: 99px; background: #ffffff08; font-size: 14px; }
+.copy { min-height: 40px; padding: 0 14px; border: 1px solid #ffffff33; border-radius: 99px; background: #ffffff08; cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.count { margin: 0 0 8px; color: var(--muted); font-size: 12px; font-family: var(--mono); }
+
+/* 대상 한 줄 — 이름 · 부제 · 칸들 · 일상컷 수 */
+.list { list-style: none; margin: 0; padding: 0; }
+.row { display: grid; grid-template-columns: minmax(150px, 220px) minmax(0, 1fr); gap: 2px 14px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.row .who b { font-weight: 700; }
+.row .who small { display: block; color: var(--muted); font-size: 12px; word-break: keep-all; }
+.row .st { display: inline-block; margin-left: 6px; font: 700 10px/1 var(--mono); padding: 3px 6px; border-radius: 99px; vertical-align: 2px; }
+.row[data-status="full"] .st { color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok) 50%, transparent); }
+.row[data-status="part"] .st { color: var(--gold); border: 1px solid color-mix(in srgb, var(--gold) 50%, transparent); }
+.row[data-status="none"] .st { color: var(--muted); border: 1px solid #ffffff2b; }
+.slots { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; font-size: 13px; }
+.slot { white-space: nowrap; }
+.slot.ok { color: var(--ok); } .slot.miss { color: var(--miss); }
+.slot .n { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+.slot.cas { color: var(--muted); }
+@media (max-width: 600px) { .row { grid-template-columns: 1fr; } .seg button { padding: 0 9px; } }
+.note { color: var(--muted); font-size: 13px; padding: 12px 0; }
+</style>
+</head>
+<body>
+<header class="head">
+  <h1><small>ATELIER</small>그림 현황</h1>
+  <a class="home" href="./">← 공방 지도</a>
+</header>
+<main class="wrap">
+  <p class="lede" id="lede">공방 여섯의 그림 등록부를 글로만 본다 — 대상마다 어느 칸이 찼는지. 그림은 받지 않는다.</p>
+  <div class="sum-wrap"><table class="sum" id="sum" aria-label="공방마다">
+    <thead><tr><th>공방</th><th>대상</th><th>다 참</th><th>일부</th><th>없음</th><th>그림</th><th>일상컷</th></tr></thead>
+    <tbody></tbody>
+  </table></div>
+  <div class="tools" id="tools">
+    <div class="seg" role="group" aria-label="상태" id="filter">
+      <button type="button" data-f="all">전부</button><button type="button" data-f="gap">빈 칸 있음</button><button type="button" data-f="full">다 참</button><button type="button" data-f="none">아직 없음</button>
+    </div>
+    <input class="find" id="find" type="search" placeholder="이름 찾기" aria-label="이름 찾기">
+    <button type="button" class="copy" id="copy">글로 복사</button>
+  </div>
+  <p class="count" id="count" role="status" aria-live="polite"></p>
+  <ul class="list" id="list"></ul>
+</main>
+<script src="status.js"></script>
+<script>
+const S = window.AtelierStatus, $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const FILTERS = ['all', 'gap', 'full', 'none'], STATUS_KO = { full: '다 참', part: '일부', none: '없음' };
+const q = new URLSearchParams(location.search);
+let cur = S.ATELIERS.some(a => a.key === q.get('a')) ? q.get('a') : S.ATELIERS[S.ATELIERS.length - 1].key;   // 기본은 지금 가장 손이 많이 가는 원소
+let filter = FILTERS.includes(q.get('f')) ? q.get('f') : 'gap', find = '';
+const result = {};   // 공방 → {cards, sum} · 'fail'
+function load(a) {
+  return Promise.all(Object.entries(a.files).map(([k, p]) => fetch('/' + a.repo + '/' + p, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(p + ' ' + r.status); return r.json(); }).then(j => [k, j])))
+    .then(pairs => { result[a.key] = S.analyze(a, Object.fromEntries(pairs)); }).catch(() => { result[a.key] = 'fail'; }).then(render);
+}
+function pct(n, all) { return all ? Math.round(n / all * 100) : 0; }
+function sumHTML() {
+  return S.ATELIERS.map(a => {
+    const r = result[a.key], btn = `<button type="button" data-a="${a.key}" style="--c:${a.c}" aria-pressed="${a.key === cur}">${esc(a.name)}</button>`;
+    if (!r) return `<tr><td>${btn}</td><td colspan="6" class="none">읽는 중</td></tr>`;
+    if (r === 'fail') return `<tr><td>${btn}</td><td colspan="6" class="none">못 읽었다</td></tr>`;
+    const s = r.sum;
+    return `<tr><td>${btn}<span class="bar" aria-hidden="true"><i style="width:${pct(s.full, s.cards)}%"></i></span></td><td>${s.cards}</td><td class="full">${s.full} <small>${pct(s.full, s.cards)}%</small></td><td class="part">${s.part}</td><td class="none">${s.none}</td><td>${s.files}</td><td>${s.casual}</td></tr>`;
+  }).join('');
+}
+function shown() {
+  const r = result[cur]; if (!r || r === 'fail') return [];
+  const f = find.trim().toLowerCase();
+  return r.cards.filter(c => (filter === 'all' || (filter === 'gap' ? c.status !== 'full' : c.status === filter)) && (!f || (c.name + ' ' + c.sub + ' ' + c.key).toLowerCase().includes(f)));
+}
+function slotText(s) { return s.label + ' ' + (s.ok ? '✓' : '—') + (s.casual != null && (s.ok || s.casual) ? ' 일상 ' + s.casual : ''); }
+function rowHTML(c) {
+  const slots = c.slots.map(s => `<span class="slot ${s.ok ? 'ok' : 'miss'}">${esc(s.label)} ${s.ok ? '✓' : '—'}${s.casual != null && (s.ok || s.casual) ? ` <span class="n">일상 ${s.casual}</span>` : ''}</span>`).join('');   /* 세계 그림이 없는 칸엔 일상컷 수를 안 붙인다 */
+  const per = c.slots.some(s => s.casual != null);
+  return `<li class="row" data-status="${c.status}" data-key="${esc(c.key)}"><div class="who"><b>${esc(c.name)}</b><span class="st">${STATUS_KO[c.status]}</span><small>${esc(c.sub)}</small></div>
+    <div class="slots">${slots}${per ? '' : `<span class="slot cas">일상 <span class="n">${c.casual}</span></span>`}</div></li>`;
+}
+function render() {
+  $('#sum tbody').innerHTML = sumHTML();
+  document.querySelectorAll('#filter button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.f === filter)));
+  const a = S.ATELIERS.find(x => x.key === cur), r = result[cur], list = shown();
+  if (!r) { $('#count').textContent = a.name + ' — 읽는 중'; $('#list').innerHTML = ''; return; }
+  if (r === 'fail') { $('#count').textContent = a.name + ' — 등록부를 못 읽었다'; $('#list').innerHTML = ''; return; }
+  $('#count').textContent = `${a.name} — 대상 ${r.sum.cards} 가운데 ${list.length} 보임`;
+  $('#list').innerHTML = list.length ? list.map(rowHTML).join('') : '<li class="note">이 거르기에 맞는 대상이 없다</li>';
+}
+function remember() { const u = new URL(location.href); u.searchParams.set('a', cur); u.searchParams.set('f', filter); history.replaceState(null, '', u); }
+$('#sum').addEventListener('click', e => { const b = e.target.closest('button[data-a]'); if (!b) return; cur = b.dataset.a; remember(); render(); });
+$('#filter').addEventListener('click', e => { const b = e.target.closest('button[data-f]'); if (!b) return; filter = b.dataset.f; remember(); render(); });
+$('#find').addEventListener('input', e => { find = e.target.value; render(); });
+$('#copy').addEventListener('click', () => {
+  const a = S.ATELIERS.find(x => x.key === cur), list = shown();
+  const text = [a.name + ' · ' + ({ all: '전부', gap: '빈 칸 있음', full: '다 참', none: '아직 없음' })[filter] + ' · ' + list.length]
+    .concat(list.map(c => c.name + (c.sub ? ' (' + c.sub + ')' : '') + ' — ' + STATUS_KO[c.status] + ' — ' + c.slots.map(slotText).join(' · ') + (c.slots.some(s => s.casual != null) ? '' : ' · 일상 ' + c.casual))).join('\n');
+  const btn = $('#copy'), done = t => { btn.textContent = t; setTimeout(() => { btn.textContent = '글로 복사'; }, 1500); };
+  if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => done('복사했다'), () => done('복사가 막혔다')); else done('복사가 막혔다');
+});
+render();
+S.ATELIERS.forEach(load);
+</script>
+</body>
+</html>
