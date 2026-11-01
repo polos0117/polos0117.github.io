@@ -173,17 +173,17 @@ for (const k of H.ORDER.filter(x => H.get(x).forms)) {   // 폼·개방 받침(g
     assert.equal(JSON.stringify(c.shots.mecha), '{"scene":"foundry","time":"night","pose":"stride","expr":"confident"}', '장면 칸 바로잡기');
     assert.equal(JSON.stringify(Object.keys(c.looks).sort()), '["fantasy","mecha"]'); assert.equal(JSON.stringify(c.looks.mecha.params), '{"hair color":"silver"}', '모르는 열쇠는 버린다');
     const t = a.buildCard(w, d, 'fe', def, 'world', c);
-    assert(t.includes('IDENTITY (chosen details override the automatic look)\nhair color: silver') && !t.includes('iron-grey hair') && t.includes('EXPOSURE (low)') && t.includes('FACE ('), '메카 외형 ' + t.slice(0, 80));
+    assert(t.includes('IDENTITY (chosen details override the automatic look)\nhair color: silver') && !t.includes('iron-grey hair') && t.includes('EXPOSURE (low)') && t.includes('\nFACE '), '메카 외형 ' + t.slice(0, 80));
     assert(t.includes('SETTING (this card): the orbital foundry floor') && t.includes('TIME & WEATHER: night') && t.includes('Mid-stride') && t.includes('EXPRESSION: level brow'), '메카 장면·시간대·자세·표정');
     c.world = 'fantasy';
     const t2 = a.buildCard(w, d, 'fe', def, 'world', c);
-    assert(!t2.includes('FACE (') && t2.includes('iron-grey hair') && t2.includes('EXPOSURE (bold)') && !t2.includes('IDENTITY (') && !t2.includes('SETTING (this card)') && t2.includes('Standing, card-ready pose'), '판타지는 그 세계의 외형·장면 칸(메카 장면 열쇠는 판타지에 없다)');
+    assert(!t2.includes('\nFACE ') && t2.includes('iron-grey hair') && t2.includes('EXPOSURE (bold)') && !t2.includes('IDENTITY (') && !t2.includes('SETTING (this card)') && t2.includes('Standing, card-ready pose'), '판타지는 그 세계의 외형·장면 칸(메카 장면 열쇠는 판타지에 없다)');
     const steps0 = ST.element('world', { A: a, D: d, S, P: w.AtelierPrompt, w: word, subject: 'fe', g: a.subject(d, 'fe'), card: c, rnd: l => l[0] });
     steps0[1].parts[1].set('forge'); steps0[1].parts[2].set('dawn'); steps0[2].parts[1].set('kneel');
     const t3 = a.buildCard(w, d, 'fe', def, 'world', c); assert(t3.includes('SETTING (this card): inside the great forge') && t3.includes('TIME & WEATHER: first light of dawn') && t3.includes('Down on one knee'), '장면·자세 단계가 그 세계 칸을 고친다');
     assert.match(steps0[1].shown(), /대장간 안 · 새벽/); assert.match(steps0[2].shown(), /한쪽 무릎/);
     const steps = ST.element('world', { A: a, D: d, S, P: w.AtelierPrompt, w: word, subject: 'fe', g: a.subject(d, 'fe'), card: c, rnd: l => l[0] });
-    steps[3].parts[2].set(true); assert(a.buildCard(w, d, 'fe', def, 'world', c).includes('FACE ('), '설계 줄 체크가 그 세계 칸을 고친다');
+    steps[3].parts[2].set(true); assert(a.buildCard(w, d, 'fe', def, 'world', c).includes('\nFACE '), '설계 줄 체크가 그 세계 칸을 고친다');
     steps[4].parts[1].items[0].run(); assert(Object.keys(c.looks.fantasy.params).length > 5 && !c.looks.fantasy.params['hair color'] && !c.looks.fantasy.params['face shape'], '외형 무작위는 설계가 쥔 칸을 비워 둔다');
     steps[4].parts[1].items[1].run(); assert.equal(JSON.stringify(c.looks.fantasy.params), '{}', '외형 초기화');
   }
