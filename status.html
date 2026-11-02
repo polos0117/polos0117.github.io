@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>그림 현황</title>
-<meta name="description" content="공방 여섯의 그림 작업 현황을 글로만 — 대상마다 어느 칸이 찼고 무엇이 비었는지.">
+<meta name="description" content="공방 일곱의 그림 작업 현황을 글로만 — 대상마다 어느 칸이 찼고 무엇이 비었는지.">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#0f0e12">
 <link rel="icon" href="icon-192.png">
@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&display=swap">
 <!--
-  그림 현황 — 공방 여섯(건담·책·포켓몬·신화·게임·원소)의 설계표와 그림 등록부(data/img.json)를 견주어, 대상마다 어느 칸이 찼는지 글로만 보인다(2026-11-01).
+  그림 현황 — 공방 일곱(건담·책·포켓몬·신화·게임·원소·삼국지)의 설계표와 그림 등록부(data/img.json)를 견주어, 대상마다 어느 칸이 찼는지 글로만 보인다(2026-11-01).
   그림은 받지 않는다 — 등록부 JSON 만 읽는다(계산은 status.js). 위 표에서 공방마다 다 참·일부·없음, 아래에서 공방 하나의 대상 목록.
   거르기: 공방(?a=) · 상태(?f= all·gap·full·none) · 이름 찾기. 「글로 복사」 는 보이는 목록을 한 줄씩 옮긴다.
   색과 이름은 공방 지도(index.html)의 ROOMS 와 같다.
@@ -92,7 +92,7 @@ button, input { font: inherit; color: inherit; }
   <a class="home" href="./">← 공방 지도</a>
 </header>
 <main class="wrap">
-  <p class="lede" id="lede">공방 여섯의 그림 등록부를 글로만 본다 — 대상마다 어느 칸이 찼는지. 그림은 받지 않는다.</p>
+  <p class="lede" id="lede">공방 일곱의 그림 등록부를 글로만 본다 — 대상마다 어느 칸이 찼는지. 그림은 받지 않는다.</p>
   <div class="sum-wrap"><table class="sum" id="sum" aria-label="공방마다">
     <thead><tr><th>공방</th><th>대상</th><th>다 참</th><th>일부</th><th>없음</th><th>그림</th><th>일상컷</th></tr></thead>
     <tbody></tbody>
@@ -113,7 +113,7 @@ const S = window.AtelierStatus, $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const FILTERS = ['all', 'gap', 'full', 'none'], STATUS_KO = { full: '다 참', part: '일부', none: '없음' };
 const q = new URLSearchParams(location.search);
-let cur = S.ATELIERS.some(a => a.key === q.get('a')) ? q.get('a') : S.ATELIERS[S.ATELIERS.length - 1].key;   // 기본은 지금 가장 손이 많이 가는 원소
+let cur = S.ATELIERS.some(a => a.key === q.get('a')) ? q.get('a') : 'element';   // 기본은 지금 가장 손이 많이 가는 원소(삼국지가 뒤에 붙어도 — 2026-11-02)
 let filter = FILTERS.includes(q.get('f')) ? q.get('f') : 'gap', find = '';
 const result = {};   // 공방 → {cards, sum} · 'fail'
 function load(a) {

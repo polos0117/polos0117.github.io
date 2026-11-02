@@ -1,6 +1,6 @@
-/* 그림 현황(status.html) — 옆에 받아 둔 공방 저장소 여섯의 설계표·등록부로 status.js 를 셈해 보고, 화면을 폰·PC 로 연다.
+/* 그림 현황(status.html) — 옆에 받아 둔 공방 저장소 일곱의 설계표·등록부로 status.js 를 셈해 보고, 화면을 폰·PC 로 연다.
    셈: 공방마다 대상 수 = 설계표 대상 수, 다 참+일부+없음 = 대상, 칸 판정(원소 주민은 사는 세계만, 포켓몬은 폼 셋 + 폭주 셋, 게임·책은 폼 셋 + 개방 셋).
-   화면: 위 표 여섯 줄 · 공방 바꾸기 · 상태 거르기(주소 ?a=&f=) · 이름 찾기 · 그림(img) 요청이 하나도 없다 · 옆으로 넘치지 않는다 · 콘솔 오류 없음.
+   화면: 위 표 일곱 줄 · 공방 바꾸기 · 상태 거르기(주소 ?a=&f=) · 이름 찾기 · 그림(img) 요청이 하나도 없다 · 옆으로 넘치지 않는다 · 콘솔 오류 없음.
    Run: CHROMIUM_PATH=<chrome> NODE_PATH=<playwright> node tests/status-screen.cjs   (옆 저장소가 없으면 건너뜀, STATUS_PORT 로 자리) */
 const assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path'), http = require('node:http');
 const ROOT = path.resolve(__dirname, '..'), SIB = path.resolve(ROOT, '..'), S = require(path.join(ROOT, 'status.js'));
@@ -25,6 +25,8 @@ assert.equal(results.pkm.cards[0].slots.length, 6, '포켓몬 폼 셋 + 폭주 �
 assert.equal(results.game.cards[0].slots.length, 6, '게임 폼 셋 + 개방 셋'); assert.equal(results.book.cards[0].slots.length, 6, '책');
 assert.equal(results.myth.cards[0].slots.map(s => s.label).join(','), '초상,각성,저주');
 assert.equal(results.gundam.sum.cards, read(S.ATELIERS[0], 'data/mech.json').cards.length, '건담 대상 = 기체 수');
+assert.equal(results.samguk.sum.cards, read(S.ATELIERS.find(a => a.key === 'samguk'), 'data/sam-design.json').generals.length, '삼국지 대상 = 장수 수');
+assert.equal(results.samguk.cards.find(c => c.key === '관우').slots.map(s => s.label).join(','), '삼국시대,중세 판타지,메카');
 
 const PORT = +(process.env.STATUS_PORT || 8805), BASE = 'http://127.0.0.1:' + PORT;
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.json': 'application/json', '.css': 'text/css', '.png': 'image/png', '.webmanifest': 'application/json' };
@@ -45,7 +47,7 @@ const server = http.createServer((q, s) => {
     p.on('request', r => { if (r.resourceType() === 'image' && !/icon-/.test(r.url())) imgs.push(r.url()); });
     await p.goto(BASE + '/status.html');
     await p.waitForFunction(n => document.querySelectorAll('#sum tbody tr').length === n && !/읽는 중/.test(document.querySelector('#sum tbody').textContent), S.ATELIERS.length);
-    assert.equal(await p.locator('#sum tbody tr').count(), S.ATELIERS.length, '표 여섯 줄');
+    assert.equal(await p.locator('#sum tbody tr').count(), S.ATELIERS.length, '표 일곱 줄');
     for (const a of S.ATELIERS) assert.match(await p.locator('#sum tbody tr', { has: p.locator(`[data-a="${a.key}"]`) }).textContent(), new RegExp(String(results[a.key].sum.cards)), a.key + ' 대상 수');
     /* 기본 — 원소 · 빈 칸 있음 */
     const gapN = results.element.cards.filter(c => c.status !== 'full').length;

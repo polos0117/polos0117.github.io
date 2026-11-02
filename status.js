@@ -1,4 +1,4 @@
-/* 그림 현황 — 공방 여섯의 설계표(대상 목록)와 그림 등록부(data/img.json)를 견주어, 대상마다 어느 칸이 찼는지 글로만 셈한다(2026-11-01).
+/* 그림 현황 — 공방 일곱의 설계표(대상 목록)와 그림 등록부(data/img.json)를 견주어, 대상마다 어느 칸이 찼는지 글로만 셈한다(2026-11-01).
    그림을 받지 않는다 — 등록부 JSON 만 읽는다. 브라우저(status.html)와 검사(tests/status.cjs)가 같은 파일을 쓴다.
 
    AtelierStatus.ATELIERS — 공방마다 {key, name(지도의 방 이름), c(지도 색), repo, dex, files: {이름: 경로}, subjects(자료) → [{key, name, sub, worlds?}], slots(대상, 몫) → [{label, ok}]}
@@ -44,6 +44,7 @@
   }
   var PKM_FORMS = [['light', '경장'], ['heavy', '중장'], ['mobility', '고기동']];
   var WORLDS = [['fantasy', '판타지'], ['steampunk', '스팀펑크'], ['mecha', '메카']];
+  var SAM_WORLDS = [['samguk', '삼국시대'], ['fantasy', '중세 판타지'], ['mecha', '메카']];
   var ATELIERS = [
     { key: 'gundam', name: '건담 격납고', c: '#7fb3ff', repo: 'atelier', dex: '/atelier/dex.html', files: { mech: 'data/mech.json', img: 'data/img.json' },
       subjects: function (d) { return (d.mech.cards || []).map(function (m) { return { key: m.name, name: m.name, sub: m.models || '' }; }); },
@@ -71,7 +72,14 @@
         return out;
       },
       /* 세계 그림 칸 + 그 세계의 일상컷 수(칸 판정에는 안 넣는다) */
-      slots: function (s, p) { return WORLDS.filter(function (w) { return s.worlds.indexOf(w[0]) >= 0; }).map(function (w) { return { label: w[1], ok: p.form(w[0]), casual: p.casual(w[0]) }; }); } }
+      slots: function (s, p) { return WORLDS.filter(function (w) { return s.worlds.indexOf(w[0]) >= 0; }).map(function (w) { return { label: w[1], ok: p.form(w[0]), casual: p.casual(w[0]) }; }); } },
+    /* 삼국지(2026-11-02) — 장수 한 명이 세 세계(삼국시대 · 중세 판타지 · 메카). 게임의 초상(images/)은 셈하지 않는다 — 새 그림 구조(data/img.json)만 */
+    { key: 'samguk', name: '삼국지 군막', c: '#c9a227', repo: 'sam-atelier', dex: '/sam-atelier/dex.html', files: { design: 'data/sam-design.json', img: 'data/img.json' },
+      subjects: function (d) {
+        var fac = {}; (d.design.factions || []).forEach(function (f) { fac[f.key] = f; });
+        return (d.design.generals || []).map(function (g) { var f = fac[g.faction] || {}; return { key: g.key, name: g.key, sub: (f.hanja ? f.hanja + ' ' : '') + (g.en || '') + (g.designed === 'hand' ? ' ★' : '') }; });
+      },
+      slots: function (s, p) { return SAM_WORLDS.map(function (w) { return { label: w[1], ok: p.form(w[0]), casual: p.casual(w[0]) }; }); } }
   ];
   function analyze(a, data) {
     var img = (data.img && data.img.img) || {}, sum = { cards: 0, full: 0, part: 0, none: 0, files: 0, casual: 0 };
