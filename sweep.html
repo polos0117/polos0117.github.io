@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>세부 항목 시험</title>
+<meta name="description" content="이미지 생성 도구가 미간 · 얼굴 길이 · 코 · 눈 · 목 · 체형 · 2D↔실사 같은 작은 차이를 받아들이는지 — 한 항목만 단계별로 바꾼 세션 지시문, 비교판, 점 찍어 재기, 판정.">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0f0e12">
+<link rel="icon" href="icon-192.png">
+<!--
+  세부 항목 시험(2026-11-04) — 셈은 sweep.js. ① 항목 · 단계 · 반복 · 말/수치 · 바탕 화풍을 고르면 세션에 넘길 지시문 묶음(지시문마다 저장 이름)이 나온다.
+  ② 받은 그림을 저장 이름 그대로 한꺼번에 고르면 항목마다 단계 × 반복 칸에 놓인다. ③ 차례가 있는 항목은 점을 찍어 비율을 재고(2D↔실사는 눈으로 1~5), 갈래 항목은 맞음 · 애매 · 아님.
+  ④ 항목마다 판정 — 단계 평균이 차례대로 움직이고 이웃 단계 차이가 같은 단계 안 흔들림보다 크면 「반영됨」. 그림은 이 기기에만, 잰 값은 브라우저에 저장 · JSON 내보내기.
+-->
+<style>
+:root { --bg: #0b0a0e; --card: #18161d; --card2: #211e28; --line: #ffffff1a; --line2: #ffffff33; --text: #f1ece2; --muted: #a8a09a; --gold: #d9b45a; --ok: #8fd9a8; --bad: #ff8f8f; --warn: #f2c46d;
+  --sans: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; --mono: ui-monospace, Menlo, Consolas, monospace; }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --bg: #f6f3ec; --card: #fff; --card2: #f1ede4; --line: #0000001a; --line2: #00000033; --text: #1d1a16; --muted: #6b645c; --gold: #9a7420; --ok: #24814a; --bad: #c03b3b; --warn: #a36a00; } }
+:root[data-theme="light"] { --bg: #f6f3ec; --card: #fff; --card2: #f1ede4; --line: #0000001a; --line2: #00000033; --text: #1d1a16; --muted: #6b645c; --gold: #9a7420; --ok: #24814a; --bad: #c03b3b; --warn: #a36a00; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 14px/1.5 var(--sans); overflow-x: hidden; }
+button, input, select, textarea { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.wrap { max-width: 1200px; margin: 0 auto; padding: calc(14px + env(safe-area-inset-top)) 16px calc(40px + env(safe-area-inset-bottom)); }
+h1 { margin: 0 0 4px; font-size: clamp(22px, 3vw, 30px); }
+h2 { margin: 22px 0 8px; font-size: 17px; }
+.note { color: var(--muted); font-size: 12.5px; word-break: keep-all; }
+.box { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px; min-width: 0; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border: 1px solid var(--line2); border-radius: 10px; background: var(--card); cursor: pointer; font-weight: 600; font-size: 13px; }
+.btn.primary { background: var(--gold); border-color: var(--gold); color: #1b1508; }
+.btn.small { min-height: 30px; padding: 0 9px; font-size: 12px; }
+select, input[type=number] { min-height: 34px; padding: 4px 8px; border: 1px solid var(--line2); border-radius: 9px; background: var(--card); }
+.attrs { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; margin: 8px 0; }
+.attrs label { display: flex; gap: 6px; align-items: flex-start; padding: 6px 8px; border: 1px solid var(--line); border-radius: 9px; cursor: pointer; }
+.attrs small { display: block; color: var(--muted); font-size: 11px; }
+.plist { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.plist li { background: var(--card2); border: 1px solid var(--line); border-radius: 10px; padding: 8px; min-width: 0; }
+.plist pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; font: 11.5px/1.45 var(--mono); max-height: 140px; overflow: auto; }
+.plist .h { display: flex; flex-wrap: wrap; gap: 6px; justify-content: space-between; align-items: center; font-size: 12.5px; }
+.plist code { font: 11.5px var(--mono); color: var(--muted); word-break: break-all; }
+.res { margin-top: 12px; }
+.grid { display: grid; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.cell { position: relative; aspect-ratio: 2 / 3; min-width: 92px; border: 1px dashed var(--line2); border-radius: 9px; background: var(--card2); overflow: hidden; display: grid; place-items: center; color: var(--muted); font-size: 11px; text-align: center; cursor: pointer; }
+.cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cell .tag { position: absolute; left: 4px; bottom: 4px; right: 4px; padding: 2px 4px; border-radius: 6px; background: #000b; color: #fff; font: 11px var(--mono); }
+.cell.done { border-style: solid; border-color: var(--ok); }
+.lvl { display: flex; align-items: center; font-size: 12px; color: var(--muted); }
+.verdict { display: inline-flex; padding: 2px 9px; border-radius: 99px; border: 1px solid var(--line2); font-size: 12px; font-weight: 700; }
+.verdict.yes { color: var(--ok); border-color: var(--ok); } .verdict.weak { color: var(--warn); border-color: var(--warn); } .verdict.no { color: var(--bad); border-color: var(--bad); }
+table.st { border-collapse: collapse; font: 12px var(--mono); margin-top: 6px; }
+table.st td, table.st th { padding: 3px 8px; border-bottom: 1px solid var(--line); text-align: right; }
+table.st th { color: var(--muted); font-weight: 600; }
+.sheet { position: fixed; inset: 0; z-index: 20; background: #000c; display: grid; place-items: center; padding: 10px; }
+.meas { width: min(980px, 100%); max-height: 100%; overflow: auto; background: var(--bg); border-radius: 14px; padding: 12px; display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 12px; }
+@media (max-width: 700px) { .meas { grid-template-columns: 1fr; } }
+.stage { position: relative; width: 100%; max-height: 78vh; aspect-ratio: 2 / 3; margin: 0 auto; cursor: crosshair; touch-action: none; }
+.stage img { width: 100%; height: 100%; object-fit: contain; display: block; user-select: none; -webkit-user-drag: none; }
+.stage .pt { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; border: 2px solid #fff; background: var(--gold); box-shadow: 0 0 0 1px #000; font: 700 10px/10px var(--mono); color: #000; display: grid; place-items: center; pointer-events: none; }
+.zoomnote { font-size: 12px; color: var(--muted); }
+.steps { margin: 6px 0; padding-left: 18px; font-size: 13px; }
+.steps li.now { color: var(--gold); font-weight: 700; } .steps li.done { color: var(--ok); }
+.toast { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); transform: translateX(-50%); max-width: calc(100vw - 32px); padding: 9px 14px; border-radius: 12px; background: var(--card2); border: 1px solid var(--line2); z-index: 30; font-size: 13px; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="row" style="justify-content:space-between"><h1>세부 항목 시험</h1><a class="btn" href="index.html">공방 지도</a></div>
+  <p class="note">생성 도구가 작은 차이(미간 · 얼굴 길이 · 코 · 눈 · 목 · 체형 · 2D↔실사)를 받아들이는지 본다. <b>한 항목만 단계별로 바꾸고 나머지는 늘 같은 말로 고정</b>한다. 같은 단계를 두 번 이상 뽑아야 문구의 효과와 우연을 가를 수 있다.</p>
+
+  <h2>① 지시문 만들기</h2>
+  <section class="box">
+    <div class="note">시험할 항목</div>
+    <div class="attrs" id="attrs"></div>
+    <div class="row">
+      <label>단계 <select id="levels"><option value="3">3단계(양 끝 · 가운데)</option><option value="5">5단계</option></select></label>
+      <label>반복 <input type="number" id="reps" min="1" max="5" value="2" style="width:64px"></label>
+      <label>쓰는 말 <select id="wording"><option value="words">말로(wide-set …)</option><option value="numbers">수치로(1.5 eye-widths …)</option></select></label>
+      <label>바탕 화풍 <select id="style"></select></label>
+    </div>
+    <div class="row" style="margin-top:10px"><button class="btn primary" type="button" id="make">지시문 만들기</button><span class="note" id="count"></span></div>
+    <div id="packbar" class="row" style="margin-top:8px" hidden><button class="btn" type="button" id="copyall">전부 글로 복사</button><button class="btn" type="button" id="savetxt">글 파일로 받기</button>
+      <span class="note">세션에서는 지시문마다 <b>새 대화</b>로 넘기는 게 가장 깨끗하다(앞 그림을 따라 그리지 않게). 받은 그림은 적힌 저장 이름으로 저장한다.</span></div>
+    <ul class="plist" id="plist"></ul>
+  </section>
+
+  <h2>② 그림 놓기 · ③ 재기</h2>
+  <section class="box">
+    <div class="row"><label class="btn primary">그림 한꺼번에 고르기<input type="file" id="bulk" accept="image/*" multiple hidden></label>
+      <span class="note">저장 이름(<code>sweep-항목-L단계-r반복</code>)대로 칸에 놓인다. 칸을 누르면 그 칸 하나만 고르거나 잰다.</span>
+      <button class="btn small" type="button" id="export">잰 값 내보내기(JSON)</button><button class="btn small" type="button" id="clear">잰 값 지우기</button></div>
+    <div id="results"></div>
+  </section>
+</main>
+
+<div class="sheet" id="sheet" hidden><div class="meas" role="dialog" aria-modal="true" aria-labelledby="m-title" id="meas"></div></div>
+<input type="file" id="one" accept="image/*" hidden>
+<div class="toast" id="toast" hidden></div>
+
+<script src="sweep.js"></script>
+<script>
+(function () {
+  'use strict';
+  var W = window.AtelierSweep, KEY = 'atelier_sweep_v1';
+  var $ = function (s, el) { return (el || document).querySelector(s); }, $$ = function (s, el) { return Array.prototype.slice.call((el || document).querySelectorAll(s)); };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  var S = { opt: { attrs: ['eye_spacing', 'face_length', 'nose_size', 'render'], levels: 3, reps: 2, wording: 'words', style: 'keyart' }, cells: {} };
+  try { var raw = localStorage.getItem(KEY); if (raw) { var j = JSON.parse(raw); if (j.opt) S.opt = j.opt; if (j.cells) S.cells = j.cells; } } catch (e) {}
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+  var IMG = {}, list = [], tt = 0;
+  function toast(m) { var t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(function () { t.hidden = true; }, 2600); }
+
+  /* ① 설정 */
+  $('#attrs').innerHTML = W.ATTRS.map(function (a) { return '<label><input type="checkbox" value="' + a.key + '"' + (S.opt.attrs.indexOf(a.key) >= 0 ? ' checked' : '') + '> <span>' + esc(a.ko) + '<small>' + (a.kind === 'kind' ? '갈래 — 맞음·애매·아님' : a.judge ? '차례 — 눈으로 1~5' : '차례 — 점 찍어 ' + esc(a.metric)) + ' · ' + (a.frame === 'body' ? '전신' : '가슴 위') + '</small></span></label>'; }).join('');
+  $('#style').innerHTML = W.STYLES.map(function (s) { return '<option value="' + s.key + '">' + esc(s.ko) + '</option>'; }).join('');
+  $('#levels').value = String(S.opt.levels); $('#reps').value = S.opt.reps; $('#wording').value = S.opt.wording; $('#style').value = S.opt.style;
+  function readOpt() { S.opt = { attrs: $$('#attrs input:checked').map(function (c) { return c.value; }), levels: +$('#levels').value, reps: Math.max(1, Math.min(5, +$('#reps').value || 2)), wording: $('#wording').value, style: $('#style').value }; save(); return S.opt; }
+  function showPack() {
+    list = W.build(S.opt);
+    $('#count').textContent = '지시문 ' + list.length + '개 — 항목 ' + S.opt.attrs.length + ' × 단계 ' + S.opt.levels + ' × 반복 ' + S.opt.reps;
+    $('#packbar').hidden = !list.length;
+    $('#plist').innerHTML = list.map(function (p, i) { return '<li><div class="h"><b>' + (i + 1) + '. ' + esc(p.ko) + '</b><span><code>' + esc(p.file) + '</code> <button class="btn small" type="button" data-copy="' + i + '">복사</button></span></div><pre>' + esc(p.text) + '</pre></li>'; }).join('');
+    renderResults();
+  }
+  $('#make').addEventListener('click', function () { readOpt(); if (!S.opt.attrs.length) return toast('항목을 하나 이상 골라줘'); showPack(); });
+  function copy(t) { return navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject(); }
+  $('#plist').addEventListener('click', function (e) { var b = e.target.closest('[data-copy]'); if (b) copy(list[+b.dataset.copy].text).then(function () { toast('복사했다'); }, function () { toast('복사가 막혔다 — 글을 직접 골라줘'); }); });
+  $('#copyall').addEventListener('click', function () { copy(W.packText(list)).then(function () { toast('전부 복사했다'); }, function () { toast('복사가 막혔다 — 글 파일로 받아줘'); }); });
+  $('#savetxt').addEventListener('click', function () { download('sweep-prompts.txt', W.packText(list), 'text/plain'); });
+  function download(name, text, type) { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: type })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 400); }
+
+  /* ② 그림 놓기 — 저장 이름에서 항목 · 단계 · 반복 */
+  function cellIdFromName(n) { var m = /sweep-([a-z_]+)-L(\d)-r(\d)/.exec(n || ''); return m && W.attr(m[1]) ? m[1] + '-' + m[2] + '-' + m[3] : null; }
+  function putImage(id, f) {
+    var url = URL.createObjectURL(f);
+    return new Promise(function (res) { var im = new Image(); im.onload = function () { IMG[id] = { url: url, w: im.naturalWidth, h: im.naturalHeight, name: f.name }; var c = S.cells[id] = S.cells[id] || {}; c.name = f.name; c.w = im.naturalWidth; c.h = im.naturalHeight; res(true); }; im.onerror = function () { res(false); }; im.src = url; });
+  }
+  $('#bulk').addEventListener('change', function (e) {
+    var fs = Array.prototype.slice.call(e.target.files), miss = [];
+    Promise.all(fs.map(function (f) { var id = cellIdFromName(f.name); if (!id) { miss.push(f.name); return null; } return putImage(id, f); })).then(function () { save(); renderResults(); toast(fs.length - miss.length + '장 놓음' + (miss.length ? ' · 이름을 못 읽음 ' + miss.length + '장' : '')); });
+    e.target.value = '';
+  });
+  var pending = null;
+  $('#one').addEventListener('change', function (e) { var f = e.target.files[0]; if (f && pending) putImage(pending, f).then(function () { save(); renderResults(); openMeasure(pending); }); e.target.value = ''; });
+
+  /* 결과 — 항목마다 단계 × 반복, 판정 */
+  function attrCells(a) {
+    var idx = W.levelIdx(S.opt.levels), out = [];
+    idx.forEach(function (li) { for (var r = 1; r <= S.opt.reps; r++) { var id = a.key + '-' + (li + 1) + '-' + r, c = S.cells[id] || {}; out.push({ id: id, level: li, rep: r, value: c.value, hit: c.hit }); } });
+    return out;
+  }
+  function cellTag(a, c) { if (a.kind === 'kind') return c.hit ? { yes: '맞음', maybe: '애매', no: '아님' }[c.hit] : ''; return typeof c.value === 'number' ? (a.judge ? '보기 ' + c.value : c.value.toFixed(3)) : ''; }
+  function renderResults() {
+    var attrs = S.opt.attrs.map(W.attr).filter(Boolean);
+    $('#results').innerHTML = attrs.map(function (a) {
+      var cells = attrCells(a), v = W.verdict(a.key, cells), idx = W.levelIdx(S.opt.levels);
+      var head = '<div class="row" style="justify-content:space-between;margin-top:14px"><b>' + esc(a.ko) + '</b><span class="verdict ' + v.result + '">' + esc(W.RESULT_KO[v.result]) + '</span></div>' +
+        '<div class="note">' + (a.kind === 'kind' ? '갈래마다 그 모양으로 보이는지 — 맞음 · 애매 · 아님' : a.judge ? '그림마다 다섯 단계(1 평면 2D ~ 5 사진) 중 어디로 보이는지' : '잴 것: ' + esc(a.metric)) + '</div>';
+      var grid = '<div class="grid" style="grid-template-columns:90px repeat(' + S.opt.reps + ', minmax(92px, 160px))">' + idx.map(function (li) {
+        var row = '<div class="lvl">L' + (li + 1) + ' ' + esc(a.levels[li].ko) + '</div>';
+        for (var r = 1; r <= S.opt.reps; r++) { var id = a.key + '-' + (li + 1) + '-' + r, im = IMG[id], c = S.cells[id] || {}, tag = cellTag(a, c);
+          row += '<button type="button" class="cell' + (tag ? ' done' : '') + '" data-cell="' + id + '" aria-label="' + esc(a.ko + ' L' + (li + 1) + ' ' + r + '번째') + '">' + (im ? '<img alt="" src="' + im.url + '">' : (c.name ? '그림 다시 고르기<br>(잰 값 있음)' : '그림 고르기')) + (tag ? '<span class="tag">' + esc(tag) + '</span>' : '') + '</button>'; }
+        return row; }).join('') + '</div>';
+      var stat = '';
+      if (a.kind === 'kind' && v.total) stat = '<p class="note">맞음 ' + v.hits.yes + ' · 애매 ' + v.hits.maybe + ' · 아님 ' + v.hits.no + ' — 맞음 ' + v.share + '%</p>';
+      if (a.kind === 'scale' && v.means && v.means.length) stat = '<table class="st"><tr><th>단계</th>' + v.levels.map(function (l) { return '<th>L' + (l + 1) + '</th>'; }).join('') + '<th>흔들림</th></tr><tr><th>평균</th>' + v.means.map(function (m) { return '<td>' + m.toFixed(3) + '</td>'; }).join('') + '<td>' + (v.spread == null ? '—' : v.spread.toFixed(3)) + '</td></tr></table>' +
+        '<p class="note">' + (v.monotonic ? '단계 차례대로 움직인다' : '차례대로 움직이지 않는다') + ' · 양 끝 차이 ' + (v.span != null ? v.span.toFixed(3) : '—') + (v.why ? ' · ' + esc(v.why) : '') + '</p>';
+      return '<section class="res">' + head + grid + stat + '</section>';
+    }).join('') || '<p class="note">① 에서 지시문을 만들면 항목마다 칸이 생긴다.</p>';
+  }
+  $('#results').addEventListener('click', function (e) { var c = e.target.closest('[data-cell]'); if (!c) return; var id = c.dataset.cell; if (IMG[id]) openMeasure(id); else { pending = id; $('#one').click(); } });
+
+  /* ③ 재기 */
+  var M = null;
+  function openMeasure(id) {
+    var parts = id.split('-'), a = W.attr(parts.slice(0, -2).join('-')), im = IMG[id]; if (!a || !im) return;
+    var c = S.cells[id] = S.cells[id] || {};
+    M = { id: id, a: a, pts: (c.pts || []).slice() };
+    $('#sheet').hidden = false; drawMeasure();
+  }
+  function drawMeasure() {
+    var a = M.a, im = IMG[M.id], c = S.cells[M.id], lvl = +M.id.split('-').slice(-2)[0];
+    var side = '';
+    if (a.kind === 'kind') side = '<p>이 그림이 「' + esc(a.levels[lvl - 1].ko) + '」 로 보이나?</p><div class="row">' + [['yes', '맞음'], ['maybe', '애매'], ['no', '아님']].map(function (h) { return '<button class="btn' + (c.hit === h[0] ? ' primary' : '') + '" type="button" data-hit="' + h[0] + '">' + h[1] + '</button>'; }).join('') + '</div>';
+    else if (a.judge) side = '<p>다섯 단계 중 어디로 보이나? (지시는 L' + lvl + ')</p><div class="row">' + a.levels.map(function (l, i) { return '<button class="btn small' + (c.value === i + 1 ? ' primary' : '') + '" type="button" data-judge="' + (i + 1) + '">' + (i + 1) + ' ' + esc(l.ko) + '</button>'; }).join('') + '</div>';
+    else side = '<p class="zoomnote">그림 위를 눌러 차례대로 점을 찍는다.</p><ol class="steps">' + a.points.map(function (p, i) { return '<li class="' + (i < M.pts.length ? 'done' : i === M.pts.length ? 'now' : '') + '">' + esc(p) + '</li>'; }).join('') + '</ol>' +
+      '<p>비율: <b id="m-ratio">' + (M.pts.length >= a.points.length ? W.ratio(a.key, M.pts, im.w, im.h).toFixed(3) : '—') + '</b> <span class="note">' + esc(a.metric) + '</span></p><div class="row"><button class="btn small" type="button" id="m-undo">점 하나 지우기</button><button class="btn small" type="button" id="m-reset">다시</button></div>';
+    $('#meas').innerHTML = '<div class="stage" id="stage"><img alt="" src="' + im.url + '">' + M.pts.map(function (p, i) { return '<span class="pt" style="left:' + (p.x * 100) + '%;top:' + (p.y * 100) + '%">' + (i + 1) + '</span>'; }).join('') + '</div>' +
+      '<div><h3 id="m-title" style="margin:0 0 6px">' + esc(a.ko) + ' · L' + lvl + ' ' + esc(a.levels[lvl - 1].ko) + '</h3><div class="note">' + esc(im.name) + ' · ' + im.w + '×' + im.h + '</div>' + side +
+      '<div class="row" style="margin-top:12px"><button class="btn" type="button" id="m-pick">그림 바꾸기</button><button class="btn primary" type="button" id="m-close">닫기</button></div></div>';
+    var st = $('#stage');
+    if (a.kind === 'scale' && !a.judge) st.addEventListener('click', function (e) {
+      if (M.pts.length >= a.points.length) return;
+      /* 그림이 칸 안에 contain 으로 들어가 있으니 실제 그림 자리로 바꾼다 */
+      var r = st.getBoundingClientRect(), sc = Math.min(r.width / im.w, r.height / im.h), dw = im.w * sc, dh = im.h * sc, ox = (r.width - dw) / 2, oy = (r.height - dh) / 2;
+      var x = (e.clientX - r.left - ox) / dw, y = (e.clientY - r.top - oy) / dh; if (x < 0 || y < 0 || x > 1 || y > 1) return;
+      M.pts.push({ x: Math.round(x * 10000) / 10000, y: Math.round(y * 10000) / 10000 }); commit(); drawMeasure();
+    });
+    $$('[data-hit]').forEach(function (b) { b.addEventListener('click', function () { c.hit = b.dataset.hit; save(); renderResults(); drawMeasure(); }); });
+    $$('[data-judge]').forEach(function (b) { b.addEventListener('click', function () { c.value = +b.dataset.judge; save(); renderResults(); drawMeasure(); }); });
+    var u = $('#m-undo'); u && u.addEventListener('click', function () { M.pts.pop(); commit(); drawMeasure(); });
+    var rs = $('#m-reset'); rs && rs.addEventListener('click', function () { M.pts = []; commit(); drawMeasure(); });
+    $('#m-pick').addEventListener('click', function () { pending = M.id; $('#sheet').hidden = true; $('#one').click(); });
+    $('#m-close').addEventListener('click', closeMeasure);
+  }
+  function commit() { var c = S.cells[M.id], im = IMG[M.id]; c.pts = M.pts.slice(); c.value = M.pts.length >= M.a.points.length ? W.ratio(M.a.key, M.pts, im.w, im.h) : undefined; if (c.value === undefined) delete c.value; save(); renderResults(); }
+  function closeMeasure() { $('#sheet').hidden = true; M = null; }
+  $('#sheet').addEventListener('click', function (e) { if (e.target.id === 'sheet') closeMeasure(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('#sheet').hidden) closeMeasure(); });
+
+  $('#export').addEventListener('click', function () {
+    var out = { version: 1, at: new Date().toISOString(), opt: S.opt, prompts: W.build(S.opt).map(function (p) { return { file: p.file, attr: p.attr, level: p.level + 1, rep: p.rep, text: p.text }; }), cells: S.cells,
+      verdicts: S.opt.attrs.map(function (k) { var a = W.attr(k); return a ? { attr: k, ko: a.ko, verdict: W.verdict(k, attrCells(a)) } : null; }).filter(Boolean) };
+    download('sweep-results.json', JSON.stringify(out, null, 1), 'application/json');
+  });
+  $('#clear').addEventListener('click', function () { if (confirm('잰 값을 다 지울까? (그림 파일은 그대로)')) { S.cells = {}; save(); renderResults(); } });
+
+  showPack();
+})();
+</script>
+</body>
+</html>
