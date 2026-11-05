@@ -128,7 +128,7 @@ const server = http.createServer((q, s) => {
     assert.equal(await page.getAttribute('.tab[data-s="still"]', 'data-done'), '', '정지 ○');
     await page.fill('#key', 'sk-test-123');
     await page.waitForFunction(() => !document.getElementById('draw').disabled);
-    assert.match(await page.textContent('#todo'), /정지 — 「그린다」/, '할 일: 그린다'); assert.match(await page.textContent('#setupSum'), /열쇠 있음 · gpt-image-2.5-sunburst · medium/);
+    assert.match(await page.textContent('#todo'), /정지 — 「그린다」/, '할 일: 그린다'); assert.match(await page.textContent('#setupSum'), /열쇠 있음 · gpt-image-2.6-sunburst · medium/);
     const perOf = () => page.evaluate(() => JSON.parse(localStorage.getItem('atelier_dot_v1')).per['book/alice']);
     if (!(await perOf()).outfit) await page.locator('#refs li').nth(0).locator('button.o').click();   // 의상 → 첨부 둘(앞에서 짚었으면 그대로)
     assert.equal(await page.locator('#attach li').count(), 2);
@@ -139,7 +139,7 @@ const server = http.createServer((q, s) => {
     assert.equal(genCalls.length, 1, '요청 한 번');
     const c1 = genCalls[0];
     assert.equal(c1.auth, 'Bearer sk-test-123'); assert.equal(c1.url, 'https://api.openai.com/v1/images/edits');
-    assert.equal(c1.fields.model, 'gpt-image-2.5-sunburst'); assert.equal(c1.fields.size, '1024x1536'); assert.equal(c1.fields.quality, 'medium'); assert.equal(c1.fields.background, 'transparent'); assert.equal(c1.fields.input_fidelity, undefined, '2 세대는 input_fidelity 없음');
+    assert.equal(c1.fields.model, 'gpt-image-2.6-sunburst', '기본 모델 2.6 sunburst'); assert.equal(c1.fields.size, '1024x1536'); assert.equal(c1.fields.quality, 'medium'); assert.equal(c1.fields.background, 'transparent'); assert.equal(c1.fields.input_fidelity, undefined, '2 세대는 input_fidelity 없음');
     assert.deepEqual(c1.images, [canonFile, outfitFile], '첨부 = 정본·의상 그 파일');
     assert(c1.fields.prompt.startsWith('Pixel art game sprite of the SAME young woman') && c1.fields.prompt.includes('Attached image 2 shows the outfit') && !c1.fields.prompt.includes('Attached image 3'), '지시문 그대로(본보기는 빠진다)');
     assert(c1.bytes > 200000, '첨부 바이트가 실려 갔다 ' + c1.bytes);
@@ -175,14 +175,14 @@ const server = http.createServer((q, s) => {
     await page.waitForFunction(() => !document.getElementById('draw').disabled);
     assert.equal(await page.evaluate(() => document.getElementById('setup').open || document.getElementById('byhand').open), false, '한 번 그렸으면 열쇠 칸·파일 칸이 접힌다');
     await page.click('#setup summary');
-    assert.deepEqual(await page.locator('#model option').evaluateAll(es => es.map(e => e.value)), ['gpt-image-2.5-sunburst', 'gpt-image-2.5-flare', 'gpt-image-2.6-sunburst', 'gpt-image-2.6-flare'], '모델 고르개 — 2.5 · 2.6');
-    await page.selectOption('#model', 'gpt-image-2.6-flare'); await page.selectOption('#quality', 'low'); await page.selectOption('#size', '2160x3840');
+    assert.deepEqual(await page.locator('#model option').evaluateAll(es => es.map(e => e.value)), ['gpt-image-2.6-sunburst', 'gpt-image-2.6-flare', 'gpt-image-2.5-sunburst', 'gpt-image-2.5-flare'], '모델 고르개 — 2.6(기본) · 2.5');
+    await page.selectOption('#model', 'gpt-image-2.5-flare'); await page.selectOption('#quality', 'low'); await page.selectOption('#size', '2160x3840');
     assert((await page.inputValue('#req')).includes('cell 720 x 1920'), '크기를 바꾸면 지시문의 칸도');
     await page.click('#draw'); await page.waitForFunction(() => /alice_begin_walk_gen4\.png/.test(document.getElementById('rawName').textContent), null, { timeout: 20000 });
     const c3 = genCalls[2];
     assert.deepEqual(c3.images, ['alice_begin_still_x6.png', 'walk_leg_guide.png', canonFile], '걷기 첨부 셋 — 정지 6배·다리 안내·정본');
     assert(c3.fields.prompt.includes('WALK CYCLE sprite sheet'), '걷기 지시문');
-    assert.equal(c3.fields.model, 'gpt-image-2.6-flare'); assert.equal(c3.fields.quality, 'low'); assert.equal(c3.fields.size, '2160x3840', '4K 로 보낸다'); assert(c3.fields.prompt.includes('canvas 2160 x 3840'));
+    assert.equal(c3.fields.model, 'gpt-image-2.5-flare', '2.5 도 고르면 그대로 보낸다'); assert.equal(c3.fields.quality, 'low'); assert.equal(c3.fields.size, '2160x3840', '4K 로 보낸다'); assert(c3.fields.prompt.includes('canvas 2160 x 3840'));
     if (!(await page.evaluate(() => document.getElementById('setup').open))) await page.click('#setup summary');   // 그리고 나면 접힌다
     await page.selectOption('#size', '1024x1536');
     genFail = 401;
@@ -212,7 +212,7 @@ const server = http.createServer((q, s) => {
     await page.click('.tab[data-s="still"]');
     await page.reload(); await page.waitForSelector('#who:not([hidden])');
     assert.equal(await page.inputValue('#key'), 'sk-test-123', '열쇠는 이 기기에 남는다');
-    assert.equal(await page.inputValue('#model'), 'gpt-image-2.6-flare'); assert.equal(await page.inputValue('#quality'), 'low', '고른 모델·품질도 남는다'); assert.equal(await page.inputValue('#size'), '1024x1536', '크기도');
+    assert.equal(await page.inputValue('#model'), 'gpt-image-2.5-flare'); assert.equal(await page.inputValue('#quality'), 'low', '고른 모델·품질도 남는다'); assert.equal(await page.inputValue('#size'), '1024x1536', '크기도');
     assert.equal(await page.evaluate(() => document.getElementById('setup').open || document.getElementById('byhand').open), false, '열쇠가 있으면 열쇠 칸·파일 칸은 접혀 있다');
     await page.click('#setup summary');
     await page.click('#keyClear');

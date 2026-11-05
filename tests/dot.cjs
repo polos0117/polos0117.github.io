@@ -272,7 +272,7 @@ function sourceHash() {
     assert.deepEqual(Array.from(r.bytes), [0x89, 0x50, 0x4e, 0x47], '받은 b64 를 바이트로'); assert.equal(r.usage.total_tokens, 1234);
     assert.equal(calls[0].url, D.GEN.url); assert.equal(calls[0].init.method, 'POST'); assert.equal(calls[0].init.headers.Authorization, 'Bearer sk-x');
     const f = calls[0].init.body;
-    assert.equal(f.get('model'), 'gpt-image-2.5-sunburst', '모델 기본은 sunburst — gpt-image-1 은 2026-10-23 에 끝났다'); assert.equal(f.get('size'), '1024x1536'); assert.equal(f.get('quality'), 'high'); assert.equal(f.get('n'), '1');
+    assert.equal(f.get('model'), 'gpt-image-2.6-sunburst', '모델 기본은 2.6 sunburst(2026-11-05) — gpt-image-1 은 2026-10-23 에 끝났다'); assert.equal(f.get('size'), '1024x1536'); assert.equal(f.get('quality'), 'high'); assert.equal(f.get('n'), '1');
     assert.equal(f.get('background'), 'transparent'); assert.equal(f.get('output_format'), 'png'); assert.equal(f.get('input_fidelity'), null, '2 세대는 input_fidelity 를 안 받는다'); assert.equal(f.get('prompt'), 'Pixel art…');
     const ims = f.getAll('image[]');
     assert.deepEqual(ims.map(b => [b.name, b.type, b.size]), [['a.webp', 'image/webp', 2], ['b.png', 'image/png', 1]], '첨부가 차례대로 image[]');
@@ -287,9 +287,10 @@ function sourceHash() {
     assert(D.prompt(Object.assign({}, big, { state: 'idle' })).text.includes('cell 1080 x 1920'), '4K 2x2 칸');
     assert(D.prompt(Object.assign({}, big, { state: 'walk4', frame: 1 })).text.includes('baseline about 84 pixels') && D.prompt(Object.assign({}, small, { state: 'walk4', frame: 1 })).text.includes('baseline about 40 pixels'), '단칸의 발 기준선');
     assert.equal(D.genForm({ prompt: 'x', images: [], model: 'gpt-image-2.5-flare' }).get('model'), 'gpt-image-2.5-flare', '빠른 모델');
-    assert.equal(D.genForm({ prompt: 'x', images: [], model: 'gpt-image-1' }).get('model'), 'gpt-image-2.5-sunburst', '끝난 모델 이름은 기본으로');
+    assert.equal(D.genForm({ prompt: 'x', images: [], model: 'gpt-image-1' }).get('model'), 'gpt-image-2.6-sunburst', '끝난 모델 이름은 기본으로');
     assert.deepEqual(Object.keys(D.GEN.quality), ['low', 'medium', 'high', 'xhigh']);
-    assert.deepEqual(Object.keys(D.GEN.models), ['gpt-image-2.5-sunburst', 'gpt-image-2.5-flare', 'gpt-image-2.6-sunburst', 'gpt-image-2.6-flare'], '모델 넷 — 2.5 · 2.6(2026-11-05)');
+    assert.deepEqual(Object.keys(D.GEN.models), ['gpt-image-2.6-sunburst', 'gpt-image-2.6-flare', 'gpt-image-2.5-sunburst', 'gpt-image-2.5-flare'], '모델 넷 — 2.6(기본) · 2.5(2026-11-05)');
+    assert.equal(D.genForm({ prompt: 'x', images: [], model: 'gpt-image-2.5-sunburst' }).get('model'), 'gpt-image-2.5-sunburst', '2.5 도 고르면 그대로');
     for (const m of ['gpt-image-2.6-sunburst', 'gpt-image-2.6-flare']) assert.equal(D.genForm({ prompt: 'x', images: [], model: m }).get('model'), m, '2.6 모델은 그대로 보낸다 ' + m);
     await assert.rejects(D.generate('k', { prompt: 'p', images: [] }, reply(404, { error: { message: 'The model `gpt-image-1` does not exist or you do not have access to it.' } })), /그 모델을 못 쓴다.*gpt-image-1/);
     await assert.rejects(D.generate('', { prompt: 'p', images: [] }, good), /열쇠가 없다/);

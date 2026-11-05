@@ -411,11 +411,12 @@
      열쇠는 부르는 쪽이 준다(화면은 이 기기의 localStorage 에만 둔다). 첨부는 차례대로 image[] — 지시문의 "attached image N" 이 그 차례다.
      모델(2026-10-28): gpt-image-1 은 2026-10-23 에 끝났다(1.5·mini 는 12-01). 지금은 gpt-image-2.5-sunburst(기본 — 꼼꼼) · gpt-image-2.5-flare(빠름).
      2.6(2026-11-04 나옴 — 사용자 「2.5, 2.6 선택할 수 있게」): gpt-image-2.6-sunburst · gpt-image-2.6-flare — 같은 끝점 · 같은 응답 꼴, 생성이 50% 빠르다(OpenAI).
-     기본은 2.5 sunburst 그대로 — 4K 도트 판(docs/DOT_4K_PLAN.md)을 그 모델로 맞췄다. 화면의 모델 고르개는 models 차례 그대로 만든다(dot.html).
+     기본은 2.6 sunburst(2026-11-05 사용자 「앞으로는 2.6써야되서 기본값도 2.6으로」). 4K 도트 판(docs/DOT_4K_PLAN.md)은 2.5 sunburst 로 맞췄던 것 — 2.5 는 고르개에 남는다.
+     화면의 모델 고르개는 models 차례 그대로 만든다(dot.html).
      2 세대부터 첨부는 늘 높은 충실도라 input_fidelity 를 안 보낸다(보내면 모르는 인자). background transparent + png — 지시문의 투명 바탕과 같은 말.
      값은 토큰제라 대략(한 장 1024×1536, 첨부 빼고): low $0.005 · medium $0.01 · high $0.04 · xhigh 그 위 — 2.5 모델 둘이 같은 값(2.6 은 아직 재 보지 않았다) ── */
   var GEN = { url: 'https://api.openai.com/v1/images/edits', size: SIZE, sizes: CANVAS,
-    models: { 'gpt-image-2.5-sunburst': '2.5 sunburst · 꼼꼼(기본)', 'gpt-image-2.5-flare': '2.5 flare · 빠름', 'gpt-image-2.6-sunburst': '2.6 sunburst · 꼼꼼', 'gpt-image-2.6-flare': '2.6 flare · 빠름' }, model: 'gpt-image-2.5-sunburst',
+    models: { 'gpt-image-2.6-sunburst': '2.6 sunburst · 꼼꼼(기본)', 'gpt-image-2.6-flare': '2.6 flare · 빠름', 'gpt-image-2.5-sunburst': '2.5 sunburst · 꼼꼼', 'gpt-image-2.5-flare': '2.5 flare · 빠름' }, model: 'gpt-image-2.6-sunburst',
     quality: { low: 0.005, medium: 0.01, high: 0.04, xhigh: 0.08 } };
   function genForm(o) {
     var f = new FormData();

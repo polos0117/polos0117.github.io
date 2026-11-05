@@ -21,7 +21,7 @@
   ① 인물: 공방을 고르면 그 공방의 그림 등록부(/<공방>/data/img.json — 같은 출처라 그대로 읽는다)에서 인물 목록, 고르면 그 인물의 그림들.
      정본·의상 그림을 짚고, 영문 이름·폼·생김새 한 줄을 적는다.
   ② 지시문: 상태(정지·대기·걷기·반응)마다 GPT 이미지 생성에 그대로 줄 요청문과 첨부 차례. 정지 도트 6배·다리 자세 안내 그림을 여기서 받는다.
-     「그린다」: OpenAI API 열쇠(이 기기의 localStorage 에만)를 넣으면 지시문과 첨부를 gpt 그림 API(dot.js 의 generate — 모델은 gpt-image-2.5 · 2.6 의 sunburst/flare, 기본 2.5 sunburst)에 보내 원본을 받아 ③ 에 바로 넣는다 —
+     「그린다」: OpenAI API 열쇠(이 기기의 localStorage 에만)를 넣으면 지시문과 첨부를 gpt 그림 API(dot.js 의 generate — 모델은 gpt-image-2.6 · 2.5 의 sunburst/flare, 기본 2.6 sunburst)에 보내 원본을 받아 ③ 에 바로 넣는다 —
      이때만 첨부와 지시문이 OpenAI 로 간다. 마음에 안 들면 「다시」(원본 번호 gen1·gen2… 가 올라간다).
   ③ 정리: 받은 원본 PNG 를 dot/dot.wasm(rust/dot-core — book-atelier 파이썬 도구와 같은 셈, 화소 하나 다르지 않다)으로 정리해
      미리 보고 재생하고, 정리본 PNG · 기록 JSON · sprites.json 칸을 받는다. 정리는 이 브라우저 안에서만 — 올리기는 세션이 한다.
