@@ -289,7 +289,8 @@ function sourceHash() {
     assert.equal(D.genForm({ prompt: 'x', images: [], model: 'gpt-image-2.5-flare' }).get('model'), 'gpt-image-2.5-flare', '빠른 모델');
     assert.equal(D.genForm({ prompt: 'x', images: [], model: 'gpt-image-1' }).get('model'), 'gpt-image-2.5-sunburst', '끝난 모델 이름은 기본으로');
     assert.deepEqual(Object.keys(D.GEN.quality), ['low', 'medium', 'high', 'xhigh']);
-    assert.deepEqual(Object.keys(D.GEN.models), ['gpt-image-2.5-sunburst', 'gpt-image-2.5-flare']);
+    assert.deepEqual(Object.keys(D.GEN.models), ['gpt-image-2.5-sunburst', 'gpt-image-2.5-flare', 'gpt-image-2.6-sunburst', 'gpt-image-2.6-flare'], '모델 넷 — 2.5 · 2.6(2026-11-05)');
+    for (const m of ['gpt-image-2.6-sunburst', 'gpt-image-2.6-flare']) assert.equal(D.genForm({ prompt: 'x', images: [], model: m }).get('model'), m, '2.6 모델은 그대로 보낸다 ' + m);
     await assert.rejects(D.generate('k', { prompt: 'p', images: [] }, reply(404, { error: { message: 'The model `gpt-image-1` does not exist or you do not have access to it.' } })), /그 모델을 못 쓴다.*gpt-image-1/);
     await assert.rejects(D.generate('', { prompt: 'p', images: [] }, good), /열쇠가 없다/);
     await assert.rejects(D.generate('k', { prompt: 'p', images: [] }, reply(401, { error: { message: 'Incorrect API key' } })), /401/);

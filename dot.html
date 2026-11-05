@@ -21,7 +21,7 @@
   ① 인물: 공방을 고르면 그 공방의 그림 등록부(/<공방>/data/img.json — 같은 출처라 그대로 읽는다)에서 인물 목록, 고르면 그 인물의 그림들.
      정본·의상 그림을 짚고, 영문 이름·폼·생김새 한 줄을 적는다.
   ② 지시문: 상태(정지·대기·걷기·반응)마다 GPT 이미지 생성에 그대로 줄 요청문과 첨부 차례. 정지 도트 6배·다리 자세 안내 그림을 여기서 받는다.
-     「그린다」: OpenAI API 열쇠(이 기기의 localStorage 에만)를 넣으면 지시문과 첨부를 gpt 그림 API(dot.js 의 generate — 모델은 gpt-image-2.5 sunburst/flare)에 보내 원본을 받아 ③ 에 바로 넣는다 —
+     「그린다」: OpenAI API 열쇠(이 기기의 localStorage 에만)를 넣으면 지시문과 첨부를 gpt 그림 API(dot.js 의 generate — 모델은 gpt-image-2.5 · 2.6 의 sunburst/flare, 기본 2.5 sunburst)에 보내 원본을 받아 ③ 에 바로 넣는다 —
      이때만 첨부와 지시문이 OpenAI 로 간다. 마음에 안 들면 「다시」(원본 번호 gen1·gen2… 가 올라간다).
   ③ 정리: 받은 원본 PNG 를 dot/dot.wasm(rust/dot-core — book-atelier 파이썬 도구와 같은 셈, 화소 하나 다르지 않다)으로 정리해
      미리 보고 재생하고, 정리본 PNG · 기록 JSON · sprites.json 칸을 받는다. 정리는 이 브라우저 안에서만 — 올리기는 세션이 한다.
@@ -249,8 +249,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
       <details class="opt" id="setup"><summary id="setupSum">열쇠·모델</summary>
         <div class="fields" style="margin-top:6px">
           <label class="wide">OpenAI API 열쇠 — 이 기기에만 남는다<span class="keyrow"><input type="password" id="key" placeholder="sk-…" autocomplete="off" spellcheck="false"><button class="btn" type="button" id="keyClear">지움</button></span></label>
-          <label>모델<select id="model">
-            <option value="gpt-image-2.5-sunburst" selected>gpt-image-2.5-sunburst — 꼼꼼(기본)</option><option value="gpt-image-2.5-flare">gpt-image-2.5-flare — 빠름</option></select></label>
+          <label>모델<select id="model"></select></label>
           <label>크기 — 4K 는 같은 121줄인데 블록이 두 배라 격자·색이 깨끗하다<select id="size">
             <option value="1024x1536" selected>보통 1024×1536</option><option value="2160x3840">4K 2160×3840 — 값 네 배쯤</option></select></label>
           <label>품질 · 한 장 값(대략, 보통 크기)<select id="quality">
@@ -599,6 +598,8 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 8px 16px 
   $('key').value = keyOf();
   $('key').addEventListener('input', function () { try { if ($('key').value.trim()) localStorage.setItem(KEY_KEY, $('key').value.trim()); else localStorage.removeItem(KEY_KEY); } catch (e) { /* 저장이 막혀도 이번 화면에선 쓴다 */ } drawReady(); });
   $('keyClear').onclick = function () { $('key').value = ''; try { localStorage.removeItem(KEY_KEY); } catch (e) { /* 위와 같다 */ } $('setup').open = true; drawReady(); status($('genStatus'), '열쇠를 지웠다'); };
+  /* 모델 고르개 — dot.js 의 GEN.models 차례 그대로(2.5 · 2.6, 2026-11-05). 기본은 GEN.model */
+  $('model').innerHTML = Object.keys(D.GEN.models).map(function (m) { return '<option value="' + m + '"' + (m === D.GEN.model ? ' selected' : '') + '>' + D.GEN.models[m] + '</option>'; }).join('');
   try { if (saved.quality && D.GEN.quality[saved.quality]) $('quality').value = saved.quality; if (saved.model && D.GEN.models[saved.model]) $('model').value = saved.model; if (saved.size && D.CANVAS[saved.size]) $('size').value = saved.size; } catch (e) { /* 없으면 기본 */ }
   $('quality').onchange = function () { saved.quality = $('quality').value; save(); todo(); };
   $('model').onchange = function () { saved.model = $('model').value; save(); todo(); };
