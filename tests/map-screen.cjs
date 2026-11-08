@@ -115,9 +115,49 @@ const NOW = Date.now(), SEED = {
       await p.goto(BASE + '/'); await p.waitForSelector('.room'); await p.waitForTimeout(600);
       assert.equal(await p.locator('.pin.news').count(), 0, name + ' 다녀간 뒤엔 새 소식이 아니다');
       assert(await p.locator('.card img').nth(1).getAttribute('src').then(s => /book-atelier-img/.test(s)), '책의 공방 카드는 실제 그림');
+      /* 지도 고르기(2026-11-08) — 대미궁이 처음, 왕국을 고르면 그림 · 지명 · 다각형이 바뀌고 이 기기에 남는다. 주소 ?map= 이 이긴다 */
+      assert.equal(await p.locator('#mapsel button[aria-pressed="true"]').getAttribute('data-map'), 'cave', name + ' 처음은 대미궁');
+      assert.equal(await p.locator('.pin[data-key="gundam"] b').textContent(), '건담 격납고', name + ' 대미궁 이름표');
+      await press('#mapsel button[data-map="kingdom"]');
+      await p.waitForFunction(() => /kingdom\.webp/.test(document.querySelector('#mapimg').src) && document.querySelector('#mapimg').complete);
+      const KNAMES = { gundam: '강철 군항', book: '만권 서고성', samguk: '적벽 관문', pokemon: '풀숲 연구촌', myth: '용광 협곡', game: '꿈빛 유원지', dot: '모자이크 들녘', image: '채색 언덕', element: '원소 군도' };
+      assert.deepEqual(Object.fromEntries(await p.locator('.pin').evaluateAll(es => es.map(e => [e.dataset.key, e.querySelector('b').textContent]))), KNAMES, name + ' 왕국 지명');
+      assert(Object.values(KNAMES).every(n => !/공방/.test(n)), '지명에 「공방」 없음');
+      assert.equal(await p.locator('.room').count(), 9, name + ' 왕국 구역 아홉');
+      assert.deepEqual(await p.locator('.room.lit').evaluateAll(es => es.map(e => e.dataset.key)), ['book', 'myth'], name + ' 왕국에서도 오늘 불');
+      for (const k of ROOMS) {
+        const inside = await p.evaluate(k => { const poly = document.querySelector(`.room[data-key="${k}"] polygon`), pin = document.querySelector(`.pin[data-key="${k}"]`);
+          const r = pin.getBoundingClientRect(), svg = document.querySelector('#svg'), pt = svg.createSVGPoint(); pt.x = r.left + r.width / 2; pt.y = r.top + r.height / 2;
+          return poly.isPointInFill(pt.matrixTransform(svg.getScreenCTM().inverse())); }, k);
+        assert(inside, name + ' 왕국 ' + k + ' 지명이 구역 안에');
+      }
+      /* 구역끼리 겹치지 않는다 — 한 구역의 이름표 자리가 다른 구역 안에 들지 않는다 */
+      const cross = await p.evaluate(() => { const out = [], svg = document.querySelector('#svg');
+        for (const pin of document.querySelectorAll('.pin')) { const r = pin.getBoundingClientRect(), pt = svg.createSVGPoint(); pt.x = r.left + r.width / 2; pt.y = r.top + r.height / 2; const q = pt.matrixTransform(svg.getScreenCTM().inverse());
+          for (const poly of document.querySelectorAll('.room')) if (poly.dataset.key !== pin.dataset.key && poly.querySelector('polygon').isPointInFill(q)) out.push(pin.dataset.key + '→' + poly.dataset.key); }
+        return out; });
+      assert.deepEqual(cross, [], name + ' 왕국 구역이 겹치지 않는다');
+      await noOverflow();
+      await press('.room[data-key="gundam"]'); await p.waitForSelector('#map.zoomed'); await p.waitForTimeout(800);
+      assert.equal(await p.locator('#doors h2').textContent(), '건담 드래프트', name + ' 왕국에서 다가가도 같은 문 패널');
+      assert(/scale\(/.test(await p.locator('#inner').evaluate(e => e.style.transform)), name + ' 왕국에서도 다가간다');
+      if (await p.locator('#mapsel').isVisible()) {   /* 다가간 채로 지도를 바꾸면 새 지도에서 그 방에 다시 다가간다(가로 폰은 다가가면 고르기 줄이 숨는다 — Esc 로) */
+        await press('#mapsel button[data-map="cave"]'); await p.waitForTimeout(300);
+        assert.equal(await p.locator('.room.on').getAttribute('data-key'), 'gundam', name + ' 지도를 바꿔도 그 방');
+        assert.equal(await p.locator('.pin[data-key="gundam"] b').textContent(), '건담 격납고', name + ' 대미궁으로');
+      } else { await p.keyboard.press('Escape'); await press('#mapsel button[data-map="cave"]'); }
+      await p.goto(BASE + '/'); await p.waitForSelector('.room');
+      assert.equal(await p.evaluate(() => localStorage.getItem('atelier_hub_map_v1')), 'cave', name + ' 고른 지도가 남는다');
+      await press('#mapsel button[data-map="kingdom"]'); await p.goto(BASE + '/'); await p.waitForSelector('.room');
+      assert.equal(await p.locator('.pin[data-key="gundam"] b').textContent(), '강철 군항', name + ' 다시 열어도 왕국');
+      await p.goto(BASE + '/?map=cave'); await p.waitForSelector('.room');
+      assert.equal(await p.locator('.pin[data-key="gundam"] b').textContent(), '건담 격납고', name + ' ?map=cave 가 이긴다');
+      await p.goto(BASE + '/?map=kingdom#samguk'); await p.waitForSelector('#map.zoomed');
+      assert.equal(await p.locator('#doors h2').textContent(), '삼국지 쟁탈전', name + ' 왕국 주소로 바로 그 구역');
+      await p.evaluate(() => localStorage.setItem('atelier_hub_map_v1', 'cave'));
       assert.deepEqual(errors, [], name + ' 오류 없음');
       await ctx.close();
     }
-    console.log('PASS 공방 지도: 방 아홉(도트·이미지 공방·원소의 섬까지)·이름표·카드 · 빛나기·미리보기 · 다가가기·문·주소·Esc·뒤로 가기 · 오늘 불·오늘 줄·오늘의 판·새 소식·다녀간 자국 · 세로/가로/PC 넘침 없음, 가로는 폭을 정해 굴린다');
+    console.log('PASS 공방 지도: 방 아홉(도트·이미지 공방·원소의 섬까지)·이름표·카드 · 지도 고르기(대미궁 · 왕국 — 지명 · 구역 · 기억 · ?map=) · 빛나기·미리보기 · 다가가기·문·주소·Esc·뒤로 가기 · 오늘 불·오늘 줄·오늘의 판·새 소식·다녀간 자국 · 세로/가로/PC 넘침 없음, 가로는 폭을 정해 굴린다');
   } finally { await br.close(); server.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

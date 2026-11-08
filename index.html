@@ -163,6 +163,14 @@ a { color: inherit; }
 /* 머리의 「즐겨찾기 n」 — 글줄 높이는 그대로 두고 누르는 자리만 44px */
 .head p a#fav-link { display: inline-flex; align-items: center; min-height: 44px; margin: -12px -6px; padding: 0 6px; border-radius: 8px; }
 .head p a#fav-link:focus-visible { outline: 2px solid var(--gold); outline-offset: -4px; }
+/* 지도 고르기(2026-11-08) — 대미궁(처음 지도) · 왕국. 고른 것은 이 기기에 남는다(atelier_hub_map_v1), 주소 ?map=kingdom 이 이긴다 */
+.mapsel { max-width: 1280px; margin: 0 auto 6px; padding: 0 16px; display: flex; justify-content: flex-end; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.mapsel button { min-height: 36px; padding: 0 14px; border: 1px solid #ffffff26; border-radius: 99px; background: #ffffff08; color: var(--muted); font: 600 13px/1 var(--serif); cursor: pointer; transition: border-color .15s, color .15s; }
+.mapsel button[aria-pressed="true"] { border-color: var(--gold); background: #d9b45a1f; color: var(--gold); }
+.mapsel button:hover { border-color: #ffffff66; color: var(--text); }
+.mapsel button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+@media (orientation: landscape) { .mapsel { width: min(100%, 720px); padding: 0 8px; } }
+@media (orientation: landscape) and (max-height: 500px) { .mapsel { width: min(100%, 520px); padding-top: calc(40px + env(safe-area-inset-top)); }   /* 겹친 제목 아래 — margin 이면 body 밖으로 접혀 제목까지 내려온다 */ body.zoomed .mapsel { display: none; } }
 footer { position: relative; z-index: 2; background: var(--bg); text-align: center; color: #6f6973; font-size: 12px; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
 
 @media (prefers-reduced-motion: reduce) {
@@ -179,11 +187,12 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
   <h1><small>ATELIER</small>공방 모음</h1>
   <p>방을 누르면 들어간다 · <a href="#all">목록으로 보기</a> · <a href="favorites.html" id="fav-link">즐겨찾기</a></p>
 </header>
+<div class="mapsel" id="mapsel" role="group" aria-label="지도 고르기"><span>지도</span><button type="button" data-map="cave" aria-pressed="true">대미궁</button><button type="button" data-map="kingdom" aria-pressed="false">왕국</button></div>
 
 <section class="map" id="map" aria-label="공방 지도">
   <div class="stage" id="stage">
     <div class="inner" id="inner">
-      <img src="img/map.webp?v=3" alt="산속 대미궁 — 절벽 폭포 옆 동굴 입구에서 계단을 올라 가운데 지하 호수를 도는 길, 왼쪽에 격납고·연구소·오락실·도트 공방, 오른쪽에 서재·군막·대장간·이미지 공방, 호수 가운데 바위섬이 원소의 섬" decoding="async" fetchpriority="high">
+      <img id="mapimg" src="img/map.webp?v=3" alt="산속 대미궁 — 절벽 폭포 옆 동굴 입구에서 계단을 올라 가운데 지하 호수를 도는 길, 왼쪽에 격납고·연구소·오락실·도트 공방, 오른쪽에 서재·군막·대장간·이미지 공방, 호수 가운데 바위섬이 원소의 섬" decoding="async" fetchpriority="high">
       <svg id="svg" viewBox="0 0 1024 1536" aria-hidden="true" focusable="false">
         <defs>
           <filter id="glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
@@ -277,6 +286,42 @@ const ROOMS = [
     desc: '원소 하나가 나라가 되고, 물질이 가문이 되고, 물건이 주민이 된다. 근본·가문주·주민이 판타지·스팀펑크·메카 세 세계에서 선다.',
     links: [['타이틀', '/element-atelier/'], ['주기율표', '/element-atelier/hall.html'], ['전시관', '/element-atelier/gallery.html'], ['도감', '/element-atelier/dex.html'], ['프롬프트', '/element-atelier/prompt.html']] },
 ];
+/* 지도 둘(2026-11-08 — 사용자 「허브쪽에 메인 이미지 선택식으로 해서 지금 공방느낌은 놔두고, 이렇게 나라느낌나게」).
+   cave = 위 ROOMS 의 다각형·이름표·이름 그대로(대미궁). kingdom = img/kingdom.webp(1024×1536, 글자 없는 왕국 전도 — 지명은 화면이 얹는다)의 구역.
+   지명은 「~ 공방」 대신 지역 이름(사용자 「--항구같이 지역명으로」). 같은 1024×1536 좌표라 무대 · 다가가기 · 오늘 불은 그대로 쓴다. 그림을 바꾸면 rooms 의 숫자와 ways 만 다시 잰다 */
+const MAPS = {
+  cave: { label: '대미궁', img: 'img/map.webp?v=3', alt: document.getElementById('mapimg').alt,
+    hint: '방에 올리면 이름이, 누르면 그 공방의 문이 보인다 · 오늘 판을 둔 방은 불이 켜진다 · Esc 로 돌아온다',
+    ways: ['M 555 1475 C 560 1380, 575 1300, 585 1240 C 600 1150, 570 1050, 545 975 C 520 905, 440 865, 340 840',
+           'M 340 840 C 300 760, 290 640, 300 520 C 310 440, 360 400, 450 380 C 500 370, 560 370, 600 380',
+           'M 690 830 C 730 760, 745 640, 725 520 C 705 440, 660 400, 600 380 C 560 370, 500 372, 450 380'] },
+  kingdom: { label: '왕국', img: 'img/kingdom.webp?v=1',
+    alt: '공방 왕국 전도 — 위에 눈 덮인 산맥과 큰 폭포, 가운데 강이 내려와 원소 군도가 떠 있는 내해로. 왼쪽 위 용광 협곡, 오른쪽 위 만권 서고성, 왼쪽 풀숲 연구촌, 오른쪽 적벽 관문, 왼쪽 아래 꿈빛 유원지, 오른쪽 아래 강철 군항, 맨 아래 왼쪽 모자이크 들녘, 오른쪽 채색 언덕',
+    hint: '구역에 올리면 지명이, 누르면 그 공방의 문이 보인다 · 오늘 판을 둔 곳은 불이 켜진다 · Esc 로 돌아온다',
+    ways: ['M 512 225 C 505 300, 470 380, 500 450 C 520 500, 515 540, 505 575',
+           'M 480 880 C 520 950, 470 1040, 500 1130 C 520 1230, 475 1330, 505 1450',
+           'M 115 372 C 200 372, 280 345, 330 320 C 380 300, 410 300, 440 290'],
+    rooms: {
+      gundam:  { name: '강철 군항',   poly: [[690, 630], [1010, 620], [1010, 960], [760, 975], [520, 910], [540, 840], [660, 790]], at: [850, 770] },
+      book:    { name: '만권 서고성', poly: [[660, 110], [860, 60], [1000, 110], [1000, 330], [840, 345], [650, 300], [640, 200]], at: [830, 200] },
+      samguk:  { name: '적벽 관문',   poly: [[700, 375], [1000, 365], [1010, 590], [660, 600], [600, 520], [640, 420]], at: [830, 470] },
+      pokemon: { name: '풀숲 연구촌', poly: [[20, 450], [230, 420], [330, 395], [420, 470], [400, 580], [200, 610], [20, 590]], at: [200, 520] },
+      myth:    { name: '용광 협곡',   poly: [[20, 90], [300, 60], [440, 120], [430, 300], [300, 390], [60, 380], [15, 250]], at: [230, 240] },
+      game:    { name: '꿈빛 유원지', poly: [[20, 620], [290, 615], [330, 720], [400, 830], [300, 930], [20, 930]], at: [170, 770] },
+      dot:     { name: '모자이크 들녘', poly: [[20, 960], [300, 940], [480, 1000], [520, 1200], [480, 1420], [200, 1460], [20, 1420]], at: [260, 1180] },
+      image:   { name: '채색 언덕',   poly: [[640, 960], [900, 960], [1010, 1060], [1000, 1300], [820, 1400], [560, 1360], [540, 1150], [560, 1000]], at: [790, 1150] },
+      element: { name: '원소 군도',   poly: [[370, 565], [560, 570], [660, 640], [640, 760], [520, 825], [400, 830], [335, 720], [345, 630]], at: [490, 690] },
+    } },
+};
+const MAP_KEY = 'atelier_hub_map_v1';
+function pickMap() {
+  const q = new URLSearchParams(location.search).get('map'); if (MAPS[q]) return q;
+  try { const v = localStorage.getItem(MAP_KEY); if (MAPS[v]) return v; } catch (e) {}
+  return 'cave';
+}
+let MAP = pickMap();
+/* 이 지도에서 그 방의 자리 — 이름(이름표) · 다각형 · 이름표 자리 */
+const geo = r => (MAPS[MAP].rooms && MAPS[MAP].rooms[r.key]) || r;
 const IW = 1024, IH = 1536;
 const $ = s => document.querySelector(s);
 const map = $('#map'), stage = $('#stage'), inner = $('#inner'), rooms = $('#rooms'), pins = $('#pins'), doors = $('#doors'), cards = $('#cards'), glows = $('#glows');
@@ -284,22 +329,32 @@ const T = window.AtelierToday;   /* 오늘 기록(today.js) — 각 공방이 �
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const linksHTML = (r, big) => r.links.map(([t, href], i) => `<a href="${href}"${i === 0 ? ' class="main"' : ''}>${esc(t)}</a>`).join('');
 
-/* 방 다각형(SVG) + 이름표(HTML) + 아래 카드 */
+/* 방 다각형(SVG) + 이름표(HTML) — 지도를 고르면 다시 짓는다. 아래 카드는 한 번 */
+function build() {
+  rooms.textContent = ''; pins.textContent = ''; glows.textContent = '';
+  const M = MAPS[MAP], img = $('#mapimg');
+  if (img.getAttribute('src') !== M.img) img.src = M.img;
+  img.alt = M.alt; $('#hint').textContent = M.hint;
+  M.ways.forEach((d, i) => document.getElementById('way' + (i + 1)).setAttribute('d', d));
+  for (const b of document.querySelectorAll('#mapsel button')) b.setAttribute('aria-pressed', String(b.dataset.map === MAP));
+  for (const r0 of ROOMS) { const r = Object.assign({}, r0, geo(r0));
+    const a = document.createElementNS('http://www.w3.org/2000/svg', 'a');
+    a.setAttribute('href', '#' + r.key); a.setAttribute('class', 'room'); a.setAttribute('data-key', r.key); a.style.setProperty('--c', r.c);
+    a.setAttribute('aria-label', r.name + ' — ' + r.title);
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    p.setAttribute('points', r.poly.map(q => q.join(',')).join(' '));
+    a.appendChild(p); rooms.appendChild(a);
+    const pin = document.createElement('div'); pin.className = 'pin'; pin.dataset.key = r.key; pin.style.setProperty('--c', r.c);
+    pin.style.left = (r.at[0] / IW * 100) + '%'; pin.style.top = (r.at[1] / IH * 100) + '%';
+    pin.innerHTML = `<div class="peek"><img src="${r.peek}" alt="" loading="lazy"><i>${esc(r.title)}</i></div><b>${esc(r.name)}</b><span class="today" hidden></span>`;
+    pins.appendChild(pin);
+    /* 오늘 불 — 방 가운데 숨 쉬는 빛. 오늘 판을 둔 방에만 보인다 */
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    g.setAttribute('class', 'glow'); g.setAttribute('data-key', r.key); g.setAttribute('r', '26'); g.setAttribute('cx', r.at[0]); g.setAttribute('cy', r.at[1] - 40); g.style.display = 'none';
+    glows.appendChild(g);
+  }
+}
 for (const r of ROOMS) {
-  const a = document.createElementNS('http://www.w3.org/2000/svg', 'a');
-  a.setAttribute('href', '#' + r.key); a.setAttribute('class', 'room'); a.setAttribute('data-key', r.key); a.style.setProperty('--c', r.c);
-  a.setAttribute('aria-label', r.name + ' — ' + r.title);
-  const p = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-  p.setAttribute('points', r.poly.map(q => q.join(',')).join(' '));
-  a.appendChild(p); rooms.appendChild(a);
-  const pin = document.createElement('div'); pin.className = 'pin'; pin.dataset.key = r.key; pin.style.setProperty('--c', r.c);
-  pin.style.left = (r.at[0] / IW * 100) + '%'; pin.style.top = (r.at[1] / IH * 100) + '%';
-  pin.innerHTML = `<div class="peek"><img src="${r.peek}" alt="" loading="lazy"><i>${esc(r.title)}</i></div><b>${esc(r.name)}</b><span class="today" hidden></span>`;
-  pins.appendChild(pin);
-  /* 오늘 불 — 방 가운데 숨 쉬는 빛. 오늘 판을 둔 방에만 보인다 */
-  const g = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-  g.setAttribute('class', 'glow'); g.setAttribute('data-key', r.key); g.setAttribute('r', '26'); g.setAttribute('cx', r.at[0]); g.setAttribute('cy', r.at[1] - 40); g.style.display = 'none';
-  glows.appendChild(g);
   const card = document.createElement('article'); card.className = 'card'; card.dataset.key = r.key; card.style.setProperty('--accent', r.c); card.style.setProperty('--tint', r.tint);
   card.innerHTML = `<a class="cover" href="${r.links[0][1]}" aria-label="${esc(r.title)} 열기" tabindex="-1"><img src="${r.cover}" alt="" loading="lazy"></a>
     <div class="head2"><a class="name" href="${r.links[0][1]}">${esc(r.title)}</a><span class="sub">${esc(r.sub)}</span></div>
@@ -363,7 +418,7 @@ rooms.addEventListener('focusout', () => { if (!map.classList.contains('zoomed')
 
 /* 누르면 다가간다 — 그 방의 사각형이 무대에 차게 transform. 주소에 #key */
 let on = null;
-function bbox(r) { const xs = r.poly.map(q => q[0]), ys = r.poly.map(q => q[1]); const x = Math.min(...xs), y = Math.min(...ys); return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y }; }
+function bbox(r) { const P = geo(r).poly, xs = P.map(q => q[0]), ys = P.map(q => q[1]); const x = Math.min(...xs), y = Math.min(...ys); return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y }; }
 function fit() {
   if (!on) { inner.style.transform = ''; return; }
   const r = ROOMS.find(q => q.key === on), b = bbox(r), W = stage.clientWidth, H = stage.clientHeight, pad = .06;
@@ -402,8 +457,16 @@ stage.addEventListener('click', e => { if (on && !e.target.closest('.room.on')) 
 addEventListener('keydown', e => { if (e.key === 'Escape' && on) leave(true); });
 addEventListener('popstate', () => { const k = location.hash.slice(1); if (ROOMS.some(r => r.key === k)) enter(k, false); else if (on) leave(false); });
 addEventListener('resize', fit);
+/* 지도 고르기 — 다가가 있었으면 그 방 그대로 새 지도에서 다가간다 */
+function setMap(k) {
+  if (!MAPS[k] || k === MAP) return;
+  MAP = k; try { localStorage.setItem(MAP_KEY, k); } catch (e) {}
+  const was = on; hot = null; build(); paint();
+  if (was) { on = null; enter(was, false); } else setHot(null);
+}
+$('#mapsel').addEventListener('click', e => { const b = e.target.closest('button[data-map]'); if (b) setMap(b.dataset.map); });
 addEventListener('load', () => { const k = location.hash.slice(1); if (ROOMS.some(r => r.key === k)) enter(k, false); });
-paint(); if (window.fetch) sniff();   /* 맨 끝에 — paint 가 on(다가간 방)을 보므로 그 선언 뒤여야 한다 */
+build(); paint(); if (window.fetch) sniff();   /* 맨 끝에 — paint 가 on(다가간 방)을 보므로 그 선언 뒤여야 한다 */
 </script>
 </body>
 </html>
