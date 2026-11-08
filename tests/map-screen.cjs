@@ -118,11 +118,17 @@ const NOW = Date.now(), SEED = {
       /* 지도 고르기(2026-11-08) — 대미궁이 처음, 왕국을 고르면 그림 · 지명 · 다각형이 바뀌고 이 기기에 남는다. 주소 ?map= 이 이긴다 */
       assert.equal(await p.locator('#mapsel button[aria-pressed="true"]').getAttribute('data-map'), 'cave', name + ' 처음은 대미궁');
       assert.equal(await p.locator('.pin[data-key="gundam"] b').textContent(), '건담 격납고', name + ' 대미궁 이름표');
+      assert.equal(await p.locator('.pin[data-key="gundam"] .peek img').getAttribute('src'), '/atelier/img/thumb/RX-78-2_건담_f.webp', name + ' 대미궁 미리보기는 공방 그림');
       await press('#mapsel button[data-map="kingdom"]');
       await p.waitForFunction(() => /kingdom\.webp/.test(document.querySelector('#mapimg').src) && document.querySelector('#mapimg').complete);
       const KNAMES = { gundam: '강철 군항', book: '만권 서고성', samguk: '적벽 관문', pokemon: '풀숲 연구촌', myth: '용광 협곡', game: '꿈빛 유원지', dot: '모자이크 들녘', image: '채색 언덕', element: '원소 군도' };
       assert.deepEqual(Object.fromEntries(await p.locator('.pin').evaluateAll(es => es.map(e => [e.dataset.key, e.querySelector('b').textContent]))), KNAMES, name + ' 왕국 지명');
       assert(Object.values(KNAMES).every(n => !/공방/.test(n)), '지명에 「공방」 없음');
+      /* 미리보기 — 왕국에선 그 구역을 잘라 낸 그림, 대미궁에선 공방 그림 */
+      const kpeeks = await p.locator('.pin').evaluateAll(es => es.map(e => [e.dataset.key, e.querySelector('.peek img').getAttribute('src')]));
+      assert(kpeeks.every(([k, src]) => src === 'img/kingdom-' + k + '.webp'), name + ' 왕국 미리보기: ' + JSON.stringify(kpeeks));
+      for (const [k] of kpeeks) assert(fs.existsSync(path.join(ROOT, 'img/kingdom-' + k + '.webp')), k + ' 미리보기 파일');
+      if (!mobile) { await p.hover('.room[data-key="samguk"]'); assert(await p.locator('.pin[data-key="samguk"].hot .peek').isVisible(), '왕국에서 올리면 미리보기'); }
       assert.equal(await p.locator('.room').count(), 9, name + ' 왕국 구역 아홉');
       assert.deepEqual(await p.locator('.room.lit').evaluateAll(es => es.map(e => e.dataset.key)), ['book', 'myth'], name + ' 왕국에서도 오늘 불');
       for (const k of ROOMS) {
