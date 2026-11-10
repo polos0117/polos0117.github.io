@@ -225,7 +225,7 @@ const SIZES = [['344', { width: 344, height: 882 }, true], ['390', { width: 390,
       assert.equal(await p.locator('#fav-link').textContent(), '즐겨찾기 8', name + ' 머리의 즐겨찾기 수');
       assert.equal(await p.locator('#fav-link').getAttribute('href'), 'favorites.html');
       assert.equal(await p.locator('#fav-all').getAttribute('href'), 'favorites.html'); assert.match(await p.locator('#fav-all').textContent(), /내 즐겨찾기.*8장/, name + ' 목록 아래 줄');
-      assert.equal(await p.locator('.card').count(), 9, name + ' 공방 줄은 아홉 그대로(2026-10-30 원소의 섬)');
+      assert.equal(await p.locator('.card').count(), 10, name + ' 공방 줄은 열 그대로(2026-10-30 원소의 섬 · 2026-11-10 화풍공방 — 도시공방은 준비 중이라 없다)');
       const r = await p.locator('#fav-link').boundingBox(); assert(r.height >= 44, name + ' 머리 링크 누르는 자리');
       await noOverflow(p, name + ' 지도');
       await p.locator('#fav-all').click(); await p.waitForURL(/favorites\.html/); await p.waitForSelector('.tile');

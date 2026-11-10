@@ -1,7 +1,7 @@
-/* 공방 지도(대미궁, 방 아홉 — 2026-10-30 도트 공방·이미지 공방·원소의 섬) — 방 아홉이 서고, 올리면 빛나고 이름·미리보기가 뜨고, 누르면 다가가며 문들이 보이고, Esc·뒤로 가기로 돌아온다.
+/* 공방 지도(대미궁, 방 열하나 — 2026-10-30 도트 공방·이미지 공방·원소의 섬 · 2026-11-10 화풍공방 · 도시공방(준비 중)) — 방 아홉이 서고, 올리면 빛나고 이름·미리보기가 뜨고, 누르면 다가가며 문들이 보이고, Esc·뒤로 가기로 돌아온다.
    오늘 기록(atelier_today_v1:<방> — 각 공방이 적는다)을 읽어 오늘 판을 둔 방에 불(빛·이름표 아래 줄)을 켜고, 문 패널·목록에 「오늘의 판」을 두고,
    공방 첫 화면의 Last-Modified 가 마지막으로 다녀간 뒤면 이름표에 새 소식 점을 찍는다. 문을 누르면 다녀간 자국(seen)이 남는다.
-   휴대폰 세로(390×844)·가로(844×390)·PC(1280×900)에서 가로로 넘치지 않는다. 지도가 세로로 길어(2:3) 가로 화면에선 너비를 정해 두고 굴려 본다.
+   휴대폰 세로(390×844)·가로(844×390)·PC(1280×900)에서 가로로 넘치지 않는다. 지도가 세로로 길어(1:2) 가로 화면에선 너비를 정해 두고 굴려 본다.
    아래 "모든 공방" 목록의 링크가 지도의 문들과 같다. 바깥 그림(각 공방의 그림 저장소)은 받지 않는다 — 404 로 돌린다.
    Run: CHROMIUM_PATH=<chrome> node tests/map-screen.cjs   (playwright 가 require 되는 자리에서 — NODE_PATH) */
 const assert = require('node:assert/strict'), http = require('node:http'), fs = require('node:fs'), path = require('node:path');
@@ -17,7 +17,8 @@ const server = http.createServer((q, s) => {
   const f = path.join(ROOT, decodeURIComponent(url.pathname.replace(/\/$/, '/index.html')));
   fs.readFile(f, (e, d) => { if (e) { s.writeHead(404); return s.end(); } s.setHeader('Content-Type', MIME[path.extname(f)] || 'application/octet-stream'); s.setHeader('Last-Modified', LM.toUTCString()); s.end(d); });
 }).listen(PORT);
-const ROOMS = ['gundam', 'book', 'samguk', 'pokemon', 'myth', 'game', 'dot', 'image', 'element'];
+const ROOMS = ['gundam', 'book', 'samguk', 'pokemon', 'myth', 'game', 'dot', 'image', 'element', 'style', 'city'];
+const CARDS = ROOMS.filter(k => k !== 'city');   /* 도시공방은 아직 없다 — 지도에만(문 없이 「준비 중」), 목록엔 없다 */
 /* 오늘 기록 — 서재는 오늘 2판 1승에 오늘의 판을 끝냈고 방금(앞으로 한 시간 뒤까지) 다녀갔다, 대장간은 1판, 격납고는 판은 없고 하루 전에 다녀갔다(그 뒤 배포 → 새 소식) */
 const NOW = Date.now(), SEED = {
   'atelier_today_v1:book': { d: T.today(), n: 2, w: 1, daily: true, at: NOW, seen: NOW + 3600e3 },
@@ -38,8 +39,8 @@ const NOW = Date.now(), SEED = {
       const noOverflow = async () => assert(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), name + ' 가로 넘침');
       await p.goto(BASE + '/'); await p.waitForSelector('.room'); await p.waitForFunction(() => document.querySelector('#stage img').complete);
       /* 방 여섯 — 다각형·이름표·카드 */
-      assert.deepEqual(await p.locator('.room').evaluateAll(es => es.map(e => e.dataset.key)), ROOMS, name + ' 방 아홉');
-      assert.equal(await p.locator('.pin').count(), 9, '이름표 아홉'); assert.equal(await p.locator('.card').count(), 9, '카드 아홉');
+      assert.deepEqual(await p.locator('.room').evaluateAll(es => es.map(e => e.dataset.key)), ROOMS, name + ' 방 열하나');
+      assert.equal(await p.locator('.pin').count(), 11, '이름표 열하나'); assert.deepEqual(await p.locator('.card').evaluateAll(es => es.map(e => e.dataset.key)), CARDS, '카드 열(도시공방 빼고)');
       /* 오락실(게임의 공방)은 오늘의 판이 아직 없다 — 그 문을 두지 않는다 */
       assert.equal(await p.locator('.card[data-key="game"] a.daily').count(), 0, name + ' 오락실에 오늘의 판 문이 없다');
       assert.equal(await p.locator('.card[data-key="book"] a.daily').count(), 1, name + ' 서재에는 오늘의 판 문');
@@ -61,7 +62,7 @@ const NOW = Date.now(), SEED = {
       await p.waitForSelector('.pin[data-key="gundam"].news');
       assert.deepEqual(await p.locator('.pin.news').evaluateAll(es => es.map(e => e.dataset.key)), ['gundam'], name + ' 새 소식은 다녀간 뒤 배포된 방에만');
       const stage = await p.locator('#stage').boundingBox();
-      assert(Math.abs(stage.width / stage.height - 1024 / 1536) < .02, name + ' 무대는 그림 비율');
+      assert(Math.abs(stage.width / stage.height - 1024 / 2048) < .02, name + ' 무대는 그림 비율(1:2)');
       if (vp.width > vp.height) assert(stage.width <= (vp.height <= 500 ? 521 : 721), name + ' 가로 — 지도 폭을 정해 둔다(세로로 긴 그림): ' + JSON.stringify(stage));
       /* 이름표가 제 방 안에 있다 — 다각형의 중심과 가깝다 */
       for (const k of ROOMS) {
@@ -96,13 +97,17 @@ const NOW = Date.now(), SEED = {
       await p.goBack(); await p.waitForFunction(() => !document.querySelector('#map.zoomed')); assert.equal(await p.evaluate(() => location.hash), '', '뒤로 가기로 지도로');
       /* 주소로 바로 */
       await p.goto(BASE + '/#pokemon'); await p.waitForSelector('#map.zoomed'); assert.equal(await p.locator('#doors h2').textContent(), '포켓몬 메카 연구소', '#pokemon 으로 열면 바로 그 방');
+      await p.goto(BASE + '/#city'); await p.waitForSelector('#map.zoomed');
+      assert.equal(await p.locator('#doors h2').textContent(), '도시공방', name + ' 도시공방'); assert.equal(await p.locator('#doorlinks a').count(), 0, name + ' 도시공방은 문이 없다');
+      assert.match(await p.locator('#doorlinks .soon').textContent(), /준비 중/, name + ' 도시공방 준비 중');
       /* 아래 목록 = 지도의 문들 */
       const cardLinks = await p.locator('.card .links a:not(.daily)').evaluateAll(es => es.map(e => e.getAttribute('href')));
       const doorLinks = await p.evaluate(() => ROOMS.flatMap(r => r.links.map(l => l[1])));
       assert.deepEqual(cardLinks, doorLinks, '목록의 링크 = 방의 문들');
       assert(cardLinks.every(h => /^\/([a-z-]+\/)?([a-z]+\.html)?$/.test(h)), '링크 꼴');
       /* 도트 공방·이미지 공방 — 허브 안의 쪽으로 가는 문 하나씩, 오늘의 판은 없다 */
-      assert.deepEqual(await p.evaluate(() => ROOMS.filter(r => r.key === 'dot' || r.key === 'image').map(r => r.links.map(l => l[1]))), [['/dot.html'], ['/prompt.html', '/style-atelier/']], name + ' 새 방 둘의 문(이미지 공방 둘째 문 = 화풍공방)');
+      assert.deepEqual(await p.evaluate(() => ROOMS.filter(r => r.key === 'dot' || r.key === 'image').map(r => r.links.map(l => l[1]))), [['/dot.html'], ['/prompt.html']], name + ' 새 방 둘의 문');
+      assert.deepEqual(await p.evaluate(() => ROOMS.find(r => r.key === 'style').links.map(l => l[1])), ['/style-atelier/'], name + ' 화풍공방은 제 방(2026-11-10)');
       assert.equal(await p.locator('#style-all').getAttribute('href'), '/style-atelier/', name + ' 모든 공방 아래 화풍공방');
       assert.equal(await p.locator('.card[data-key="dot"] a.daily, .card[data-key="image"] a.daily').count(), 0, name + ' 새 방 둘엔 오늘의 판이 없다');
       assert.deepEqual(await p.locator('.card a.daily').evaluateAll(es => es.map(e => e.getAttribute('href'))), await p.evaluate(() => ROOMS.filter(r => r.daily).map(r => r.daily)), '목록에도 오늘의 판(있는 방만)');
@@ -121,16 +126,16 @@ const NOW = Date.now(), SEED = {
       assert.equal(await p.locator('.pin[data-key="gundam"] b').textContent(), '건담 격납고', name + ' 대미궁 이름표');
       assert.equal(await p.locator('.pin[data-key="gundam"] .peek img').getAttribute('src'), '/atelier/img/thumb/RX-78-2_건담_f.webp', name + ' 대미궁 미리보기는 공방 그림');
       await press('#mapsel button[data-map="kingdom"]');
-      await p.waitForFunction(() => /kingdom\.webp/.test(document.querySelector('#mapimg').src) && document.querySelector('#mapimg').complete);
-      const KNAMES = { gundam: '강철 군항', book: '만권 서고성', samguk: '적벽 관문', pokemon: '풀숲 연구촌', myth: '용광 협곡', game: '꿈빛 유원지', dot: '모자이크 들녘', image: '채색 언덕', element: '원소 군도' };
+      await p.waitForFunction(() => /kingdom2\.webp/.test(document.querySelector('#mapimg').src) && document.querySelector('#mapimg').complete);
+      const KNAMES = { gundam: '강철 군항', book: '만권 서고성', samguk: '적벽 관문', pokemon: '풀숲 연구촌', myth: '용광 협곡', game: '꿈빛 유원지', dot: '모자이크 들녘', image: '채색 언덕', element: '원소 군도', style: '프리즘 호반', city: '시계탑 왕도' };
       assert.deepEqual(Object.fromEntries(await p.locator('.pin').evaluateAll(es => es.map(e => [e.dataset.key, e.querySelector('b').textContent]))), KNAMES, name + ' 왕국 지명');
       assert(Object.values(KNAMES).every(n => !/공방/.test(n)), '지명에 「공방」 없음');
       /* 미리보기 — 왕국에선 그 구역을 잘라 낸 그림, 대미궁에선 공방 그림 */
       const kpeeks = await p.locator('.pin').evaluateAll(es => es.map(e => [e.dataset.key, e.querySelector('.peek img').getAttribute('src')]));
-      assert(kpeeks.every(([k, src]) => src === 'img/kingdom-' + k + '.webp'), name + ' 왕국 미리보기: ' + JSON.stringify(kpeeks));
-      for (const [k] of kpeeks) assert(fs.existsSync(path.join(ROOT, 'img/kingdom-' + k + '.webp')), k + ' 미리보기 파일');
+      assert(kpeeks.every(([k, src]) => src === 'img/kingdom2-' + k + '.webp'), name + ' 왕국 미리보기: ' + JSON.stringify(kpeeks));
+      for (const [k] of kpeeks) assert(fs.existsSync(path.join(ROOT, 'img/kingdom2-' + k + '.webp')), k + ' 미리보기 파일');
       if (!mobile) { await p.hover('.room[data-key="samguk"]'); assert(await p.locator('.pin[data-key="samguk"].hot .peek').isVisible(), '왕국에서 올리면 미리보기'); }
-      assert.equal(await p.locator('.room').count(), 9, name + ' 왕국 구역 아홉');
+      assert.equal(await p.locator('.room').count(), 11, name + ' 왕국 구역 열하나');
       assert.deepEqual(await p.locator('.room.lit').evaluateAll(es => es.map(e => e.dataset.key)), ['book', 'myth'], name + ' 왕국에서도 오늘 불');
       for (const k of ROOMS) {
         const inside = await p.evaluate(k => { const poly = document.querySelector(`.room[data-key="${k}"] polygon`), pin = document.querySelector(`.pin[data-key="${k}"]`);
@@ -165,6 +170,6 @@ const NOW = Date.now(), SEED = {
       assert.deepEqual(errors, [], name + ' 오류 없음');
       await ctx.close();
     }
-    console.log('PASS 공방 지도: 방 아홉(도트·이미지 공방·원소의 섬까지)·이름표·카드 · 지도 고르기(대미궁 · 왕국 — 지명 · 구역 · 기억 · ?map=) · 빛나기·미리보기 · 다가가기·문·주소·Esc·뒤로 가기 · 오늘 불·오늘 줄·오늘의 판·새 소식·다녀간 자국 · 세로/가로/PC 넘침 없음, 가로는 폭을 정해 굴린다');
+    console.log('PASS 공방 지도: 방 열하나(도트·이미지 공방·원소의 섬 · 화풍공방 · 도시공방 준비 중, 1:2)·이름표·카드 · 지도 고르기(대미궁 · 왕국 — 지명 · 구역 · 기억 · ?map=) · 빛나기·미리보기 · 다가가기·문·주소·Esc·뒤로 가기 · 오늘 불·오늘 줄·오늘의 판·새 소식·다녀간 자국 · 세로/가로/PC 넘침 없음, 가로는 폭을 정해 굴린다');
   } finally { await br.close(); server.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
