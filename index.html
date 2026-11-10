@@ -225,6 +225,7 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
     <a href="status.html" id="status-all"><span aria-hidden="true">≡</span> 그림 현황 <i>공방마다 어느 칸이 찼는지 글로만</i></a>
     <a href="sweep.html" id="sweep-all"><span aria-hidden="true">±</span> 세부 항목 시험 <i>생성 도구가 미간 · 코 · 눈 · 체형 · 2D↔실사 차이를 받아들이는지</i></a>
     <a href="review.html" id="review-all"><span aria-hidden="true">✓</span> 그림 검수판 <i>최근 그림을 검수 · 승인하고 고칠 지시문을 요청으로</i></a>
+    <a href="/style-atelier/" id="style-all"><span aria-hidden="true">◐</span> 화풍공방 <i>화풍을 부품(방향 · 얼굴 · 채색 · 빛 · 이펙트)으로 나눠 조합하고 축 하나씩 시험</i></a>
 </p>
 </section>
 <footer>polos0117 · 개인 공방 · 홈 화면에 추가하면 앱처럼 열린다</footer>
@@ -274,11 +275,12 @@ const ROOMS = [
     peek: 'img/room-dot.webp', cover: 'img/room-dot.webp',
     desc: '다섯 공방 인물을 도트로 — 지시문을 만들고, 그리고, 격자에 맞춰 정리한다.',
     links: [['도트 공방', '/dot.html']] },
-  { key: 'image', name: '이미지 공방', title: '이미지 공방', sub: '통합 생성기 · 다섯 공방 그림 지시문', num: '08 / STUDIO', c: '#f3b8a6', tint: '#1e1514',
+  { key: 'image', name: '이미지 공방', title: '이미지 공방', sub: '통합 생성기 · 다섯 공방 그림 지시문 · 화풍공방', num: '08 / STUDIO', c: '#f3b8a6', tint: '#1e1514',
     poly: [[720, 775], [980, 775], [1000, 900], [970, 1030], [760, 1030], [700, 900]], at: [850, 905],
     peek: 'img/room-image.webp', cover: 'img/room-image.webp',
-    desc: '게임·책·신화·포켓몬·원소 다섯 공방의 그림 지시문을 한곳에서 — 고르면 다음 단계로, 계획을 불러와 한 단계씩.',
-    links: [['통합 생성기', '/prompt.html']] },
+    desc: '게임·책·신화·포켓몬·원소 다섯 공방의 그림 지시문을 한곳에서 — 고르면 다음 단계로, 계획을 불러와 한 단계씩. 화풍공방에서는 화풍을 부품(방향 · 얼굴 · 채색 · 빛 · 이펙트)으로 나눠 조합하고 시험한다.',
+    /* 화풍공방(style-atelier, 2026-11-10 — 사용자 「style 공방도 허브에서 들어갈 수 있게 메뉴 만들어줘」): 지도에 새 방 자리가 없어 그림 쪽 방의 둘째 문으로 */
+    links: [['통합 생성기', '/prompt.html'], ['화풍공방', '/style-atelier/']] },
   /* 원소의 섬(2026-10-30) — 가운데 지하 호수의 바위섬들. 원소 공방(element-atelier)은 주기율표 끝의 「안정의 섬」 이야기를 가졌으니 호수 가운데가 그 자리다. 그림은 그대로 두고 다각형만 호수에 */
   { key: 'element', name: '원소의 섬', title: '원소의 공방', sub: '원소 · 가문 · 주민 · 판타지·스팀펑크·메카', num: '09 / ELEMENT', c: '#5fd3e8', tint: '#0e1a22',
     poly: [[400, 330], [625, 330], [695, 480], [640, 685], [395, 685], [330, 480]], at: [512, 520],

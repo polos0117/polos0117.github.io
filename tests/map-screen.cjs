@@ -102,7 +102,8 @@ const NOW = Date.now(), SEED = {
       assert.deepEqual(cardLinks, doorLinks, '목록의 링크 = 방의 문들');
       assert(cardLinks.every(h => /^\/([a-z-]+\/)?([a-z]+\.html)?$/.test(h)), '링크 꼴');
       /* 도트 공방·이미지 공방 — 허브 안의 쪽으로 가는 문 하나씩, 오늘의 판은 없다 */
-      assert.deepEqual(await p.evaluate(() => ROOMS.filter(r => r.key === 'dot' || r.key === 'image').map(r => r.links.map(l => l[1]))), [['/dot.html'], ['/prompt.html']], name + ' 새 방 둘의 문');
+      assert.deepEqual(await p.evaluate(() => ROOMS.filter(r => r.key === 'dot' || r.key === 'image').map(r => r.links.map(l => l[1]))), [['/dot.html'], ['/prompt.html', '/style-atelier/']], name + ' 새 방 둘의 문(이미지 공방 둘째 문 = 화풍공방)');
+      assert.equal(await p.locator('#style-all').getAttribute('href'), '/style-atelier/', name + ' 모든 공방 아래 화풍공방');
       assert.equal(await p.locator('.card[data-key="dot"] a.daily, .card[data-key="image"] a.daily').count(), 0, name + ' 새 방 둘엔 오늘의 판이 없다');
       assert.deepEqual(await p.locator('.card a.daily').evaluateAll(es => es.map(e => e.getAttribute('href'))), await p.evaluate(() => ROOMS.filter(r => r.daily).map(r => r.daily)), '목록에도 오늘의 판(있는 방만)');
       assert.doesNotMatch(await p.locator('.card[data-key="myth"] a.daily').textContent(), /끝냈다/, '끝내지 않은 방은 표 없음');
