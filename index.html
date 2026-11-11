@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&display=swap">
 <!--
-  첫 화면 = 공방 지도 한 장(img/cave2.webp 1024×2048 세로 — 산속 드워프 대미궁, 2026-10-30 · 2026-11-10 휴대폰 한 화면 1:2 로 다시). 절벽 폭포 옆 동굴 입구 → 계단 → 가운데 둥근 지하 호수를 도는 길 → 왼쪽 다섯·오른쪽 다섯의 방 열(방마다 호숫가 길로 문이 난다 — 2026-11-10 다시 그림, 늘리기만 한 앞 그림은 맨 아래 방으로 가는 길이 없었다), 가운데 호수의 바위섬이 원소의 섬.
+  첫 화면 = 공방 지도 한 장(img/cave3.webp 1024×2048 세로 — 산속 드워프 대미궁, 2026-10-30 · 2026-11-10 휴대폰 한 화면 1:2 로 다시). 절벽 폭포 옆 동굴 입구 → 계단 → 가운데 둥근 지하 호수를 도는 길 → 왼쪽 다섯·오른쪽 다섯의 방 열(방마다 계단 · 다리로 호숫가 길에 닿는다 — 2026-11-11 Blender 구조(blender-cloud scenes/cave_hub.py)를 첨부해 칠한 그림. 다각형 · 이름표는 그 구조의 방 색깔 지도에서, 등불 길은 구조 좌표에서 그대로), 가운데 호수의 바위섬이 원소의 섬.
   방 자리는 ROOMS 표의 다각형(1024×2048 기준 좌표 — 그림 크기 그대로)이고
   SVG viewBox 가 그림 크기라 화면이 바뀌어도 같이 늘어난다. 글자는 그림에 없다 — 이름표·미리보기는 화면이 얹는다.
   방에 올리면 빛나고 이름·대표 그림이 뜬다. 누르면 지도가 그 방으로 다가가고(transform) 그 공방의 문들(하위 링크)이 보인다.
@@ -193,15 +193,15 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
 <section class="map" id="map" aria-label="공방 지도">
   <div class="stage" id="stage">
     <div class="inner" id="inner">
-      <img id="mapimg" src="img/cave2.webp?v=1" alt="산속 대미궁 — 절벽 폭포 옆 동굴 입구에서 계단을 올라 가운데 지하 호수를 도는 길, 왼쪽에 격납고·연구소·오락실·도트 공방·도시공방, 오른쪽에 서재·군막·대장간·이미지 공방·화풍공방, 호수 가운데 바위섬이 원소의 섬" decoding="async" fetchpriority="high">
+      <img id="mapimg" src="img/cave3.webp?v=1" alt="산속 대미궁 — 절벽 폭포 옆 동굴 입구에서 계단을 올라 가운데 지하 호수를 도는 길, 왼쪽에 격납고·연구소·오락실·도트 공방·도시공방, 오른쪽에 서재·군막·대장간·이미지 공방·화풍공방, 호수 가운데 바위섬이 원소의 섬" decoding="async" fetchpriority="high">
       <svg id="svg" viewBox="0 0 1024 2048" aria-hidden="true" focusable="false">
         <defs>
           <filter id="glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
           <filter id="lamp" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-          <!-- 길 — 등불이 다니는 길(1024×2048). 동굴 입구 계단을 올라 호수 앞 길로, 호수를 왼쪽·오른쪽으로 돌아 뒤에서 만난다. 그림을 바꾸면 같이 다시 긋는다 -->
-          <path id="way1" d="M 512 1997 C 512 1800, 512 1600, 512 1403"/>
-          <path id="way2" d="M 512 1403 C 380 1385, 305 1170, 305 820 C 305 460, 365 325, 512 315"/>
-          <path id="way3" d="M 512 1403 C 644 1385, 719 1170, 719 820 C 719 460, 659 325, 512 315"/>
+          <!-- 길 — 등불이 다니는 길(1024×2048, Blender 구조 좌표). 동굴 입구 계단을 올라 호수 아래 끝에서 호숫가를 왼쪽 · 오른쪽으로 돌아 위에서 만난다. 그림을 바꾸면 같이 다시 긋는다 -->
+          <path id="way1" d="M 512 1897 C 512 1866 512 1772 512 1709 512 1646 512 1552 512 1520"/>
+          <path id="way2" d="M 512 1520 C 499 1514 453 1503 434 1484 415 1466 406 1436 397 1410 387 1385 382 1358 377 1332 371 1305 368 1278 364 1251 361 1225 359 1198 357 1171 355 1144 354 1117 353 1090 352 1063 351 1036 351 1009 351 982 351 955 351 928 351 901 351 874 351 847 351 820 352 793 353 766 354 740 355 713 357 686 359 659 361 632 364 605 368 578 371 551 377 525 382 498 387 471 397 446 406 420 415 390 434 372 453 354 499 342 512 336"/>
+          <path id="way3" d="M 512 1520 C 525 1514 570 1503 589 1484 608 1466 617 1436 626 1410 636 1385 641 1358 646 1332 652 1305 655 1278 659 1251 662 1225 664 1198 666 1171 668 1144 669 1117 670 1090 671 1063 672 1036 672 1009 673 982 672 955 672 928 672 901 673 874 672 847 672 820 671 793 670 766 669 740 668 713 666 686 664 659 662 632 659 605 655 578 652 551 646 525 641 498 636 471 626 446 617 420 608 390 589 372 570 354 525 342 512 336"/>
         </defs>
         <g id="rooms"></g>
         <g id="glows"></g>
@@ -235,56 +235,56 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
 <script src="today.js"></script>
 <script src="favorites.js"></script>
 <script>
-/* 방 표 — 다각형은 대미궁 img/cave2.webp 의 픽셀 좌표(1024×2048 기준, 2026-11-10 다시 그림 — 예전 img/map.webp 는 1024×1536). 꼭짓점은 바위에 판 방의 벽 테두리(그림 위에 겹쳐 따 맞춘다). 그림을 바꾸면 여기만 다시 잰다.
+/* 방 표 — 다각형은 대미궁 img/cave3.webp 의 픽셀 좌표(1024×2048 기준, 2026-11-10 다시 그림 — 예전 img/map.webp 는 1024×1536). 꼭짓점은 바위에 판 방의 벽 테두리(그림 위에 겹쳐 따 맞춘다). 그림을 바꾸면 여기만 다시 잰다.
    대미궁 지도(2026-10-30) — 왼쪽 위에서부터 격납고·연구소·오락실·도트 공방, 오른쪽 위에서부터 서재·군막·대장간·이미지 공방.
    at: 이름표 자리, peek: 미리보기 그림(각 공방의 그림 저장소), links: 문들(첫 번째가 큰 문), daily: 오늘의 판(날짜가 씨앗 — 그 공방이 ?daily 를 읽는다) */
 const ROOMS = [
   { key: 'gundam', name: '건담 격납고', title: '건담 드래프트', sub: '기동전사 · 3D 격납고', num: '01 / HANGAR', c: '#7fb3ff', tint: '#151a21',
-    poly: [[61, 184], [154, 118], [307, 123], [338, 256], [307, 389], [72, 394], [46, 287]], at: [195, 266],
+    poly: [[63, 374], [41, 414], [37, 465], [74, 532], [199, 551], [257, 524], [273, 462], [256, 400], [223, 359], [139, 337]], at: [154, 446],
     peek: '/atelier/img/thumb/RX-78-2_건담_f.webp', cover: '/atelier/img/thumb/RX-78-2_건담_f.webp',
     desc: '3D 격납고를 걸어 다니며 기체를 둘러보고, 드래프트로 출격한다.',
     links: [['격납고', '/atelier/'], ['드래프트', '/atelier/play.html'], ['도감', '/atelier/dex.html'], ['프롬프트', '/atelier/prompt.html']], daily: '/atelier/play.html?daily' },
   { key: 'book', name: '책의 서재', title: '책의 공방', sub: '고전 · 발단 · 전개 · 결말', num: '02 / LIBRARY', c: '#e39b6b', tint: '#1c1210',
-    poly: [[696, 174], [788, 108], [963, 118], [1009, 236], [993, 384], [717, 389], [676, 287]], at: [850, 256],
+    poly: [[827, 345], [791, 359], [758, 390], [732, 491], [762, 541], [835, 563], [895, 558], [932, 537], [961, 496], [964, 419], [945, 383], [912, 356]], at: [852, 454],
     peek: '/book-atelier-img/img/thumb/don_quixote_middle_literary_fantasy_f.webp', cover: '/book-atelier-img/img/thumb/don_quixote_middle_literary_fantasy_f.webp',
     desc: '도서관에서 깨어난 책들이, 자신의 이야기를 세상에 남기기 위해 싸운다. 책 한 권이 한 사람이 된다. 결투 한 판, 서고를 아홉 층 내려가는 탐험.',
     links: [['서재', '/book-atelier/'], ['서가', '/book-atelier/dex.html'], ['결투', '/book-atelier/duel.html'], ['탐험', '/book-atelier/run.html'], ['프롬프트', '/book-atelier/prompt.html']], daily: '/book-atelier/duel.html?daily' },
   { key: 'samguk', name: '삼국지 군막', title: '삼국지 쟁탈전', sub: '장수를 뽑아 진영을 꾸린다', num: '03 / 竹簡', c: '#c9a227', tint: '#17130f',
-    poly: [[727, 461], [819, 404], [983, 410], [1014, 532], [993, 660], [748, 666], [717, 553]], at: [860, 532],
+    poly: [[807, 586], [760, 651], [749, 716], [765, 754], [838, 786], [942, 769], [985, 697], [966, 614], [898, 571]], at: [869, 679],
     peek: '/sam-atelier/images/large/관우.jpg', cover: '/sam-atelier/images/large/관우.jpg',
     desc: '위·촉·오의 장수들을 드래프트로 모아 한 진영을 짠다. 장수가 여성이 되어 삼국시대·중세 판타지·메카 세 세계에 선다.',
     links: [['타이틀', '/sam-atelier/'], ['군막', '/sam-atelier/hall.html'], ['드래프트', '/sam-atelier/draft.html'], ['전장', '/sam-atelier/battle.html'], ['도감', '/sam-atelier/dex.html'], ['프롬프트', '/sam-atelier/prompt.html']], daily: '/sam-atelier/draft.html?daily' },
   { key: 'pokemon', name: '포켓몬 연구소', title: '포켓몬 메카 연구소', sub: '메카 의인화 · 연구소', num: '04 / LAB', c: '#f4c542', tint: '#2a2718',
-    poly: [[20, 461], [113, 410], [276, 420], [307, 532], [276, 650], [41, 655], [10, 553]], at: [164, 532],
+    poly: [[59, 566], [21, 642], [41, 732], [121, 776], [232, 761], [258, 665], [227, 581], [147, 540]], at: [138, 660],
     peek: '/pkm-atelier-img/img/thumb/피카츄_heavy_cinematic_semi_real_f.webp', cover: '/pkm-atelier-img/img/thumb/피카츄_heavy_cinematic_semi_real_f.webp',
     desc: '포켓몬을 메카로 의인화한 도감과 전투, 일곱 판 달리기, 진화 결투, 폼 결투.',
     links: [['연구소', '/pkm-atelier/'], ['도감', '/pkm-atelier/dex.html'], ['전투', '/pkm-atelier/battle.html'], ['런', '/pkm-atelier/run.html'], ['결투', '/pkm-atelier/lane.html'], ['폼 결투', '/pkm-atelier/gwent.html'], ['프롬프트', '/pkm-atelier/prompt.html']], daily: '/pkm-atelier/survey.html?daily' },
   { key: 'myth', name: '신화 무기 대장간', title: '신화 무기 공방', sub: '열한 권 · 백여든일곱 자루', num: '05 / FORGE', c: '#d9b45a', tint: '#121016',
-    poly: [[727, 748], [819, 686], [983, 696], [1014, 809], [993, 937], [748, 942], [717, 829]], at: [870, 809],
+    poly: [[833, 793], [794, 832], [772, 903], [802, 983], [894, 980], [940, 991], [965, 978], [994, 946], [1008, 908], [1006, 860], [987, 820], [916, 779]], at: [892, 887],
     peek: '/myth-atelier-img/img/thumb/묠니르_game_keyart_f.webp', cover: '/myth-atelier-img/img/thumb/묠니르_game_keyart_f.webp',
     desc: '신화 속 무기가 사람이 되어 싸운다. 오토 배틀러·결투와 3D 박물관.',
     links: [['공방', '/myth-atelier/'], ['오토 배틀', '/myth-atelier/auto.html'], ['박물관', '/myth-atelier/museum.html'], ['도감', '/myth-atelier/dex.html'], ['드래프트', '/myth-atelier/draft.html'], ['던전', '/myth-atelier/run.html'], ['결투', '/myth-atelier/duel.html'], ['프롬프트', '/myth-atelier/prompt.html']], daily: '/myth-atelier/duel.html?daily' },
   /* 오락실(2026-10-26) — 옛 아래 가운데 복도 자리, 앞 계단 입구가 이리로 열린다. 미리보기는 테트리스 타이틀 폼(시범 그림, 2026-10-26).
      오늘의 판(daily)은 결투가 붙으면 적는다 — 없으면 문 패널에 그 문을 두지 않는다 */
   { key: 'game', name: '게임 오락실', title: '게임의 공방', sub: '게임 의인화 · 타이틀 · 중반 · 엔딩', num: '06 / ARCADE', c: '#ff6ad5', tint: '#1d1020',
-    poly: [[15, 737], [113, 676], [276, 686], [307, 799], [276, 927], [31, 927], [10, 819]], at: [154, 804],
+    poly: [[62, 823], [35, 901], [48, 951], [72, 981], [111, 1002], [185, 1003], [256, 972], [272, 911], [255, 850], [225, 811], [143, 786], [102, 795]], at: [152, 897],
     peek: '/game-atelier-img/img/thumb/tetris_title_glossy_kr_game_f.webp', cover: '/game-atelier-img/img/thumb/tetris_title_glossy_kr_game_f.webp',
     desc: '게임 한 편이 한 사람이 되고, 그 게임의 조작이 그녀의 능력이 된다. 첫 묶음 열 편의 도감과 그림 프롬프트.',
     links: [['첫 화면', '/game-atelier/'], ['도감', '/game-atelier/dex.html'], ['프롬프트', '/game-atelier/prompt.html']] },
   /* 도트 공방·이미지 공방(2026-10-30) — 대미궁 지도의 앞 두 방. 허브 안의 쪽이라 문은 하나씩, 미리보기는 지도의 그 방 */
   { key: 'dot', name: '도트 공방', title: '도트 공방', sub: '다섯 공방 인물의 도트', num: '07 / PIXEL', c: '#5fe3c0', tint: '#0f1c1a',
-    poly: [[15, 1009], [113, 947], [287, 957], [317, 1075], [287, 1208], [31, 1208], [10, 1106]], at: [164, 1075],
-    peek: 'img/cave2-dot.webp', cover: 'img/cave2-dot.webp',
+    poly: [[59, 1038], [38, 1075], [33, 1128], [48, 1170], [82, 1205], [160, 1222], [253, 1188], [269, 1126], [253, 1066], [219, 1023], [135, 1001], [96, 1011]], at: [149, 1113],
+    peek: 'img/cave3-dot.webp', cover: 'img/cave3-dot.webp',
     desc: '다섯 공방 인물을 도트로 — 지시문을 만들고, 그리고, 격자에 맞춰 정리한다.',
     links: [['도트 공방', '/dot.html']] },
   { key: 'image', name: '이미지 공방', title: '이미지 공방', sub: '통합 생성기 · 다섯 공방 그림 지시문', num: '08 / STUDIO', c: '#f3b8a6', tint: '#1e1514',
-    poly: [[717, 1024], [809, 963], [983, 973], [1014, 1096], [993, 1224], [737, 1229], [707, 1116]], at: [870, 1096],
-    peek: 'img/cave2-image.webp', cover: 'img/cave2-image.webp',
+    poly: [[894, 981], [819, 996], [774, 1047], [758, 1124], [784, 1205], [909, 1216], [956, 1192], [987, 1153], [995, 1086], [980, 1034], [943, 997]], at: [878, 1102],
+    peek: 'img/cave3-image.webp', cover: 'img/cave3-image.webp',
     desc: '게임·책·신화·포켓몬·원소 다섯 공방의 그림 지시문을 한곳에서 — 고르면 다음 단계로, 계획을 불러와 한 단계씩.',
     links: [['통합 생성기', '/prompt.html']] },
   /* 원소의 섬(2026-10-30) — 가운데 지하 호수의 바위섬들. 원소 공방(element-atelier)은 주기율표 끝의 「안정의 섬」 이야기를 가졌으니 호수 가운데가 그 자리다. 그림은 그대로 두고 다각형만 호수에 */
   { key: 'element', name: '원소의 섬', title: '원소의 공방', sub: '원소 · 가문 · 주민 · 판타지·스팀펑크·메카', num: '09 / ELEMENT', c: '#5fd3e8', tint: '#0e1a22',
-    poly: [[369, 328], [655, 328], [696, 717], [666, 1126], [614, 1362], [430, 1362], [348, 1126], [328, 717]], at: [512, 737],
+    poly: [[498, 373], [435, 446], [403, 578], [387, 1092], [430, 1427], [529, 1491], [605, 1390], [653, 914], [596, 465], [550, 381]], at: [512, 938],
     peek: '/element-atelier-img/img/thumb/fe_mecha_game_keyart_f.webp', cover: '/element-atelier-img/img/thumb/fe_fantasy_game_keyart_f.webp',
     desc: '원소 하나가 나라가 되고, 물질이 가문이 되고, 물건이 주민이 된다. 근본·가문주·주민이 판타지·스팀펑크·메카 세 세계에서 선다.',
     links: [['타이틀', '/element-atelier/'], ['주기율표', '/element-atelier/hall.html'], ['전시관', '/element-atelier/gallery.html'], ['도감', '/element-atelier/dex.html'], ['프롬프트', '/element-atelier/prompt.html']] },
@@ -292,13 +292,13 @@ const ROOMS = [
      지도를 세로 1:2 로 다시 그려 대미궁 양쪽 맨 아래 방, 왕국 아래쪽 구역으로. 화풍공방은 이미지 공방의 둘째 문이던 것을 제 방으로.
      도시공방은 아직 없다 — soon: 문 없이 「준비 중」, 아래 목록에도 안 싣는다. 생기면 links · desc 를 채우고 soon 을 뺀다 */
   { key: 'style', name: '화풍공방', title: '화풍공방', sub: '화풍 부품 · 축 하나씩 시험', num: '10 / STYLE', c: '#c39bff', tint: '#17121f',
-    poly: [[696, 1321], [799, 1244], [983, 1260], [1014, 1413], [983, 1562], [717, 1567], [676, 1434]], at: [840, 1393],
-    peek: 'img/cave2-style.webp', cover: 'img/cave2-style.webp',
+    poly: [[802, 1228], [759, 1243], [725, 1275], [699, 1374], [729, 1425], [849, 1446], [920, 1397], [934, 1314], [884, 1243]], at: [819, 1339],
+    peek: 'img/cave3-style.webp', cover: 'img/cave3-style.webp',
     desc: '화풍을 부품(방향 · 얼굴 · 채색 · 빛 · 이펙트)으로 나눠 조합하고, 축 하나씩 바꿔 시험한다.',
     links: [['화풍공방', '/style-atelier/']] },
   { key: 'city', name: '도시공방', title: '도시공방', sub: '준비 중', num: '11 / CITY', c: '#9fd3a8', tint: '#111a14', soon: true,
-    poly: [[20, 1290], [123, 1229], [307, 1239], [358, 1393], [338, 1556], [41, 1567], [10, 1434]], at: [184, 1398],
-    peek: 'img/cave2-city.webp', cover: 'img/cave2-city.webp',
+    poly: [[113, 1268], [91, 1310], [88, 1355], [128, 1428], [212, 1451], [308, 1416], [324, 1355], [306, 1291], [275, 1253], [190, 1230]], at: [204, 1342],
+    peek: 'img/cave3-city.webp', cover: 'img/cave3-city.webp',
     desc: '앞으로 지을 공방 — 문이 아직 없다.',
     links: [] },
 ];
@@ -306,11 +306,11 @@ const ROOMS = [
    cave = 위 ROOMS 의 다각형·이름표·이름 그대로(대미궁). kingdom = img/kingdom2.webp(1024×2048, 글자 없는 왕국 전도 — 지명은 화면이 얹는다, 2026-11-10 열한 구역으로 다시 — 예전 img/kingdom.webp 는 1024×1536 아홉 구역)의 구역.
    지명은 「~ 공방」 대신 지역 이름(사용자 「--항구같이 지역명으로」). 올렸을 때 미리보기(peek)는 그 구역을 지도에서 잘라 낸 그림(img/kingdom2-<방>.webp, 300×375 — 사용자 「마우스오버 시 미리보기 이미지도 수정해줘」). 같은 1024×2048 좌표라 무대 · 다가가기 · 오늘 불은 그대로 쓴다. 그림을 바꾸면 rooms 의 숫자와 ways 만 다시 잰다 */
 const MAPS = {
-  cave: { label: '대미궁', img: 'img/cave2.webp?v=1', alt: document.getElementById('mapimg').alt,
+  cave: { label: '대미궁', img: 'img/cave3.webp?v=1', alt: document.getElementById('mapimg').alt,
     hint: '방에 올리면 이름이, 누르면 그 공방의 문이 보인다 · 오늘 판을 둔 방은 불이 켜진다 · Esc 로 돌아온다',
-    ways: ['M 512 1997 C 512 1800, 512 1600, 512 1403',
-           'M 512 1403 C 380 1385, 305 1170, 305 820 C 305 460, 365 325, 512 315',
-           'M 512 1403 C 644 1385, 719 1170, 719 820 C 719 460, 659 325, 512 315'] },
+    ways: ['M 512 1897 C 512 1866 512 1772 512 1709 512 1646 512 1552 512 1520',
+           'M 512 1520 C 499 1514 453 1503 434 1484 415 1466 406 1436 397 1410 387 1385 382 1358 377 1332 371 1305 368 1278 364 1251 361 1225 359 1198 357 1171 355 1144 354 1117 353 1090 352 1063 351 1036 351 1009 351 982 351 955 351 928 351 901 351 874 351 847 351 820 352 793 353 766 354 740 355 713 357 686 359 659 361 632 364 605 368 578 371 551 377 525 382 498 387 471 397 446 406 420 415 390 434 372 453 354 499 342 512 336',
+           'M 512 1520 C 525 1514 570 1503 589 1484 608 1466 617 1436 626 1410 636 1385 641 1358 646 1332 652 1305 655 1278 659 1251 662 1225 664 1198 666 1171 668 1144 669 1117 670 1090 671 1063 672 1036 672 1009 673 982 672 955 672 928 672 901 673 874 672 847 672 820 671 793 670 766 669 740 668 713 666 686 664 659 662 632 659 605 655 578 652 551 646 525 641 498 636 471 626 446 617 420 608 390 589 372 570 354 525 342 512 336'] },
   kingdom: { label: '왕국', img: 'img/kingdom2.webp?v=1',
     alt: '공방 왕국 전도 — 위에 눈 덮인 산맥과 큰 폭포, 가운데 강이 내려와 원소 군도가 떠 있는 내해를 지나 바다로. 위 왼쪽 용광 협곡, 오른쪽 만권 서고성, 그 아래 왼쪽 풀숲 연구촌, 오른쪽 적벽 관문, 내해 왼쪽 꿈빛 유원지, 오른쪽 강철 군항, 가운데 성벽으로 둘린 시계탑 왕도, 그 아래 왼쪽 프리즘 호반, 오른쪽 채색 언덕, 맨 아래 모자이크 들녘',
     hint: '구역에 올리면 지명이, 누르면 그 공방의 문이 보인다 · 오늘 판을 둔 곳은 불이 켜진다 · Esc 로 돌아온다',
