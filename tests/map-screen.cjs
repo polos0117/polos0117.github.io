@@ -84,7 +84,13 @@ const NOW = Date.now(), SEED = {
       assert.match(await p.locator('#doors a.daily').textContent(), /끝냈다/, name + ' 끝낸 오늘의 판은 표');
       assert.match(await p.locator('#status').textContent(), /오늘 2판 · 1승 · 오늘의 판 ✓ · 통산 12판 7승 · 3연승 · 오늘의 판 연속 2일/, name + ' 문 패널에 오늘 줄·통산·연승·연속 일수');
       const d = await p.locator('#doors').boundingBox(), s2 = await p.locator('#stage').boundingBox();
-      if (vp.width > vp.height) assert(d.x >= s2.x + s2.width - 1, name + ' 가로 — 문 패널은 지도 오른쪽'); else assert(d.y >= s2.y + s2.height - 1, name + ' 세로 — 문 패널은 지도 아래');
+      if (vp.width > vp.height) assert(d.x >= s2.x + s2.width - 1, name + ' 가로 — 문 패널은 지도 오른쪽');
+      else {   /* 세로 — 지도가 1:3 이라 문 패널은 화면 아래에 떠 있다(2026-11-11 폰에서 메뉴가 화면 밖이었다). 다가간 방은 그 위에 보인다 */
+        assert(d.y >= 0 && d.y + d.height <= vp.height + 1, name + ' 세로 — 문 패널이 화면 안: ' + JSON.stringify(d));
+        await p.waitForTimeout(700);
+        const room = await p.locator('.room[data-key="book"] polygon').boundingBox(), d2 = await p.locator('#doors').boundingBox();
+        assert(room.y + room.height / 2 > 0 && room.y + room.height / 2 < d2.y, name + ' 세로 — 다가간 방은 문 패널 위에: ' + JSON.stringify([room, d2]));
+      }
       for (const b of await p.locator('#doors a, #doors button').all()) { const r = await b.boundingBox(); assert(r.height >= 36, '누르는 자리'); }
       if (vp.width > vp.height && vp.height <= 500) assert(!(await p.locator('.head').isVisible()), name + ' 가로 폰 — 다가가면 제목이 지도 위에 겹치지 않게 숨는다');
       await noOverflow();
