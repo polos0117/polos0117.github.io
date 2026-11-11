@@ -486,7 +486,7 @@ function fit() {
 }
 function enter(k, push) {
   const r = ROOMS.find(q => q.key === k); if (!r) return leave(push);
-  on = k; setHot(k);
+  on = k; setHot(k); lastSet(k);
   map.classList.add('zoomed'); document.body.classList.add('zoomed'); map.style.setProperty('--c', r.c);
   for (const el of rooms.querySelectorAll('.room')) el.classList.toggle('on', el.dataset.key === k);
   doors.innerHTML = `<div class="num">${esc(r.num)}</div><h2>${esc(r.title)}</h2><div class="sub">${esc(r.sub)}</div><p>${esc(r.desc)}</p>
@@ -509,6 +509,7 @@ function leave(push) {
   doors.innerHTML = '';
   inner.style.transform = '';
   if (push && location.hash && location.hash !== '#all') history.pushState({}, '', location.pathname + location.search);
+  aliceHold();   /* 「← 지도로」 — 앨리스는 그 방 문 앞에 남는다(굴려야 다시 걷는다) */
   requestAnimationFrame(onScroll);
 }
 rooms.addEventListener('click', e => { const a = e.target.closest('.room'); if (!a) return; e.preventDefault(); if (on === a.dataset.key) leave(true); else go(a.dataset.key); });
@@ -571,7 +572,7 @@ function bfs(s, t) {
   const p = [t]; while (p[p.length - 1] !== s) p.push(prev[p[p.length - 1]]); return p.reverse();
 }
 const aliceOn = () => A.ok && MAPS[MAP].alice;
-function aliceMap() { A.el.hidden = !aliceOn(); if (aliceOn()) { if (A.node < 0) aliceJump(A.nav.top); aliceDraw(); } }
+function aliceMap() { A.el.hidden = !aliceOn(); if (aliceOn()) { if (A.node < 0) { const k = !location.hash && lastGet(); aliceJump(k && A.nav.doors[k] !== undefined ? A.nav.doors[k] : A.nav.top); if (k) aliceHold(); } aliceDraw(); } }
 function aliceJump(n) { A.node = n; A.x = A.nav.n[n][0]; A.y = A.nav.n[n][1]; A.path = []; A.done = null; aliceDraw(); }
 function aliceWalk(p, maxS, done) {
   if (!p || p.length < 2 || REDUCED) { if (p) aliceJump(p[p.length - 1]); if (done) done(); return; }
@@ -579,12 +580,23 @@ function aliceWalk(p, maxS, done) {
   A.path = p.slice(1); A.speed = Math.max(260, len / maxS); A.done = done || null;
 }
 /* 굴릴 때 — 안내 길(맨 위 → 입구)에서 그 높이에 가장 가까운 점으로 */
+function guideAt(y) { const g = A.nav.guide; let bi = 0, bd = Infinity; for (let i = 0; i < g.length; i++) { const d = Math.abs(A.nav.n[g[i]][1] - y); if (d < bd) { bd = d; bi = i; } } return g[bi]; }
 function aliceFollow(y) {
   if (!aliceOn() || on || A.door) return;   /* 문으로 가는 중엔 굴림이 길을 바꾸지 않는다(2026-11-11 — 폰에서 누른 뒤 굴림 · 주소창 크기 바뀜이 길을 덮어 문이 안 열렸다) */
-  const g = A.nav.guide; let bi = 0, bd = Infinity;
-  for (let i = 0; i < g.length; i++) { const d = Math.abs(A.nav.n[g[i]][1] - y); if (d < bd) { bd = d; bi = i; } }
-  const t = g[bi]; if (t === A.goal) return; A.goal = t;
+  const t = guideAt(y); if (t === A.goal) return; A.goal = t;
   aliceWalk(bfs(A.node, t), 1.4);
+}
+/* 지금 높이의 안내 점을 「이미 간 곳」 으로 — 굴림이 바뀔 때까지 앨리스는 제자리(문 앞)에 선다 */
+function aliceHold() { if (aliceOn()) A.goal = guideAt(mapYAtCenter()); }
+/* 최근 공방(2026-11-11 — 사용자 「공방 안들어가고 지도로 했을때 위치를 최근 그 공방 앞에 있게」) — 문 패널을 연 방을 이 기기에 남기고(atelier_hub_last_v1),
+   다시 열면(주소에 #방 이 없을 때) 그 방 높이로 굴리고 앨리스는 그 문 앞에 */
+const LAST_KEY = 'atelier_hub_last_v1';
+function lastSet(k) { try { localStorage.setItem(LAST_KEY, k); } catch (e) {} }
+function lastGet() { try { const k = localStorage.getItem(LAST_KEY); return ROOMS.some(r => r.key === k) ? k : null; } catch (e) { return null; } }
+function lastRestore() {
+  const k = !location.hash && lastGet(); if (!k) return;
+  const r = ROOMS.find(q => q.key === k), { span } = scrollSpan();
+  if (span > 0) scrollTo({ top: geo(r).at[1] / IH * span, behavior: 'instant' });   /* html 의 smooth 를 넘는다 — 열자마자 그 자리 */
 }
 /* 방을 누르면 — 대미궁에선 문 앞까지 걸어간 뒤 연다(멀어도 0.9초 안), 아니면 바로 */
 function go(k) {
@@ -639,7 +651,7 @@ function setMap(k) {
 }
 $('#mapsel').addEventListener('click', e => { const b = e.target.closest('button[data-map]'); if (b) setMap(b.dataset.map); });
 addEventListener('load', () => { const k = location.hash.slice(1); if (ROOMS.some(r => r.key === k)) { aliceTo(k); enter(k, false); } });
-build(); paint(); if (window.fetch) { sniff(); aliceLoad(); }   /* 맨 끝에 — paint 가 on(다가간 방)을 보므로 그 선언 뒤여야 한다 */
+build(); paint(); lastRestore(); if (window.fetch) { sniff(); aliceLoad(); }   /* 맨 끝에 — paint 가 on(다가간 방)을 보므로 그 선언 뒤여야 한다 */
 </script>
 </body>
 </html>

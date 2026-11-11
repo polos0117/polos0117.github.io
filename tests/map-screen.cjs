@@ -195,7 +195,16 @@ const NOW = Date.now(), SEED = {
         const at = await p.evaluate(() => { const a = document.querySelector('#alice'); return [parseFloat(a.style.left), parseFloat(a.style.top)]; });
         const door = await p.evaluate(() => fetch('img/cave4-nav.json').then(r => r.json()).then(j => j.n[j.doors.blender]));
         assert(Math.abs(at[0] - door[0] / 1024 * 100) < 0.5 && Math.abs(at[1] - door[1] / 3072 * 100) < 0.5, '앨리스는 조형실 문 앞: ' + at + ' / ' + door);
-        await p.keyboard.press('Escape'); await press('#mapsel button[data-map="kingdom"]');
+        /* 최근 공방(2026-11-11) — 「← 지도로」 하면 앨리스는 그 문 앞에 남고, 다시 열면 그 방 높이 · 그 문 앞에서 시작한다 */
+        const alicePos = () => p.evaluate(() => { const a = document.querySelector('#alice'); return [parseFloat(a.style.left), parseFloat(a.style.top)]; });
+        await press('#back'); await p.waitForFunction(() => !document.querySelector('#map.zoomed')); await p.waitForTimeout(1000);
+        const stay = await alicePos(); assert(Math.abs(stay[0] - at[0]) < 0.5 && Math.abs(stay[1] - at[1]) < 0.5, '지도로 돌아와도 앨리스는 조형실 문 앞: ' + stay);
+        assert.equal(await p.evaluate(() => localStorage.getItem('atelier_hub_last_v1')), 'blender', '최근 공방을 남긴다');
+        await p.goto(BASE + '/?map=cave'); await p.waitForFunction(() => !document.querySelector('#alice').hidden); await p.waitForTimeout(600);
+        const back = await alicePos(); assert(Math.abs(back[0] - at[0]) < 0.5 && Math.abs(back[1] - at[1]) < 0.5, '다시 열면 앨리스는 최근 공방 문 앞: ' + back);
+        assert((await p.locator('.room.near').evaluateAll(es => es.map(e => e.dataset.key))).includes('blender'), '다시 열면 최근 공방 높이');
+        await p.evaluate(() => localStorage.removeItem('atelier_hub_last_v1'));
+        await press('#mapsel button[data-map="kingdom"]');
         assert.equal(await p.locator('#alice').isHidden(), true, '왕국에선 앨리스 없음');
         await p.evaluate(() => localStorage.setItem('atelier_hub_map_v1', 'cave'));
       }
