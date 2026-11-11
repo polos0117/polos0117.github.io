@@ -1,4 +1,4 @@
-/* 공방 지도(대미궁, 방 열하나 — 2026-10-30 도트 공방·이미지 공방·원소의 섬 · 2026-11-10 화풍공방 · 도시공방(준비 중)) — 방 아홉이 서고, 올리면 빛나고 이름·미리보기가 뜨고, 누르면 다가가며 문들이 보이고, Esc·뒤로 가기로 돌아온다.
+/* 공방 지도(대미궁, 방 열여섯 — 2026-11-11 도구 다섯 · 두 층 1:3 · 2026-10-30 도트 공방·이미지 공방·원소의 섬 · 2026-11-10 화풍공방 · 도시공방(준비 중)) — 방 아홉이 서고, 올리면 빛나고 이름·미리보기가 뜨고, 누르면 다가가며 문들이 보이고, Esc·뒤로 가기로 돌아온다.
    오늘 기록(atelier_today_v1:<방> — 각 공방이 적는다)을 읽어 오늘 판을 둔 방에 불(빛·이름표 아래 줄)을 켜고, 문 패널·목록에 「오늘의 판」을 두고,
    공방 첫 화면의 Last-Modified 가 마지막으로 다녀간 뒤면 이름표에 새 소식 점을 찍는다. 문을 누르면 다녀간 자국(seen)이 남는다.
    휴대폰 세로(390×844)·가로(844×390)·PC(1280×900)에서 가로로 넘치지 않는다. 지도가 세로로 길어(1:2) 가로 화면에선 너비를 정해 두고 굴려 본다.
@@ -17,8 +17,9 @@ const server = http.createServer((q, s) => {
   const f = path.join(ROOT, decodeURIComponent(url.pathname.replace(/\/$/, '/index.html')));
   fs.readFile(f, (e, d) => { if (e) { s.writeHead(404); return s.end(); } s.setHeader('Content-Type', MIME[path.extname(f)] || 'application/octet-stream'); s.setHeader('Last-Modified', LM.toUTCString()); s.end(d); });
 }).listen(PORT);
-const ROOMS = ['gundam', 'book', 'samguk', 'pokemon', 'myth', 'game', 'dot', 'image', 'element', 'style', 'city'];
-const CARDS = ROOMS.filter(k => k !== 'city');   /* 도시공방은 아직 없다 — 지도에만(문 없이 「준비 중」), 목록엔 없다 */
+const ROOMS = ['gundam', 'book', 'samguk', 'pokemon', 'myth', 'game', 'dot', 'image', 'element', 'style', 'city', 'fav', 'status', 'sweep', 'review', 'blender'];
+const CARDS = ROOMS.filter(k => k !== 'city');   /* 도시공방은 아직 없다 — 지도에만(문 없이 「준비 중」), 맨 아래 칩엔 없다 */
+const TOOLS = { fav: 'favorites.html', status: 'status.html', sweep: 'sweep.html', review: 'review.html', blender: '/blender-cloud/' };   /* 2026-11-11 하단 버튼 줄 → 대미궁 아래층 · 왕국 남쪽 바다의 방 */
 /* 오늘 기록 — 서재는 오늘 2판 1승에 오늘의 판을 끝냈고 방금(앞으로 한 시간 뒤까지) 다녀갔다, 대장간은 1판, 격납고는 판은 없고 하루 전에 다녀갔다(그 뒤 배포 → 새 소식) */
 const NOW = Date.now(), SEED = {
   'atelier_today_v1:book': { d: T.today(), n: 2, w: 1, daily: true, at: NOW, seen: NOW + 3600e3 },
@@ -38,12 +39,11 @@ const NOW = Date.now(), SEED = {
       const press = sel => mobile ? p.locator(sel).first().tap() : p.locator(sel).first().click();
       const noOverflow = async () => assert(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), name + ' 가로 넘침');
       await p.goto(BASE + '/'); await p.waitForSelector('.room'); await p.waitForFunction(() => document.querySelector('#stage img').complete);
-      /* 방 여섯 — 다각형·이름표·카드 */
-      assert.deepEqual(await p.locator('.room').evaluateAll(es => es.map(e => e.dataset.key)), ROOMS, name + ' 방 열하나');
-      assert.equal(await p.locator('.pin').count(), 11, '이름표 열하나'); assert.deepEqual(await p.locator('.card').evaluateAll(es => es.map(e => e.dataset.key)), CARDS, '카드 열(도시공방 빼고)');
-      /* 오락실(게임의 공방)은 오늘의 판이 아직 없다 — 그 문을 두지 않는다 */
-      assert.equal(await p.locator('.card[data-key="game"] a.daily').count(), 0, name + ' 오락실에 오늘의 판 문이 없다');
-      assert.equal(await p.locator('.card[data-key="book"] a.daily').count(), 1, name + ' 서재에는 오늘의 판 문');
+      /* 방 열여섯 — 다각형·이름표, 맨 아래 칩(공방마다 메인 화면 하나) */
+      assert.deepEqual(await p.locator('.room').evaluateAll(es => es.map(e => e.dataset.key)), ROOMS, name + ' 방 열여섯');
+      assert.equal(await p.locator('.pin').count(), 16, '이름표 열여섯'); assert.deepEqual(await p.locator('.chip').evaluateAll(es => es.map(e => e.dataset.key)), CARDS, '칩 열다섯(도시공방 빼고)');
+      assert.equal(await p.locator('.all-fav, .card').count(), 0, name + ' 하단 버튼 줄 · 카드 줄 없음');
+      assert.equal(await p.locator('#lamps circle').count(), 5, name + ' 대미궁 등불 길 다섯');
       for (const k of ROOMS) assert((await p.locator(`.pin[data-key="${k}"] b`).textContent()).length > 2, k + ' 이름');
       await noOverflow();
       /* 제목 「공방 모음」 은 한 줄 — 좁은 폰에서 안내 글에 밀려 글자가 밑줄로 떨어지지 않는다(344 폭도) */
@@ -62,7 +62,7 @@ const NOW = Date.now(), SEED = {
       await p.waitForSelector('.pin[data-key="gundam"].news');
       assert.deepEqual(await p.locator('.pin.news').evaluateAll(es => es.map(e => e.dataset.key)), ['gundam'], name + ' 새 소식은 다녀간 뒤 배포된 방에만');
       const stage = await p.locator('#stage').boundingBox();
-      assert(Math.abs(stage.width / stage.height - 1024 / 2048) < .02, name + ' 무대는 그림 비율(1:2)');
+      assert(Math.abs(stage.width / stage.height - 1024 / 3072) < .02, name + ' 무대는 그림 비율(1:3)');
       if (vp.width > vp.height) assert(stage.width <= (vp.height <= 500 ? 521 : 721), name + ' 가로 — 지도 폭을 정해 둔다(세로로 긴 그림): ' + JSON.stringify(stage));
       /* 이름표가 제 방 안에 있다 — 다각형의 중심과 가깝다 */
       for (const k of ROOMS) {
@@ -100,19 +100,21 @@ const NOW = Date.now(), SEED = {
       await p.goto(BASE + '/#city'); await p.waitForSelector('#map.zoomed');
       assert.equal(await p.locator('#doors h2').textContent(), '도시공방', name + ' 도시공방'); assert.equal(await p.locator('#doorlinks a').count(), 0, name + ' 도시공방은 문이 없다');
       assert.match(await p.locator('#doorlinks .soon').textContent(), /준비 중/, name + ' 도시공방 준비 중');
-      /* 아래 목록 = 지도의 문들 */
-      const cardLinks = await p.locator('.card .links a:not(.daily)').evaluateAll(es => es.map(e => e.getAttribute('href')));
-      const doorLinks = await p.evaluate(() => ROOMS.flatMap(r => r.links.map(l => l[1])));
-      assert.deepEqual(cardLinks, doorLinks, '목록의 링크 = 방의 문들');
-      assert(cardLinks.every(h => /^\/([a-z-]+\/)?([a-z]+\.html)?$/.test(h)), '링크 꼴');
+      /* 맨 아래 칩 = 방마다 큰 문(메인 화면) 하나 */
+      const cardLinks = await p.locator('.chip').evaluateAll(es => es.map(e => e.getAttribute('href')));
+      const doorLinks = await p.evaluate(() => ROOMS.filter(r => !r.soon).map(r => r.links[0][1]));
+      assert.deepEqual(cardLinks, doorLinks, '칩의 링크 = 방마다 큰 문');
+      assert(cardLinks.every(h => /^\/?([a-z-]+\/)?([a-z]+\.html)?$/.test(h)), '링크 꼴');
+      /* 도구 다섯(2026-11-11) — 하단 버튼이던 것이 방이 됐다: 문 하나, 오늘의 판은 없다 */
+      assert.deepEqual(await p.evaluate(() => Object.fromEntries(ROOMS.filter(r => r.tool).map(r => [r.key, r.links.map(l => l[1])]))), Object.fromEntries(Object.entries(TOOLS).map(([k, v]) => [k, [v]])), name + ' 도구 다섯의 문');
+      await p.goto(BASE + '/#review'); await p.waitForSelector('#map.zoomed');
+      assert.equal(await p.locator('#doors h2').textContent(), '그림 검수판', name + ' 검수의 방'); assert.equal(await p.locator('#doors a.main').getAttribute('href'), 'review.html');
       /* 도트 공방·이미지 공방 — 허브 안의 쪽으로 가는 문 하나씩, 오늘의 판은 없다 */
       assert.deepEqual(await p.evaluate(() => ROOMS.filter(r => r.key === 'dot' || r.key === 'image').map(r => r.links.map(l => l[1]))), [['/dot.html'], ['/prompt.html']], name + ' 새 방 둘의 문');
       assert.deepEqual(await p.evaluate(() => ROOMS.find(r => r.key === 'style').links.map(l => l[1])), ['/style-atelier/'], name + ' 화풍공방은 제 방(2026-11-10)');
-      assert.equal(await p.locator('#style-all').getAttribute('href'), '/style-atelier/', name + ' 모든 공방 아래 화풍공방');
-      assert.equal(await p.locator('#blender-all').getAttribute('href'), '/blender-cloud/', name + ' 모든 공방 아래 3D 공방(2026-11-11)');
-      assert.equal(await p.locator('.card[data-key="dot"] a.daily, .card[data-key="image"] a.daily').count(), 0, name + ' 새 방 둘엔 오늘의 판이 없다');
-      assert.deepEqual(await p.locator('.card a.daily').evaluateAll(es => es.map(e => e.getAttribute('href'))), await p.evaluate(() => ROOMS.filter(r => r.daily).map(r => r.daily)), '목록에도 오늘의 판(있는 방만)');
-      assert.doesNotMatch(await p.locator('.card[data-key="myth"] a.daily').textContent(), /끝냈다/, '끝내지 않은 방은 표 없음');
+      assert.equal(await p.evaluate(() => ROOMS.filter(r => r.tool || r.key === 'dot' || r.key === 'image').some(r => r.daily)), false, name + ' 허브 안의 방엔 오늘의 판이 없다');
+      await p.goto(BASE + '/#myth'); await p.waitForSelector('#map.zoomed');
+      assert.doesNotMatch(await p.locator('#doors a.daily').textContent(), /끝냈다/, '끝내지 않은 방은 표 없음');
       /* 새 소식 방에 다가가면 문 패널에 말이, 문을 누르면 다녀간 자국이 남아 다음엔 새 소식이 아니다 */
       await p.goto(BASE + '/#gundam'); await p.waitForSelector('#map.zoomed'); await p.waitForSelector('.pin[data-key="gundam"].news');
       assert.match(await p.locator('#status').textContent(), /새 소식/, name + ' 새 소식 말');
@@ -121,22 +123,21 @@ const NOW = Date.now(), SEED = {
       assert(seen >= NOW - 1000, name + ' 문을 누르면 다녀간 자국: ' + seen);
       await p.goto(BASE + '/'); await p.waitForSelector('.room'); await p.waitForTimeout(600);
       assert.equal(await p.locator('.pin.news').count(), 0, name + ' 다녀간 뒤엔 새 소식이 아니다');
-      assert(await p.locator('.card img').nth(1).getAttribute('src').then(s => /book-atelier-img/.test(s)), '책의 공방 카드는 실제 그림');
       /* 지도 고르기(2026-11-08) — 대미궁이 처음, 왕국을 고르면 그림 · 지명 · 다각형이 바뀌고 이 기기에 남는다. 주소 ?map= 이 이긴다 */
       assert.equal(await p.locator('#mapsel button[aria-pressed="true"]').getAttribute('data-map'), 'cave', name + ' 처음은 대미궁');
       assert.equal(await p.locator('.pin[data-key="gundam"] b').textContent(), '건담 격납고', name + ' 대미궁 이름표');
       assert.equal(await p.locator('.pin[data-key="gundam"] .peek img').getAttribute('src'), '/atelier/img/thumb/RX-78-2_건담_f.webp', name + ' 대미궁 미리보기는 공방 그림');
       await press('#mapsel button[data-map="kingdom"]');
-      await p.waitForFunction(() => /kingdom2\.webp/.test(document.querySelector('#mapimg').src) && document.querySelector('#mapimg').complete);
-      const KNAMES = { gundam: '강철 군항', book: '만권 서고성', samguk: '적벽 관문', pokemon: '풀숲 연구촌', myth: '용광 협곡', game: '꿈빛 유원지', dot: '모자이크 들녘', image: '채색 언덕', element: '원소 군도', style: '프리즘 호반', city: '시계탑 왕도' };
+      await p.waitForFunction(() => /kingdom3\.webp/.test(document.querySelector('#mapimg').src) && document.querySelector('#mapimg').complete);
+      const KNAMES = { gundam: '강철 군항', book: '만권 서고성', samguk: '적벽 관문', pokemon: '풀숲 연구촌', myth: '용광 협곡', game: '꿈빛 유원지', dot: '모자이크 들녘', image: '채색 언덕', element: '원소 군도', style: '프리즘 호반', city: '시계탑 왕도', fav: '보석 정원', status: '기록의 등대', sweep: '저울 시험장', review: '검수 관문', blender: '조각가 마을' };
       assert.deepEqual(Object.fromEntries(await p.locator('.pin').evaluateAll(es => es.map(e => [e.dataset.key, e.querySelector('b').textContent]))), KNAMES, name + ' 왕국 지명');
       assert(Object.values(KNAMES).every(n => !/공방/.test(n)), '지명에 「공방」 없음');
       /* 미리보기 — 왕국에선 그 구역을 잘라 낸 그림, 대미궁에선 공방 그림 */
       const kpeeks = await p.locator('.pin').evaluateAll(es => es.map(e => [e.dataset.key, e.querySelector('.peek img').getAttribute('src')]));
-      assert(kpeeks.every(([k, src]) => src === 'img/kingdom2-' + k + '.webp'), name + ' 왕국 미리보기: ' + JSON.stringify(kpeeks));
-      for (const [k] of kpeeks) assert(fs.existsSync(path.join(ROOT, 'img/kingdom2-' + k + '.webp')), k + ' 미리보기 파일');
+      assert(kpeeks.every(([k, src]) => src === 'img/kingdom3-' + k + '.webp'), name + ' 왕국 미리보기: ' + JSON.stringify(kpeeks));
+      for (const [k] of kpeeks) assert(fs.existsSync(path.join(ROOT, 'img/kingdom3-' + k + '.webp')), k + ' 미리보기 파일');
       if (!mobile) { await p.hover('.room[data-key="samguk"]'); assert(await p.locator('.pin[data-key="samguk"].hot .peek').isVisible(), '왕국에서 올리면 미리보기'); }
-      assert.equal(await p.locator('.room').count(), 11, name + ' 왕국 구역 열하나');
+      assert.equal(await p.locator('.room').count(), 16, name + ' 왕국 구역 열여섯');
       assert.deepEqual(await p.locator('.room.lit').evaluateAll(es => es.map(e => e.dataset.key)), ['book', 'myth'], name + ' 왕국에서도 오늘 불');
       for (const k of ROOMS) {
         const inside = await p.evaluate(k => { const poly = document.querySelector(`.room[data-key="${k}"] polygon`), pin = document.querySelector(`.pin[data-key="${k}"]`);
@@ -168,9 +169,31 @@ const NOW = Date.now(), SEED = {
       await p.goto(BASE + '/?map=kingdom#samguk'); await p.waitForSelector('#map.zoomed');
       assert.equal(await p.locator('#doors h2').textContent(), '삼국지 쟁탈전', name + ' 왕국 주소로 바로 그 구역');
       await p.evaluate(() => localStorage.setItem('atelier_hub_map_v1', 'cave'));
+      /* 굴리며 보기 · 앨리스(2026-11-11) — 옆 위치 줄은 방마다 하나, 누르면 그 높이로. 앨리스 그림(책 공방 그림 저장소)은 이 시험에서 허브의 아무 그림으로 대신한다 */
+      if (name === 'phone-port') {
+        await p.goto(BASE + '/?map=cave'); await p.waitForSelector('.room');
+        assert.equal(await p.locator('#alice').isHidden(), true, '앨리스 그림을 못 받으면 앨리스 없이(방은 바로 열린다)');
+        await ctx.route('**/book-atelier-img/sprites/alice/*', r => r.fulfill({ status: 200, contentType: 'image/png', body: fs.readFileSync(path.join(ROOT, 'icon-192.png')) }));
+        await p.goto(BASE + '/?map=cave'); await p.waitForFunction(() => !document.querySelector('#alice').hidden);
+        assert.equal(await p.locator('#rail button').count(), 16, '옆 위치 줄 — 방마다 하나');
+        const top0 = await p.evaluate(() => parseFloat(document.querySelector('#alice').style.top));
+        await p.evaluate(() => { const r = ROOMS.find(q => q.key === 'review'), { span } = scrollSpan(); scrollTo(0, r.at[1] / IH * span); });   /* 굴리는 동안 짚는 높이가 0 → IH(scrollSpan) */
+        await p.waitForFunction(t => parseFloat(document.querySelector('#alice').style.top) > t + 30, top0, { timeout: 6000 });
+        assert((await p.locator('.room.near').evaluateAll(es => es.map(e => e.dataset.key))).includes('review'), '짚는 높이의 방이 빛난다');
+        await p.locator('#rail button[data-key="gundam"]').click(); await p.waitForTimeout(1500);
+        assert((await p.locator('.room.near').evaluateAll(es => es.map(e => e.dataset.key))).includes('gundam'), '위치 줄을 누르면 그 방 높이로');
+        await press('.room[data-key="blender"]'); await p.waitForSelector('#map.zoomed', { timeout: 6000 });
+        assert.equal(await p.evaluate(() => location.hash), '#blender', '앨리스가 문까지 걸어간 뒤 열린다');
+        const at = await p.evaluate(() => { const a = document.querySelector('#alice'); return [parseFloat(a.style.left), parseFloat(a.style.top)]; });
+        const door = await p.evaluate(() => fetch('img/cave4-nav.json').then(r => r.json()).then(j => j.n[j.doors.blender]));
+        assert(Math.abs(at[0] - door[0] / 1024 * 100) < 0.5 && Math.abs(at[1] - door[1] / 3072 * 100) < 0.5, '앨리스는 조형실 문 앞: ' + at + ' / ' + door);
+        await p.keyboard.press('Escape'); await press('#mapsel button[data-map="kingdom"]');
+        assert.equal(await p.locator('#alice').isHidden(), true, '왕국에선 앨리스 없음');
+        await p.evaluate(() => localStorage.setItem('atelier_hub_map_v1', 'cave'));
+      }
       assert.deepEqual(errors, [], name + ' 오류 없음');
       await ctx.close();
     }
-    console.log('PASS 공방 지도: 방 열하나(도트·이미지 공방·원소의 섬 · 화풍공방 · 도시공방 준비 중, 1:2)·이름표·카드 · 지도 고르기(대미궁 · 왕국 — 지명 · 구역 · 기억 · ?map=) · 빛나기·미리보기 · 다가가기·문·주소·Esc·뒤로 가기 · 오늘 불·오늘 줄·오늘의 판·새 소식·다녀간 자국 · 세로/가로/PC 넘침 없음, 가로는 폭을 정해 굴린다');
+    console.log('PASS 공방 지도: 방 열여섯(공방 열 · 도구 다섯 · 도시공방 준비 중, 두 층 1:3)·칩·이름표·카드 · 지도 고르기(대미궁 · 왕국 — 지명 · 구역 · 기억 · ?map=) · 빛나기·미리보기 · 다가가기·문·주소·Esc·뒤로 가기 · 오늘 불·오늘 줄·오늘의 판·새 소식·다녀간 자국 · 세로/가로/PC 넘침 없음, 가로는 폭을 정해 굴린다');
   } finally { await br.close(); server.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

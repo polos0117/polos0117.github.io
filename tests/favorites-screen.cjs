@@ -218,17 +218,19 @@ const SIZES = [['344', { width: 344, height: 882 }, true], ['390', { width: 390,
       await noOverflow(b.p, name + ' 저장 막힘'); assert.deepEqual(b.errors, [], name + ' 저장이 막혀도 오류 없음');
       await b.ctx.close();
     }
-    /* 공방 지도 — 머리의 「즐겨찾기 n」 · 목록 아래 줄. 목록의 공방 줄(.card)은 그대로 여덟(2026-10-30 도트·이미지 공방) */
+    /* 공방 지도 — 머리의 「즐겨찾기 n」 · 대미궁 아래층 보물고 방(2026-11-11 — 하단 버튼 줄이 지도의 방이 됐다) · 맨 아래 칩 */
     for (const [name, vp, mobile] of [SIZES[1], SIZES[2], SIZES[4]]) {
       const { ctx, p, errors } = await page(vp, mobile, { seed: SEED });
       await p.goto(BASE + '/'); await p.waitForSelector('.room');
       assert.equal(await p.locator('#fav-link').textContent(), '즐겨찾기 8', name + ' 머리의 즐겨찾기 수');
       assert.equal(await p.locator('#fav-link').getAttribute('href'), 'favorites.html');
-      assert.equal(await p.locator('#fav-all').getAttribute('href'), 'favorites.html'); assert.match(await p.locator('#fav-all').textContent(), /내 즐겨찾기.*8장/, name + ' 목록 아래 줄');
-      assert.equal(await p.locator('.card').count(), 10, name + ' 공방 줄은 열 그대로(2026-10-30 원소의 섬 · 2026-11-10 화풍공방 — 도시공방은 준비 중이라 없다)');
+      assert.equal(await p.locator('.chip[data-key="fav"]').getAttribute('href'), 'favorites.html', name + ' 맨 아래 칩');
+      assert.equal(await p.locator('.chip').count(), 15, name + ' 칩 열다섯(공방 열 · 도구 다섯 — 도시공방은 준비 중이라 없다)');
       const r = await p.locator('#fav-link').boundingBox(); assert(r.height >= 44, name + ' 머리 링크 누르는 자리');
       await noOverflow(p, name + ' 지도');
-      await p.locator('#fav-all').click(); await p.waitForURL(/favorites\.html/); await p.waitForSelector('.tile');
+      await p.goto(BASE + '/#fav'); await p.waitForSelector('#map.zoomed');
+      assert.match(await p.locator('#doors .sub').textContent(), /담은 그림 8장/, name + ' 보물고 방의 부제에 담은 수');
+      await p.locator('#doors a.main').click(); await p.waitForURL(/favorites\.html/); await p.waitForSelector('.tile');
       assert.deepEqual(errors, [], name + ' 오류 없음');
       await ctx.close();
     }
