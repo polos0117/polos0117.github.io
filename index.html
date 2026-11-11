@@ -591,6 +591,8 @@ function aliceHold() { if (aliceOn()) A.goal = guideAt(mapYAtCenter()); }
 /* 최근 공방(2026-11-11 — 사용자 「공방 안들어가고 지도로 했을때 위치를 최근 그 공방 앞에 있게」) — 문 패널을 연 방을 이 기기에 남기고(atelier_hub_last_v1),
    다시 열면(주소에 #방 이 없을 때) 그 방 높이로 굴리고 앨리스는 그 문 앞에 */
 const LAST_KEY = 'atelier_hub_last_v1';
+/* 뒤로 가기 — 브라우저가 방을 누르기 전 굴림 자리로 되돌리면 앨리스가 그쪽으로 떠났다(2026-11-11 사용자 「뒤로가기때도 해줘」). 굴림 자리는 지도가 정한다 */
+try { if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; } catch (e) {}
 function lastSet(k) { try { localStorage.setItem(LAST_KEY, k); } catch (e) {} }
 function lastGet() { try { const k = localStorage.getItem(LAST_KEY); return ROOMS.some(r => r.key === k) ? k : null; } catch (e) { return null; } }
 function lastRestore() {
