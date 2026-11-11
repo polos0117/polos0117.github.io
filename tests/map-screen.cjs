@@ -199,6 +199,9 @@ const NOW = Date.now(), SEED = {
         const alicePos = () => p.evaluate(() => { const a = document.querySelector('#alice'); return [parseFloat(a.style.left), parseFloat(a.style.top)]; });
         await press('#back'); await p.waitForFunction(() => !document.querySelector('#map.zoomed')); await p.waitForTimeout(1000);
         const stay = await alicePos(); assert(Math.abs(stay[0] - at[0]) < 0.5 && Math.abs(stay[1] - at[1]) < 0.5, '지도로 돌아와도 앨리스는 조형실 문 앞: ' + stay);
+        const inView = k => p.evaluate(k => { const r = document.querySelector(`.room[data-key="${k}"] polygon`).getBoundingClientRect(), y = r.top + r.height / 2; return y > 0 && y < innerHeight; }, k);
+        assert(await inView('blender'), '지도로 돌아오면 그 방(아래층)이 화면 안');
+        assert(await p.evaluate(() => { const r = document.querySelector('#alice').getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; }), '앨리스도 화면 안');
         assert.equal(await p.evaluate(() => localStorage.getItem('atelier_hub_last_v1')), 'blender', '최근 공방을 남긴다');
         await p.goto(BASE + '/?map=cave'); await p.waitForFunction(() => !document.querySelector('#alice').hidden); await p.waitForTimeout(600);
         const back = await alicePos(); assert(Math.abs(back[0] - at[0]) < 0.5 && Math.abs(back[1] - at[1]) < 0.5, '다시 열면 앨리스는 최근 공방 문 앞: ' + back);
@@ -210,6 +213,12 @@ const NOW = Date.now(), SEED = {
         const sam = await alicePos();
         await p.goBack(); await p.waitForFunction(() => !document.querySelector('#map.zoomed')); await p.waitForTimeout(1500);
         const sam2 = await alicePos(); assert(Math.abs(sam2[0] - sam[0]) < 0.5 && Math.abs(sam2[1] - sam[1]) < 0.5, '뒤로 가기로 지도에 와도 앨리스는 군막 문 앞: ' + sam + ' → ' + sam2);
+        /* 아래층도 — 뒤로 가기로 와도 그 방이 화면 안, 앨리스는 그 문 앞(2026-11-11 「1층에서만 돼」) */
+        await press('.room[data-key="review"]'); await p.waitForSelector('#map.zoomed', { timeout: 3000 }); await p.waitForTimeout(900);
+        const rv = await alicePos();
+        await p.goBack(); await p.waitForFunction(() => !document.querySelector('#map.zoomed')); await p.waitForTimeout(1500);
+        const rv2 = await alicePos(); assert(Math.abs(rv2[0] - rv[0]) < 0.5 && Math.abs(rv2[1] - rv[1]) < 0.5, '아래층 뒤로 가기 — 앨리스는 검수의 방 문 앞: ' + rv + ' → ' + rv2);
+        assert(await inView('review'), '아래층 뒤로 가기 — 그 방이 화면 안');
         await p.evaluate(() => localStorage.removeItem('atelier_hub_last_v1'));
         await press('#mapsel button[data-map="kingdom"]');
         assert.equal(await p.locator('#alice').isHidden(), true, '왕국에선 앨리스 없음');

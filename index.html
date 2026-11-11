@@ -503,13 +503,16 @@ function enter(k, push) {
   else if (innerWidth < 900) stage.scrollIntoView({ block: stage.offsetHeight > innerHeight ? 'center' : 'start', behavior: 'smooth' });
 }
 function leave(push) {
+  const was = on;
   on = null; setHot(null);
   map.classList.remove('zoomed'); document.body.classList.remove('zoomed'); map.style.removeProperty('--c');
   for (const el of rooms.querySelectorAll('.room')) el.classList.remove('on');
   doors.innerHTML = '';
   inner.style.transform = '';
   if (push && location.hash && location.hash !== '#all') history.pushState({}, '', location.pathname + location.search);
-  aliceHold();   /* 「← 지도로」 — 앨리스는 그 방 문 앞에 남는다(굴려야 다시 걷는다) */
+  /* 지도로 돌아오면 — 그 방 높이로 굴리고(다가간 동안엔 무대 가운데에 있었다 — 아래층 방이면 화면 밖이었다), 앨리스는 그 문 앞에 남는다(굴려야 다시 걷는다) */
+  if (was) scrollToRoom(was);
+  aliceHold();
   requestAnimationFrame(onScroll);
 }
 rooms.addEventListener('click', e => { const a = e.target.closest('.room'); if (!a) return; e.preventDefault(); if (on === a.dataset.key) leave(true); else go(a.dataset.key); });
@@ -595,11 +598,12 @@ const LAST_KEY = 'atelier_hub_last_v1';
 try { if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; } catch (e) {}
 function lastSet(k) { try { localStorage.setItem(LAST_KEY, k); } catch (e) {} }
 function lastGet() { try { const k = localStorage.getItem(LAST_KEY); return ROOMS.some(r => r.key === k) ? k : null; } catch (e) { return null; } }
-function lastRestore() {
-  const k = !location.hash && lastGet(); if (!k) return;
-  const r = ROOMS.find(q => q.key === k), { span } = scrollSpan();
-  if (span > 0) scrollTo({ top: geo(r).at[1] / IH * span, behavior: 'instant' });   /* html 의 smooth 를 넘는다 — 열자마자 그 자리 */
+function scrollToRoom(k) {   /* 그 방이 짚히는 굴림 자리로 곧장 — html 의 smooth 를 잠깐 끈다(behavior 'instant' 는 옛 사파리가 오류로 받는다) */
+  const r = ROOMS.find(q => q.key === k), { span } = scrollSpan(); if (!r || span <= 0) return;
+  const h = document.documentElement, was = h.style.scrollBehavior; h.style.scrollBehavior = 'auto';
+  scrollTo(0, geo(r).at[1] / IH * span); h.style.scrollBehavior = was;
 }
+function lastRestore() { const k = !location.hash && lastGet(); if (k) scrollToRoom(k); }
 /* 방을 누르면 — 대미궁에선 문 앞까지 걸어간 뒤 연다(멀어도 0.9초 안), 아니면 바로 */
 function go(k) {
   if (!aliceOn() || A.nav.doors[k] === undefined) return enter(k, true);
