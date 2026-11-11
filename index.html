@@ -553,7 +553,7 @@ addEventListener('resize', () => requestAnimationFrame(onScroll));
 /* ── 앨리스 — 책 공방 도트(book-atelier-img sprites/alice, 4K 칸 192×256 · 오른쪽을 본다)가 대미궁 길 지도(img/cave4-nav.json — blender-cloud 의 보행 그래프)를 걷는다.
    굴리면 「맨 위 → 입구」 안내 길에서 화면 가운데 높이의 점으로, 방을 누르면 그 문 앞 점까지 걸어간 뒤 문이 열린다. 그림 · 길을 못 받으면 앨리스 없이 바로 열린다 */
 const ALICE = { base: '/book-atelier-img/sprites/alice/', walk: { file: 'alice_begin_walk_4k.png', frames: 6, ms: [200, 200, 200, 200, 200, 200] }, idle: { file: 'alice_begin_idle_4k.png', frames: 4, ms: [700, 220, 140, 220] } };
-const A = { el: $('#alice'), i: $('#alice i'), nav: null, ok: false, img: 0, node: -1, x: 0, y: 0, path: [], speed: 260, done: null, sheet: '', frame: 0, ft: 0, last: 0, goal: -1 };
+const A = { el: $('#alice'), i: $('#alice i'), nav: null, ok: false, img: 0, door: 0, node: -1, x: 0, y: 0, path: [], speed: 260, done: null, sheet: '', frame: 0, ft: 0, last: 0, goal: -1 };
 function bfs(s, t) {
   const adj = A.nav.adj, prev = new Int32Array(adj.length).fill(-1); prev[s] = s; const q = [s];
   for (let i = 0; i < q.length && prev[t] < 0; i++) for (const y of adj[q[i]]) if (prev[y] < 0) { prev[y] = q[i]; q.push(y); }
@@ -570,7 +570,7 @@ function aliceWalk(p, maxS, done) {
 }
 /* 굴릴 때 — 안내 길(맨 위 → 입구)에서 그 높이에 가장 가까운 점으로 */
 function aliceFollow(y) {
-  if (!aliceOn() || on) return;
+  if (!aliceOn() || on || A.door) return;   /* 문으로 가는 중엔 굴림이 길을 바꾸지 않는다(2026-11-11 — 폰에서 누른 뒤 굴림 · 주소창 크기 바뀜이 길을 덮어 문이 안 열렸다) */
   const g = A.nav.guide; let bi = 0, bd = Infinity;
   for (let i = 0; i < g.length; i++) { const d = Math.abs(A.nav.n[g[i]][1] - y); if (d < bd) { bd = d; bi = i; } }
   const t = g[bi]; if (t === A.goal) return; A.goal = t;
@@ -580,7 +580,10 @@ function aliceFollow(y) {
 function go(k) {
   if (!aliceOn() || A.nav.doors[k] === undefined) return enter(k, true);
   setHot(k); A.goal = -1;
-  aliceWalk(bfs(A.node, A.nav.doors[k]), 0.9, () => enter(k, true));
+  /* 문은 꼭 열린다 — 걸어서 닿거나, 무슨 일로 못 닿아도 1.2초 뒤엔 */
+  let opened = false; const open = () => { if (opened) return; opened = true; clearTimeout(A.door); A.door = 0; if (A.node !== A.nav.doors[k]) aliceJump(A.nav.doors[k]); enter(k, true); };
+  clearTimeout(A.door); A.door = setTimeout(open, 1200);
+  aliceWalk(bfs(A.node, A.nav.doors[k]), 0.9, open);
 }
 function aliceTo(k) { if (aliceOn() && A.nav.doors[k] !== undefined) { A.goal = -1; aliceJump(A.nav.doors[k]); } }
 function aliceDraw() {

@@ -182,7 +182,9 @@ const NOW = Date.now(), SEED = {
         assert((await p.locator('.room.near').evaluateAll(es => es.map(e => e.dataset.key))).includes('review'), '짚는 높이의 방이 빛난다');
         await p.locator('#rail button[data-key="gundam"]').click(); await p.waitForTimeout(1500);
         assert((await p.locator('.room.near').evaluateAll(es => es.map(e => e.dataset.key))).includes('gundam'), '위치 줄을 누르면 그 방 높이로');
-        await press('.room[data-key="blender"]'); await p.waitForSelector('#map.zoomed', { timeout: 6000 });
+        /* 누른 뒤 굴림 · 크기 바뀜이 와도 문은 열린다(폰에서 문이 안 열리던 것 — 2026-11-11) */
+        await press('.room[data-key="blender"]'); await p.evaluate(() => { scrollBy(0, 40); dispatchEvent(new Event('resize')); });
+        await p.waitForSelector('#map.zoomed', { timeout: 3000 });
         assert.equal(await p.evaluate(() => location.hash), '#blender', '앨리스가 문까지 걸어간 뒤 열린다');
         const at = await p.evaluate(() => { const a = document.querySelector('#alice'); return [parseFloat(a.style.left), parseFloat(a.style.top)]; });
         const door = await p.evaluate(() => fetch('img/cave4-nav.json').then(r => r.json()).then(j => j.n[j.doors.blender]));
