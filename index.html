@@ -33,6 +33,13 @@
   기울임 = 굴림(굴리며 보기의 짚는 높이 기준 — 344×882 처럼 지도가 화면보다 조금만 긴 폰도 다 쓴다) + PC 마우스 · 안드로이드 기기 기울기(iOS 는 권한 창이 떠서 굴림만).
   방 다각형 · 이름표 · 누르는 자리(SVG)는 캔버스 위라 그대로, 앨리스는 서 있는 자리의 깊이만큼 같이 밀린다. 다가간 동안 · 움직임 끔(AtelierMotion, 없으면 동작 줄이기) ·
   WebGL 없음 · 깊이 그림 못 받음 · 왕국 → 지금처럼 정지 그림. 숨은 탭 · 화면 밖이면 그리지 않는다. 왜: 칠한 그림이 평평해 두 층 · 호수 · 계단의 높낮이가 잘 안 읽혔다.
+  시간대 조명(2026-11-12, 대미궁만) — 칠한 지도는 그대로 두고 Blender 에서 구운 빛 그림 두 장을 덮개로 얹어 시간대를 바꾼다. 기기 시각으로 페이지를 열 때 한 번 정한다:
+  새벽 4~6시(푸르스름 · 호수와 아래층에 낮은 안개) · 아침 6~9시(따뜻한 빛줄기) · 낮 9~18시(덮개 없음 = 지금 그림) · 밤 18~4시(남색 바탕 · 등불과 문 앞 불빛 · 폭포 달빛). 전환 애니메이션은 없다.
+  덮개 = img/cave4-light-<dawn|morning|night>-mul.webp(곱하기, mix-blend-mode: multiply — 흰색이면 그대로) + -glow.webp(더하기, screen — 검정이면 없음), 512×1536 을 지도 크기로 늘린다.
+  만든 곳은 blender-cloud scenes/cave_hub.py --light(blender-cloud-img 2026-11-12_cave2-light-* — cave4 와 같은 구조 · 같은 카메라, 지도와 10~25px 어긋나서 흐려 구웠다).
+  쌓는 차례: 그림 · 패럴랙스 캔버스 · 앨리스 < 덮개 둘 < 방 다각형 · 등불(SVG) < 이름표. 덮개는 누름을 받지 않아 누르는 자리는 그대로고, 이름표는 덮개 위라 밤에도 읽힌다.
+  주소 ?time=dawn|morning|day|night 가 기기 시각을 이긴다(?fx= 처럼 폰에서 바로 견줘 보려고). 덮개 그림을 하나라도 못 받으면 낮처럼 덮개 없이. 왕국은 이번 범위가 아니다(덮개 없음).
+  왜: 지도가 늘 같은 불빛이라 하루의 때가 느껴지지 않았다 — 다시 칠하지 않고 빛만 바꾼다.
 -->
 <style>
 :root {
@@ -170,6 +177,12 @@ body.zoomed .rail { opacity: 0; pointer-events: none; }
 .inner > canvas.fx { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; opacity: 0; transition: opacity .3s; }
 .inner > canvas.fx.ready { opacity: 1; }
 .map.zoomed .inner > canvas.fx { opacity: 0; }
+/* 시간대 조명(2026-11-12, 대미궁만) — 빛 그림 덮개 둘(곱하기 · 더하기). 그림 · 캔버스 · 앨리스(z 1) 위, 방 다각형 · 등불(SVG, z 3) 아래. 누름은 받지 않는다. 전환 애니메이션 없음 */
+.inner > svg { z-index: 3; }
+.inner > img.light { z-index: 2; pointer-events: none; }
+.inner > img.light.mul { mix-blend-mode: multiply; }
+.inner > img.light.add { mix-blend-mode: screen; }   /* 이름이 add 인 까닭: .glow 는 오늘 불(숨 쉬는 빛)의 규칙이라 겹치면 덮개가 같이 숨을 쉰다 */
+.inner > img.light[hidden] { display: none; }
 /* 머리의 「즐겨찾기 n」 — 글줄 높이는 그대로 두고 누르는 자리만 44px */
 .head p a#fav-link { display: inline-flex; align-items: center; min-height: 44px; margin: -12px -6px; padding: 0 6px; border-radius: 8px; }
 .head p a#fav-link:focus-visible { outline: 2px solid var(--gold); outline-offset: -4px; }
@@ -214,6 +227,8 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
         <g id="lamps"></g>
       </svg>
       <div class="alice" id="alice" hidden aria-hidden="true"><i></i></div>
+      <img class="light mul" id="light-mul" alt="" aria-hidden="true" decoding="async" hidden>
+      <img class="light add" id="light-glow" alt="" aria-hidden="true" decoding="async" hidden>
     </div>
     <div class="pins" id="pins" aria-hidden="true"></div>
   </div>
@@ -408,6 +423,7 @@ function build() {
   buildRail();
   if (typeof aliceMap === 'function') aliceMap();
   if (typeof fxMap === 'function') fxMap();
+  if (typeof lightMap === 'function') lightMap();
 }
 /* 길 · 등불 — 지도마다 ways(SVG path) 수만큼 등불이 오간다 */
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -822,6 +838,30 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) fxKi
 /* 움직임 설정이 바뀌면 — 끄면 캔버스를 걷고 정지 그림, 켜면 다시 */
 if (window.AtelierMotion && window.AtelierMotion.subscribe) window.AtelierMotion.subscribe(fxMap);
 try { const mq = matchMedia('(prefers-reduced-motion: reduce)'); mq.addEventListener ? mq.addEventListener('change', fxMap) : mq.addListener(fxMap); } catch (e) {}
+
+/* ── 시간대 조명(2026-11-12, 대미궁만) — 칠한 지도는 그대로, Blender 에서 구운 빛 그림 두 장(곱하기 mul · 더하기 glow, blender-cloud cave_hub.py --light)을 덮개로 얹는다.
+   기기 시각으로 페이지를 열 때 한 번 정한다: 새벽 4~6 · 아침 6~9 · 낮 9~18(덮개 없음) · 밤 18~4. 주소 ?time=dawn|morning|day|night 가 이긴다(폰에서 바로 견줘 보려고).
+   두 장을 다 받은 뒤에만 보인다 — 하나라도 못 받으면 낮처럼 덮개 없이. 왕국은 덮개 없음. 전환 애니메이션은 없다 */
+const LIGHT_TIMES = ['dawn', 'morning', 'night'];
+function pickTime() {
+  const q = new URLSearchParams(location.search).get('time'); if (q === 'day' || LIGHT_TIMES.includes(q)) return q;
+  const h = new Date().getHours();
+  return h >= 4 && h < 6 ? 'dawn' : h >= 6 && h < 9 ? 'morning' : h >= 9 && h < 18 ? 'day' : 'night';
+}
+const TIME = pickTime();
+const LIGHT = { els: [$('#light-mul'), $('#light-glow')], asked: false, got: 0, fail: false };
+function lightShow() { const on = MAP === 'cave' && TIME !== 'day' && !LIGHT.fail && LIGHT.got === 2; for (const el of LIGHT.els) el.hidden = !on; stage.dataset.time = on ? TIME : 'day'; }
+function lightMap() {
+  if (MAP === 'cave' && TIME !== 'day' && !LIGHT.asked) {
+    LIGHT.asked = true;
+    LIGHT.els.forEach((el, i) => {
+      el.addEventListener('load', () => { LIGHT.got++; lightShow(); });
+      el.addEventListener('error', () => { LIGHT.fail = true; lightShow(); });
+      el.src = 'img/cave4-light-' + TIME + '-' + (i ? 'glow' : 'mul') + '.webp?v=1';
+    });
+  }
+  lightShow();
+}
 
 /* 지도 고르기 — 다가가 있었으면 그 방 그대로 새 지도에서 다가간다 */
 function setMap(k) {
