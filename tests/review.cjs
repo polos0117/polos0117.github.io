@@ -38,9 +38,14 @@ assert.equal(R.parseFile(pk, '제크로무_unknown_style_f.webp'), null, '모르
   assert.equal(R.parseFile(q, '가디_light_mecha_cinematic_keyart_f.webp'), null, '표에 없는 열쇠');
 }
 
-/* 그림 주소 — 포켓몬은 where 로 저장소 */
+/* 그림 주소 — 포켓몬 · 삼국지는 where 로 저장소 */
 assert.equal(R.imageURL(pk, 'a_light_glossy_promo_f.webp', { where: { 'a_light_glossy_promo_f.webp': 3 } }), 'https://polos0117.github.io/pkm-atelier-img-4/img/a_light_glossy_promo_f.webp');
 assert.equal(R.imageURL(el, "o'x_fantasy_game_keyart_f.webp", {}, true), 'https://polos0117.github.io/element-atelier-img/img/thumb/o%27x_fantasy_game_keyart_f.webp');
+/* 삼국지도 둘(2026-11-12) — where 1 은 sam-atelier-img-2, 적히지 않은 것은 첫 저장소. 잠금 파일은 첫 저장소 */
+{ const sm = R.PROJECTS.find(p => p.key === 'sam'), a = '관우_samguk_api25_f.webp', b = '관우_samguk_api25_f_casual1.webp', doc = { where: { [b]: 1 } };
+  assert.equal(R.imageURL(sm, a, doc), 'https://polos0117.github.io/sam-atelier-img/img/' + encodeURIComponent(a));
+  assert.equal(R.imageURL(sm, b, doc, true), 'https://polos0117.github.io/sam-atelier-img-2/img/thumb/' + encodeURIComponent(b));
+  assert(sm.imgRepos[0] === 'sam-atelier-img' && sm.upload === 'sam-atelier-img-2', '삼국지 그림 저장소 차례 · 올리는 곳'); }
 
 /* 옆 공방 저장소의 등록부 — 모든 등록 파일을 읽고(화풍 열쇠는 공방마다 그 공방 표), 후보는 최근 날부터 */
 for (const p of R.PROJECTS) assert.equal(p.styleTable, 'data/style.json', p.key + ' 화풍 표');

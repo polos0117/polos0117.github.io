@@ -133,7 +133,8 @@
       gen: ['세로 2:3 · 1024×1536', 'WebP 품질 90', '잠금: tools/image-claim.cjs', '일상컷은 액션 그림 첨부(STYLE · FACE 줄)'],
       post: steps(['WebP(품질 90), 기록에 원본 sha256', '교체면 replacement.json', 'myth-atelier-img main 에 커밋 하나', 'image-claim done', '썸네일 · 등록부 갱신 확인']) },
     { key: 'sam', name: '삼국지 군막', c: '#c9a227', repo: 'sam-atelier', unit: '장수',
-      imgRepos: ['sam-atelier-img'], claims: true, styleTable: 'data/style.json', styles: ['kr_mmorpg', 'game_keyart', 'glossy_kr_game'],
+      /* 그림 저장소 둘(2026-11-12 — 첫 저장소가 약 1.0 GB 로 찼다): 0 번 sam-atelier-img 닫힘(교체만 · 잠금 파일은 그대로 여기), 1 번 sam-atelier-img-2 열림. 주소는 등록부 where 로 */
+      imgRepos: ['sam-atelier-img', 'sam-atelier-img-2'], upload: 'sam-atelier-img-2', claims: true, styleTable: 'data/style.json', styles: ['kr_mmorpg', 'game_keyart', 'glossy_kr_game'],
       slots: ['samguk', 'fantasy', 'mecha'], worldSlots: true, webp: { q: 90, m: 6 },
       ruleSets: BASE_SETS.concat(['text-sam', 'no-creature', 'casual-ref']),
       rules: [
@@ -142,8 +143,8 @@
         '말 · 짐승 · 두 번째 인물 없음. 글자는 깃발 · 인장 한 글자만.',
         '일상컷은 무기를 들지 않는다(본뜬 작은 장신구로).',
         '기본 화풍 kr_mmorpg. 체형은 볼륨 · 굴곡이 있게.'],
-      gen: ['세로 2:3 · 1024×1536', 'WebP 품질 90 · method 6', '일상컷: images/edits + ref_sha256', '교체: records/replacement.json + 옛 썸네일 지우기'],
-      post: steps(['WebP(품질 90 · method 6), 기록에 원본 sha256 · endpoint · ref_sha256', '교체면 records/replacement.json, 옛 썸네일 지움', 'sam-atelier-img main 에 커밋 하나', 'image-claim done', '썸네일 · 등록부 갱신 확인']) }
+      gen: ['세로 2:3 · 1024×1536', 'WebP 품질 90 · method 6', '그림 저장소: sam-atelier-img-2(새로 올리는 곳 — 교체는 그 파일이 있는 저장소)', '일상컷: images/edits + ref_sha256', '교체: records/replacement.json + 옛 썸네일 지우기'],
+      post: steps(['WebP(품질 90 · method 6), 기록에 원본 sha256 · endpoint · ref_sha256', '교체면 records/replacement.json, 옛 썸네일 지움', 'sam-atelier-img-2 main 에 커밋 하나(교체는 그 파일이 있는 저장소)', 'image-claim done', '썸네일 · 등록부 갱신 확인']) }
   ];
   function project(key) { for (var i = 0; i < PROJECTS.length; i++) if (PROJECTS[i].key === key) return PROJECTS[i]; return null; }
 
@@ -170,7 +171,7 @@
   }
   function slotKey(item) { return [item.project, item.card, item.place || item.slot || ''].join('|'); }
 
-  /* 그림 주소 — 포켓몬은 where(파일 → 저장소 번호) */
+  /* 그림 주소 — 포켓몬 · 삼국지는 where(파일 → 저장소 번호, imgRepos 차례) */
   function imageURL(p, file, doc, thumb) {
     var n = (doc && doc.where && doc.where[file]) || 0, repo = p.imgRepos[n] || p.imgRepos[0];
     return 'https://polos0117.github.io/' + repo + '/img/' + (thumb ? 'thumb/' : '') + encodeURIComponent(file).replace(/'/g, '%27');
