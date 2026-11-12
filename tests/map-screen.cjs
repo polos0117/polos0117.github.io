@@ -268,12 +268,12 @@ const NOW = Date.now(), SEED = {
       assert.deepEqual(await polys(B.p), poly0, '패럴랙스가 있어도 다각형은 정지 그림 때와 같은 자리');
       assert.deepEqual(await hits(B.p), hit0, '패럴랙스가 있어도 누르는 자리는 정지 그림 때와 같다');
       assert.deepEqual(B.errors, [], '동작 줄이기 오류 없음'); await B.ctx.close();
-      /* 굴려도 다각형은 그림 좌표 그대로 — 앨리스는 서 있는 자리의 깊이만큼 밀린다(최대 8px) */
+      /* 굴려도 다각형은 그림 좌표 그대로 — 앨리스는 서 있는 자리의 깊이만큼 밀린다(최대 FX_PX) */
       await A.p.waitForFunction(() => !document.querySelector('#alice').hidden);
       await A.p.evaluate(s => scrollTo(0, s), span); await A.p.waitForTimeout(2500);
       assert.deepEqual((await polys(A.p)).map(x => x[0]), poly0.map(x => x[0]), '굴려도 다각형 꼭짓점은 그대로');
-      const sh = await A.p.evaluate(() => { const t = document.querySelector('#alice').style.translate.split(' ').map(parseFloat), o = fxOff(A.x, A.y); return { t, o }; });
-      assert(sh.o && sh.t.length === 2 && sh.t.every(Number.isFinite) && Math.abs(sh.t[0] - sh.o[0]) < 0.02 && Math.abs(sh.t[1] - sh.o[1]) < 0.02 && sh.t.every(v => Math.abs(v) <= 8), '앨리스는 바닥과 같이 밀린다: ' + JSON.stringify(sh));
+      const sh = await A.p.evaluate(() => { const t = document.querySelector('#alice').style.translate.split(' ').map(parseFloat), o = fxOff(A.x, A.y); return { t, o, max: FX_PX }; });
+      assert(sh.o && sh.t.length === 2 && sh.t.every(Number.isFinite) && Math.abs(sh.t[0] - sh.o[0]) < 0.02 && Math.abs(sh.t[1] - sh.o[1]) < 0.02 && sh.t.every(v => Math.abs(v) <= sh.max), '앨리스는 바닥과 같이 밀린다: ' + JSON.stringify(sh));
       for (const [k, got] of await hits(A.p)) if (got !== 'off') assert.equal(got, k, '굴린 뒤에도 ' + k + ' 누르는 자리는 그 방');
       /* 캔버스가 있어도 방을 누르면 다가가고, 다가간 동안은 캔버스를 숨기고 앨리스는 밀리지 않는다 */
       await A.p.locator('.room[data-key="review"]').tap(); await A.p.waitForSelector('#map.zoomed', { timeout: 3000 }); await A.p.waitForTimeout(500);

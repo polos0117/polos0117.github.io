@@ -28,7 +28,7 @@
   이름표 아래 "오늘 n판 · w승"을, 문 패널에 「오늘의 판」(?daily — 날짜가 씨앗) 을 둔다. 공방의 첫 화면을 HEAD 로 물어 Last-Modified 가 마지막으로
   다녀간 뒤(seen)라면 이름표에 초록 점 — 새 소식. 문을 누르면 그 방에 다녀간 자국(seen)을 남긴다.
   깊이 패럴랙스(2026-11-12, 대미궁만) — 은은한 2.5D 입체감(화려한 3D 전환이 아니라). #mapimg 위에 WebGL 캔버스(canvas.fx)를 얹고 셰이더가 깊이 그림 img/cave4-depth.webp 만큼
-  UV 를 민다: (깊이 − 0.5) × 세기 × 기울임, 가장 많이 밀려도 화면 8px. 깊이 그림은 blender-cloud cave_hub 구조의 깊이 렌더(blender-cloud-img 2026-11-11_cave2-depth.png — cave4 와 같은 구조)에서
+  UV 를 민다: (깊이 − 0.5) × 세기 × 기울임, 가장 많이 밀려도 화면 14px(2026-11-12 8 → 14, ?fx=<px> 로 견줘 본다). 깊이 그림은 blender-cloud cave_hub 구조의 깊이 렌더(blender-cloud-img 2026-11-11_cave2-depth.png — cave4 와 같은 구조)에서
   위층→아래층 큰 세로 기울기를 하이패스로 빼고 국소 높낮이만 남긴 흑백(흰색 = 가깝다, 0.5 = 바위 바닥 — 그래서 바위는 제자리), 만든 셈은 tools/cave4-depth.py.
   기울임 = 굴림(굴리며 보기의 짚는 높이 기준 — 344×882 처럼 지도가 화면보다 조금만 긴 폰도 다 쓴다) + PC 마우스 · 안드로이드 기기 기울기(iOS 는 권한 창이 떠서 굴림만).
   방 다각형 · 이름표 · 누르는 자리(SVG)는 캔버스 위라 그대로, 앨리스는 서 있는 자리의 깊이만큼 같이 밀린다. 다가간 동안 · 움직임 끔(AtelierMotion, 없으면 동작 줄이기) ·
@@ -668,10 +668,12 @@ function aliceLoad() {
    기울임 = 굴림(그 자리가 굴리며 보기의 「짚는 높이」(mapYAtCenter)에서 지도 높이의 FX_HALF 만큼 떨어지면 끝까지 — 눈이 짚는 높이를 내려다보는 셈. 화면 가운데가 아니라
    짚는 높이인 까닭: 344×882 처럼 지도가 화면보다 조금만 긴 폰은 다 굴려도 204px 라 화면 기준이면 거의 안 움직였다(±2px) — 짚는 높이는 어느 기기든 0 → 3072 를 다 쓴다)
    + PC 는 마우스 자리, 안드로이드는 기기 기울기(deviceorientation — 권한 창을 띄우는 iOS 는 쓰지 않는다).
-   가장 많이 밀려도 화면에서 FX_PX(8px) — 바위 바닥(0.5)은 제자리라 다각형 · 이름표 · 누르는 자리(SVG, 캔버스 위)와 어긋나지 않는다. 앨리스는 서 있는 자리의 깊이만큼 같이.
+   가장 많이 밀려도 화면에서 FX_PX(14px) — 바위 바닥(0.5)은 제자리라 다각형 · 이름표 · 누르는 자리(SVG, 캔버스 위)와 어긋나지 않는다. 앨리스는 서 있는 자리의 깊이만큼 같이.
    그리는 때는 기울임이 바뀔 때뿐(굴림 · 마우스 · 기울기 · 크기). 숨은 탭 · 화면 밖 · 다가간 동안은 그리지 않는다.
    움직임 끔(AtelierMotion, 없으면 동작 줄이기) · WebGL 없음 · 깊이 그림 못 받음 · 왕국 → 캔버스를 만들지 않는다(지금처럼 정지 그림) */
-const FX_PX = 8, FX_HALF = 0.25, FX_DEPTH = 'img/cave4-depth.webp?v=1';
+/* 세기 — 깊이 그림 값이 대부분 0.5 언저리(가운데 절반이 ±0.06, 위아래 1% 가 ±0.25)라 8px 로는 실제 1~3px 만 밀려 안 보였다(2026-11-12) → 14. 20 은 끝까지 기울이면 방 벽이 늘어진다(칠한 그림과 깊이 그림의 벽 테두리가 조금 어긋나서).
+   주소에 ?fx=<px>(0~40)를 붙이면 그 세기로 — 폰에서 바로 견줘 보려고 */
+const FX_PX = (() => { const v = parseFloat(new URLSearchParams(location.search).get('fx')); return v >= 0 && v <= 40 ? v : 14; })(), FX_HALF = 0.25, FX_DEPTH = 'img/cave4-depth.webp?v=1';
 const FX = { cv: null, gl: null, u: null, ok: false, fail: false, dimg: null, dpx: null, dw: 0, dh: 0, vis: true, raf: 0, last: 0, ro: null, io: null,
   cy: 0, tx: 0, ty: 0, wx: 0, wy: 0, drawn: '', gyro: null };
 const fxClamp = v => v < -1 ? -1 : v > 1 ? 1 : v;
