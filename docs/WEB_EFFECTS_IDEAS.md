@@ -33,4 +33,4 @@
 
 ## 만들 때 쓸 스킬 (2026-11-12)
 
-허브 `.claude/skills/` 에 PixiJS · three.js · Phaser 스킬 열 개를 넣어 뒀어(Apache-2.0, 목록 · 출처는 [`.claude/skills/GAMEDEV-SKILLS.md`](../.claude/skills/GAMEDEV-SKILLS.md)). 허브에서 연 세션이면 바로 써. 최신 문서는 Context7 로 확인해.
+허브 `.claude/skills/` 에 PixiJS · three.js · Phaser 스킬 아홉 개를 넣어 뒀어(Apache-2.0, 목록 · 출처는 [`.claude/skills/GAMEDEV-SKILLS.md`](../.claude/skills/GAMEDEV-SKILLS.md)). 허브에서 연 세션이면 바로 써. 최신 문서는 Context7 로 확인해.
