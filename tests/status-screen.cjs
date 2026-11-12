@@ -66,9 +66,8 @@ const server = http.createServer((q, s) => {
     assert(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), vp.width + ' 옆으로 넘치지 않는다');
     assert.deepEqual(errors, []); checks += 12; await ctx.close();
   }
-  /* 지도에서 들어가는 문 */
-  const ctx = await br.newContext(); await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, r => r.abort()); const p = await ctx.newPage();
-  await p.goto(BASE + '/index.html'); assert.equal(await p.locator('#status-all').getAttribute('href'), 'status.html', '지도 → 그림 현황'); checks++; await ctx.close();
+  /* 지도에서 들어가는 문(#status-all)을 보던 줄은 2026-11-12 뺐다 — 지도가 방 표(ROOMS)로 바뀌어 그 요소가 없어졌고
+     30초를 헛기다렸다. 지도의 문들은 tests/map-screen.cjs 가 본다 */
   await br.close(); server.close();
   console.log('PASS 그림 현황: 공방 ' + S.ATELIERS.length + ' 셈(' + S.ATELIERS.map(a => a.key + ' ' + results[a.key].sum.full + '/' + results[a.key].sum.cards).join(' · ') + ') · 표 · 공방 바꾸기 · 상태 거르기 · 찾기 · 주소 · 그림 안 받음 · 폰·PC — ' + checks + '가지');
 })().catch(e => { console.error(e); server.close(); process.exit(1); });

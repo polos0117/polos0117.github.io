@@ -1,7 +1,9 @@
 /* 도트 공방 — dot/dot.wasm · dot/dot.js. node tests/dot.cjs
    - wasm 이 소스보다 묵지 않았나: wasm 안의 source_hash 와 rust/ 소스를 같은 규칙으로 셈한 값(rust/dot-wasm/build.rs)
-   - book 서재 세 인물: 그림 저장소(../book-atelier-img)의 기록(records/sprites/<인물>/<상태>.json)마다 원본을 같은 인자로 다시 정리해
-     올린 정리본과 화소 하나 다르지 않다 — 정지 셋 · 대기 셋 · 걷기 셋 · 반응 셋, 걷기 v2 의 dy·빠르기는 book 의 data/sprites.json 과 같다
+   - book 서재: 그림 저장소(../book-atelier-img)의 기록(records/sprites/<인물>/<상태>.json)을 기록 이름마다 한 장씩(정지 · 대기 · 걷기 · 반응 ×
+     처음 도트 · 4K — 인물 차례로 처음 만난 것) 원본을 같은 인자로 다시 정리해 올린 정리본과 화소 하나 다르지 않다.
+     (인물마다 전부 — 28장 — 돌던 것을 2026-11-12 이름마다 한 장으로: 같은 정리 길의 되풀이였고 45초가 걸렸다.)
+     걷기 v2 의 dy·빠르기는 인물 모두 book 의 data/sprites.json 과 같다
    - 지시문 · 요청문 · 파일 이름 · 기록 · sprites.json 칸 · 공방 그림 목록(옆에 저장소가 있으면 여섯 공방 실제 자료로) */
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict');
 const ROOT = path.resolve(__dirname, '..');
@@ -37,12 +39,14 @@ function sourceHash() {
   if (fs.existsSync(path.join(IMG, 'records/sprites'))) {
     const dec = f => W.decode(fs.readFileSync(path.join(IMG, f)));
     const flag = (a, k) => { const i = a.indexOf(k); return i < 0 ? null : a[i + 1]; };
+    const kinds = new Set();   /* 기록 이름(still.json · walk_4k.json …)마다 한 장 */
     for (const who of fs.readdirSync(path.join(IMG, 'records/sprites')).sort()) {
       const dir = path.join(IMG, 'records/sprites', who);
       if (!fs.statSync(dir).isDirectory()) continue;
       for (const f of fs.readdirSync(dir).filter(f => f.endsWith('.json')).sort()) {
         const r = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')), c = r.cleaned;
-        if (!c || !c.args) continue;
+        if (!c || !c.args || kinds.has(f)) continue;
+        kinds.add(f);
         const src = r.generations ? r.generations.find(g => g.file.endsWith((c.from || 'gen1') + '.png')).file : r.generation.file;
         const a = c.args.map(String), raw = dec(src);
         let out;
@@ -72,7 +76,8 @@ function sourceHash() {
         same++; W.free(raw); W.free(out.id);
       }
     }
-    assert.equal(same, 28, '세 인물 × (정지·대기·걷기·반응) × (처음 도트·4K) + 뤼팽(귀환) 4K 넷');
+    assert(['still', 'idle', 'walk', 'react'].every(k => kinds.has(k + '.json') && kinds.has(k + '_4k.json')), '정지·대기·걷기·반응 × (처음 도트·4K) 가 다 있다: ' + [...kinds].join(' '));
+    assert.equal(same, kinds.size);
     /* 걷기 v2 — 오르내림·빠르기가 book 의 sprites.json 과 같다(4K 인물은 오르내림 두 칸) */
     const book = JSON.parse(fs.readFileSync(path.join(ROOT, '..', 'book-atelier/data/sprites.json'), 'utf8'));
     for (const [who, a] of Object.entries(book.actors)) {

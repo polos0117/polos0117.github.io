@@ -9,7 +9,7 @@
 ## 파이썬 도구와 같은 셈
 
 book-atelier 의 `tools/sprite_px.py` · `sprite-grid.py` · `sprite-sheet.py` · `sprite-bob.py` 를 옮겼다. 같은 원본·같은 인자면 화소 하나 다르지 않다 —
-`dot verify ../../book-atelier-img` 와 `tests/dot.cjs` 가 book 서재 세 인물의 기록 12장(정지·대기·걷기·반응 × 셋)으로 본다(파이썬 42초, 이쪽 2초 남짓).
+`dot verify ../../book-atelier-img` 는 book 서재 인물 기록 전부로, `tests/dot.cjs` 는 기록 이름마다 한 장(정지·대기·걷기·반응 × 처음 도트·4K)으로 본다(파이썬 42초, 이쪽 2초 남짓).
 numpy 의 셈 차례까지 따른다(끝자리 하나로 팔레트 묶음이 갈리지 않게):
 
 - `np.arange(a, b, s)` = `a + i·((a+s)−a)`, 길이 `ceil((b−a)/s)` · `np.round` 와 파이썬 `round` 는 짝수 쪽 반올림 · `round(x, 2)` 는 이진 값 그대로를 셈한다(`round2`)

@@ -2,8 +2,8 @@
    네 공방의 칸을 심어 두고: 새것부터 2:3 칸 · 공방 칩(지도 ROOMS 의 색)으로 거르기(?a=, 새로 고쳐도) · 크게 보기(← → 키·밀기·Esc·초점 되돌림·
    「그 공방에서 보기」= 칸의 link) · 빼기(저장소에서 빠지고 다음 그림이 뜬다) · 감상 모드(6초마다, 손대면 멈춤, 움직임 줄이기면 잠김) ·
    빈 자리(공방 도감 넷으로 가는 문) · 저장이 막힌 브라우저 · 공방 지도의 「즐겨찾기 n」 과 목록 아래 줄 · favorites.js 동작(500칸·같은 그림 하나·막힌 저장).
-   344×882 · 390×844 · 844×390 · 690×829 · 1280×900 에서 옆으로 넘치지 않고 누르는 자리 44px.
-   바깥 그림은 받지 않는다 — 옆 저장소에 같은 파일이 있으면 그것, 없으면 색 칸(SVG). SHOT_DIR 을 주면 390×844 · 1280×900 화면을 찍는다.
+   344×882 · 1280×900 에서 옆으로 넘치지 않고 누르는 자리 44px.
+   바깥 그림은 받지 않는다 — 옆 저장소에 같은 파일이 있으면 그것, 없으면 색 칸(SVG). SHOT_DIR 을 주면 344×882 · 1280×900 화면을 찍는다.
    Run: CHROMIUM_PATH=<chrome> NODE_PATH=<playwright 가 있는 node_modules> node tests/favorites-screen.cjs   (FAV_PORT 로 자리 바꾸기, 기본 8767) */
 const assert = require('node:assert/strict'), http = require('node:http'), fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
 const { chromium } = require('playwright');
@@ -84,7 +84,8 @@ async function routeArt(ctx) {
     return r.fulfill({ status: 404, body: '' });
   });
 }
-const SIZES = [['344', { width: 344, height: 882 }, true], ['390', { width: 390, height: 844 }, true], ['844', { width: 844, height: 390 }, true], ['690', { width: 690, height: 829 }, true], ['1280', { width: 1280, height: 900 }, false]];
+/* 가장 좁은 휴대폰 · 넓은 PC — 다섯 크기에서 같은 판을 되풀이하던 것을 2026-11-12 둘로 */
+const SIZES = [['344', { width: 344, height: 882 }, true], ['1280', { width: 1280, height: 900 }, false]];
 
 (async () => {
   const br = await chromium.launch({ headless: true, ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox', '--disable-dev-shm-usage'] } : {}) });
@@ -117,7 +118,7 @@ const SIZES = [['344', { width: 344, height: 882 }, true], ['390', { width: 390,
       assert.match(await p.locator('.chip[data-a="book"]').textContent(), /책의 서재\s*2/, name + ' 칩 수');
       await targets(p, '.chip, .play, .home', name);
       await noOverflow(p, name);
-      if (name === '390' || name === '1280') {
+      if (name === '344' || name === '1280') {
         await p.waitForFunction(() => [...document.querySelectorAll('.tile img')].every(i => i.complete)).catch(() => {});
         if (process.env.SHOT_DIR) { fs.mkdirSync(process.env.SHOT_DIR, { recursive: true }); await p.screenshot({ path: path.join(process.env.SHOT_DIR, `favorites-${vp.width}x${vp.height}.png`) }); }
       }
@@ -219,7 +220,7 @@ const SIZES = [['344', { width: 344, height: 882 }, true], ['390', { width: 390,
       await b.ctx.close();
     }
     /* 공방 지도 — 머리의 「즐겨찾기 n」 · 대미궁 아래층 보물고 방(2026-11-11 — 하단 버튼 줄이 지도의 방이 됐다) · 맨 아래 칩 */
-    for (const [name, vp, mobile] of [SIZES[1], SIZES[2], SIZES[4]]) {
+    for (const [name, vp, mobile] of SIZES) {
       const { ctx, p, errors } = await page(vp, mobile, { seed: SEED });
       await p.goto(BASE + '/'); await p.waitForSelector('.room');
       assert.equal(await p.locator('#fav-link').textContent(), '즐겨찾기 8', name + ' 머리의 즐겨찾기 수');

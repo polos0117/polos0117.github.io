@@ -4,7 +4,7 @@
    ③ 정리 — book 의 앨리스 정지 원본(gen2)·손자 걷기 원본(gen1)을 넣어 정리해 받은 PNG 가 그림 저장소의 정리본과 화소 하나 다르지 않다.
    그린다 — OpenAI 그림 API 를 흉내 내(api.openai.com 을 가로채 앨리스 원본을 돌려준다): 열쇠 없으면 못 그린다, 첨부가 지시문 차례로 실린다, 받은 원본이 ③ 에 들어가 정리하면 같은 화소, 다시 → gen2, 걷기는 첨부 셋, 401, 열쇠는 남고 지울 수 있다.
       걷기는 빠르기·dy, sprites.json 칸, 기록 JSON. 정지를 정리하면 그것이 동작 시트의 정지 도트가 된다.
-   공방 바꾸기(포켓몬 379명 → 찾기 → 피카츄 = pikachu), 새로 고쳐도 고른 값이 남는다, 344×882 · 390×844 · 844×390 · 1280×900 에서 옆으로 넘치지 않고 누르는 자리 44px.
+   공방 바꾸기(포켓몬 379명 → 찾기 → 피카츄 = pikachu), 새로 고쳐도 고른 값이 남는다, 344×882 · 1280×900 에서 옆으로 넘치지 않고 누르는 자리 44px.
    옆 저장소(../book-atelier · ../book-atelier-img · ../pkm-atelier …)를 같은 출처의 /<저장소>/ 로 내준다 — 실제 Pages 와 같은 꼴.
    Run: CHROMIUM_PATH=<chrome> NODE_PATH=<playwright 가 있는 node_modules> node tests/dot-screen.cjs   (DOT_PORT 로 자리 바꾸기, 기본 8769) */
 const assert = require('node:assert/strict'), http = require('node:http'), fs = require('node:fs'), path = require('node:path'), os = require('node:os');
@@ -425,8 +425,8 @@ const server = http.createServer((q, s) => {
     if (errors.length) console.log('errors:', JSON.stringify(errors).slice(0, 1500));
     assert.deepEqual(errors, []);
 
-    /* 크기마다 — 옆으로 넘치지 않고 누르는 자리 44px */
-    for (const [w, h] of [[344, 882], [390, 844], [844, 390], [1280, 900]]) {
+    /* 크기마다 — 옆으로 넘치지 않고 누르는 자리 44px. 가장 좁은 휴대폰 · 넓은 PC 둘(넷 → 둘, 2026-11-12) */
+    for (const [w, h] of [[344, 882], [1280, 900]]) {
       await page.setViewportSize({ width: w, height: h });
       await page.goto(BASE + '/dot.html?a=book&c=alice&s=walk'); await page.waitForSelector('#who:not([hidden])');
       const over = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);

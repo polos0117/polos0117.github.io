@@ -4,7 +4,7 @@
    ③ game·book 폼 초상·개방: 대상·폼·인물 기준·노출 모두, 개방 장면마다, 엉망인 저장값 바로잡기, 랜덤 장면.
    ④ 신화 무기 초상·각성·저주·스킨: 무기 모두, 단계 표(prompt/steps.js), 자세 표, 스킨 없는 무기, 엉망인 저장값.
    ⑤ 포켓몬 액션·폭주: 1025 마리 모두, 단계 표, 큰 자료(원작 외형·종별 얼굴) 있고 없고, 엉망인 저장값, 랜덤 장면.
-   옛 생성기 화면과 글자 하나 다르지 않은지는 tests/prompt-screen.cjs(브라우저)가 본다.
+   옛 생성기와 같은 글인지는 여기 한 곳에서 본다(2026-11-12 — tests/prompt-screen.cjs 가 옛 생성기 화면을 열어 하던 같은 대조는 뺐다).
    옆 저장소(../game-atelier · ../book-atelier · ../myth-atelier · ../pkm-atelier)가 있어야 한다. Run: node tests/prompt-parity.cjs */
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm'), path = require('node:path');
 const H = require('../prompt/adapters.js');

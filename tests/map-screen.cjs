@@ -5,14 +5,28 @@
    아래 "모든 공방" 목록의 링크가 지도의 문들과 같다. 바깥 그림(각 공방의 그림 저장소)은 받지 않는다 — 404 로 돌린다.
    시간대 조명(2026-11-12) — 344×882 에서 ?time=night 면 패럴랙스 셰이더가 빛 그림 두 장으로 그리고(등불 깜빡임 · 새벽은 안개 흐름) 누르는 자리가 낮과 같다. 움직임 끔 · WebGL 없음이면 CSS 덮개 둘(정지). ?time=day 면 빛이 없다, 못 받으면 낮처럼, 기기 시각으로 고른다.
    방에 들어가는 연출(2026-11-12) — 344×882 에서 확대 0.7초 동안 캔버스를 보인 채 밀고, 끝나면 감춘다. 앨리스가 문으로 사라지고 문 빛. 기다림은 그대로. 끝난 뒤 누르는 자리 · 문 패널은 움직임 끔 때와 같다. 움직임 끔이면 연출 없음.
-   Run: CHROMIUM_PATH=<chrome> node tests/map-screen.cjs   (playwright 가 require 되는 자리에서 — NODE_PATH) */
+   Run: CHROMIUM_PATH=<chrome> node tests/map-screen.cjs   (playwright 가 require 되는 자리에서 — NODE_PATH, MAP_PORT 로 자리 바꾸기, 기본 8766) */
 const assert = require('node:assert/strict'), http = require('node:http'), fs = require('node:fs'), path = require('node:path');
 const { chromium } = require('playwright');
-const ROOT = path.resolve(__dirname, '..'), PORT = 8766, BASE = 'http://127.0.0.1:' + PORT;
+const ROOT = path.resolve(__dirname, '..'), PORT = +(process.env.MAP_PORT || 8766), BASE = 'http://127.0.0.1:' + PORT;
 const MIME = { '.html': 'text/html; charset=utf-8', '.webp': 'image/webp', '.png': 'image/png', '.json': 'application/json', '.js': 'text/javascript' };
 const T = require(path.join(ROOT, 'today.js'));
 const LM = new Date(Date.now() - 60e3);   /* 공방들이 "배포된" 때 — 일 분 전 */
 const VT_LINE = "<style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }</style><script>addEventListener('pageswap', e => { const t = e.viewTransition; if (t) { t.skipTransition(); t.ready.catch(() => {}); } }); addEventListener('pagereveal', e => { const t = e.viewTransition; if (t) t.ready.catch(() => {}); });</script>";
+/* 고정 대기 대신(2026-11-12 — 고정 대기만 54초였다) — 움직임이 멎을 때까지: 끝이 있는 CSS 전환 · 애니메이션, 굴림, 앨리스 자리,
+   지도 다가가기(#inner transform), 셰이더 패럴랙스(FX.tx · ty)가 여섯 프레임 내리 그대로면 멎은 것. 무한 반복(등불 깜빡임 등)은 안 본다.
+   "가만히 두면 그대로인가" 를 보는 대기(밤 깜빡임 · 낮 다시 안 그림 · 밀기 0.7초)는 시간이 곧 보는 것이라 그대로 둔다 */
+const calm = async (pg, ms = 4000) => {
+  await pg.evaluate(() => { window.__calm = { sig: '', n: 0 }; }).catch(() => {});
+  await pg.waitForFunction(() => {
+    const busy = document.getAnimations().some(a => a.playState === 'running' && a.effect && a.effect.getTiming().iterations !== Infinity);
+    const al = document.querySelector('#alice'), inner = document.querySelector('#inner');
+    const sig = [scrollY, al ? al.style.left + al.style.top : '', inner ? inner.style.transform : '', typeof FX !== 'undefined' && FX ? FX.tx + ',' + FX.ty : ''].join('|');
+    const w = window.__calm || (window.__calm = { sig: '', n: 0 });
+    w.n = !busy && sig === w.sig ? w.n + 1 : 0; w.sig = sig;
+    return w.n >= 6;
+  }, null, { timeout: ms, polling: 'raf' }).catch(() => {});
+};
 const server = http.createServer((q, s) => {
   const url = new URL(q.url, BASE);
   /* 공방 첫 화면 — 지도가 HEAD 로 Last-Modified 를 묻는 자리(진짜 공방은 다른 저장소) */
@@ -79,7 +93,7 @@ const NOW = Date.now(), SEED = {
       /* 올리면 빛난다(PC) · 누르면 다가간다 */
       if (!mobile) { await p.hover('.room[data-key="book"]'); assert(await p.locator('.room[data-key="book"].hot').count() === 1 && await p.locator('.pin[data-key="book"].hot .peek').isVisible(), '올리면 빛나고 미리보기'); }
       await press('.room[data-key="book"]');
-      await p.waitForSelector('#map.zoomed'); await p.waitForTimeout(800);
+      await p.waitForSelector('#map.zoomed'); await calm(p);
       assert.equal(await p.evaluate(() => location.hash), '#book', name + ' 주소에 방');
       assert(/scale\(/.test(await p.locator('#inner').evaluate(e => e.style.transform)), '지도가 다가간다');
       const links = await p.locator('#doorlinks a:not(.daily)').evaluateAll(es => es.map(e => [e.textContent, e.getAttribute('href')]));
@@ -92,7 +106,7 @@ const NOW = Date.now(), SEED = {
       if (vp.width > vp.height) assert(d.x >= s2.x + s2.width - 1, name + ' 가로 — 문 패널은 지도 오른쪽');
       else {   /* 세로 — 지도가 1:3 이라 문 패널은 화면 아래에 떠 있다(2026-11-11 폰에서 메뉴가 화면 밖이었다). 다가간 방은 그 위에 보인다 */
         assert(d.y >= 0 && d.y + d.height <= vp.height + 1, name + ' 세로 — 문 패널이 화면 안: ' + JSON.stringify(d));
-        await p.waitForTimeout(700);
+        await calm(p);
         const room = await p.locator('.room[data-key="book"] polygon').boundingBox(), d2 = await p.locator('#doors').boundingBox();
         assert(room.y + room.height / 2 > 0 && room.y + room.height / 2 < d2.y, name + ' 세로 — 다가간 방은 문 패널 위에: ' + JSON.stringify([room, d2]));
       }
@@ -132,7 +146,7 @@ const NOW = Date.now(), SEED = {
       await p.locator('#doors a.main').click(); await p.waitForLoadState();
       const seen = await p.evaluate(() => JSON.parse(localStorage.getItem('atelier_today_v1:gundam')).seen);
       assert(seen >= NOW - 1000, name + ' 문을 누르면 다녀간 자국: ' + seen);
-      await p.goto(BASE + '/'); await p.waitForSelector('.room'); await p.waitForTimeout(600);
+      await p.goto(BASE + '/'); await p.waitForSelector('.room'); await calm(p);
       assert.equal(await p.locator('.pin.news').count(), 0, name + ' 다녀간 뒤엔 새 소식이 아니다');
       /* 지도 고르기(2026-11-08) — 대미궁이 처음, 왕국을 고르면 그림 · 지명 · 다각형이 바뀌고 이 기기에 남는다. 주소 ?map= 이 이긴다 */
       assert.equal(await p.locator('#mapsel button[aria-pressed="true"]').getAttribute('data-map'), 'cave', name + ' 처음은 대미궁');
@@ -163,11 +177,11 @@ const NOW = Date.now(), SEED = {
         return out; });
       assert.deepEqual(cross, [], name + ' 왕국 구역이 겹치지 않는다');
       await noOverflow();
-      await press('.room[data-key="gundam"]'); await p.waitForSelector('#map.zoomed'); await p.waitForTimeout(800);
+      await press('.room[data-key="gundam"]'); await p.waitForSelector('#map.zoomed'); await calm(p);
       assert.equal(await p.locator('#doors h2').textContent(), '건담 드래프트', name + ' 왕국에서 다가가도 같은 문 패널');
       assert(/scale\(/.test(await p.locator('#inner').evaluate(e => e.style.transform)), name + ' 왕국에서도 다가간다');
       if (await p.locator('#mapsel').isVisible()) {   /* 다가간 채로 지도를 바꾸면 새 지도에서 그 방에 다시 다가간다(가로 폰은 다가가면 고르기 줄이 숨는다 — Esc 로) */
-        await press('#mapsel button[data-map="cave"]'); await p.waitForTimeout(300);
+        await press('#mapsel button[data-map="cave"]'); await calm(p);
         assert.equal(await p.locator('.room.on').getAttribute('data-key'), 'gundam', name + ' 지도를 바꿔도 그 방');
         assert.equal(await p.locator('.pin[data-key="gundam"] b').textContent(), '건담 격납고', name + ' 대미궁으로');
       } else { await p.keyboard.press('Escape'); await press('#mapsel button[data-map="cave"]'); }
@@ -191,7 +205,7 @@ const NOW = Date.now(), SEED = {
         await p.evaluate(() => { const r = ROOMS.find(q => q.key === 'review'), { span } = scrollSpan(); scrollTo(0, r.at[1] / IH * span); });   /* 굴리는 동안 짚는 높이가 0 → IH(scrollSpan) */
         await p.waitForFunction(t => parseFloat(document.querySelector('#alice').style.top) > t + 30, top0, { timeout: 6000 });
         assert((await p.locator('.room.near').evaluateAll(es => es.map(e => e.dataset.key))).includes('review'), '짚는 높이의 방이 빛난다');
-        await p.locator('#rail button[data-key="gundam"]').click(); await p.waitForTimeout(1500);
+        await p.locator('#rail button[data-key="gundam"]').click(); await calm(p);
         assert((await p.locator('.room.near').evaluateAll(es => es.map(e => e.dataset.key))).includes('gundam'), '위치 줄을 누르면 그 방 높이로');
         /* 누른 뒤 굴림 · 크기 바뀜이 와도 문은 열린다(폰에서 문이 안 열리던 것 — 2026-11-11) */
         await press('.room[data-key="blender"]'); await p.evaluate(() => { scrollBy(0, 40); dispatchEvent(new Event('resize')); });
@@ -202,26 +216,26 @@ const NOW = Date.now(), SEED = {
         assert(Math.abs(at[0] - door[0] / 1024 * 100) < 0.5 && Math.abs(at[1] - door[1] / 3072 * 100) < 0.5, '앨리스는 조형실 문 앞: ' + at + ' / ' + door);
         /* 최근 공방(2026-11-11) — 「← 지도로」 하면 앨리스는 그 문 앞에 남고, 다시 열면 그 방 높이 · 그 문 앞에서 시작한다 */
         const alicePos = () => p.evaluate(() => { const a = document.querySelector('#alice'); return [parseFloat(a.style.left), parseFloat(a.style.top)]; });
-        await press('#back'); await p.waitForFunction(() => !document.querySelector('#map.zoomed')); await p.waitForTimeout(1000);
+        await press('#back'); await p.waitForFunction(() => !document.querySelector('#map.zoomed')); await calm(p);
         const stay = await alicePos(); assert(Math.abs(stay[0] - at[0]) < 0.5 && Math.abs(stay[1] - at[1]) < 0.5, '지도로 돌아와도 앨리스는 조형실 문 앞: ' + stay);
         const inView = k => p.evaluate(k => { const r = document.querySelector(`.room[data-key="${k}"] polygon`).getBoundingClientRect(), y = r.top + r.height / 2; return y > 0 && y < innerHeight; }, k);
         assert(await inView('blender'), '지도로 돌아오면 그 방(아래층)이 화면 안');
         assert(await p.evaluate(() => { const r = document.querySelector('#alice').getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; }), '앨리스도 화면 안');
         assert.equal(await p.evaluate(() => localStorage.getItem('atelier_hub_last_v1')), 'blender', '최근 공방을 남긴다');
-        await p.goto(BASE + '/?map=cave'); await p.waitForFunction(() => !document.querySelector('#alice').hidden); await p.waitForTimeout(600);
+        await p.goto(BASE + '/?map=cave'); await p.waitForFunction(() => !document.querySelector('#alice').hidden); await calm(p);
         const back = await alicePos(); assert(Math.abs(back[0] - at[0]) < 0.5 && Math.abs(back[1] - at[1]) < 0.5, '다시 열면 앨리스는 최근 공방 문 앞: ' + back);
         assert((await p.locator('.room.near').evaluateAll(es => es.map(e => e.dataset.key))).includes('blender'), '다시 열면 최근 공방 높이');
         /* 뒤로 가기로 지도에 와도 같다 — 브라우저가 누르기 전 굴림 자리로 되돌리면 앨리스가 떠났다(2026-11-11) */
         await p.evaluate(() => { const { span } = scrollSpan(); scrollTo({ top: 0, behavior: 'instant' }); });
-        await p.waitForTimeout(1500);
-        await press('.room[data-key="samguk"]'); await p.waitForSelector('#map.zoomed', { timeout: 3000 }); await p.waitForTimeout(900);
+        await calm(p);
+        await press('.room[data-key="samguk"]'); await p.waitForSelector('#map.zoomed', { timeout: 3000 }); await calm(p);
         const sam = await alicePos();
-        await p.goBack(); await p.waitForFunction(() => !document.querySelector('#map.zoomed')); await p.waitForTimeout(1500);
+        await p.goBack(); await p.waitForFunction(() => !document.querySelector('#map.zoomed')); await calm(p);
         const sam2 = await alicePos(); assert(Math.abs(sam2[0] - sam[0]) < 0.5 && Math.abs(sam2[1] - sam[1]) < 0.5, '뒤로 가기로 지도에 와도 앨리스는 군막 문 앞: ' + sam + ' → ' + sam2);
         /* 아래층도 — 뒤로 가기로 와도 그 방이 화면 안, 앨리스는 그 문 앞(2026-11-11 「1층에서만 돼」) */
-        await press('.room[data-key="review"]'); await p.waitForSelector('#map.zoomed', { timeout: 3000 }); await p.waitForTimeout(900);
+        await press('.room[data-key="review"]'); await p.waitForSelector('#map.zoomed', { timeout: 3000 }); await calm(p);
         const rv = await alicePos();
-        await p.goBack(); await p.waitForFunction(() => !document.querySelector('#map.zoomed')); await p.waitForTimeout(1500);
+        await p.goBack(); await p.waitForFunction(() => !document.querySelector('#map.zoomed')); await calm(p);
         const rv2 = await alicePos(); assert(Math.abs(rv2[0] - rv[0]) < 0.5 && Math.abs(rv2[1] - rv[1]) < 0.5, '아래층 뒤로 가기 — 앨리스는 검수의 방 문 앞: ' + rv + ' → ' + rv2);
         assert(await inView('review'), '아래층 뒤로 가기 — 그 방이 화면 안');
         await p.evaluate(() => localStorage.removeItem('atelier_hub_last_v1'));
@@ -262,32 +276,32 @@ const NOW = Date.now(), SEED = {
       assert(fx.same && fx.w >= fx.cw && fx.w <= 1024, '캔버스는 무대 크기 그대로, 그림 폭(1024)을 넘지 않는다: ' + JSON.stringify(fx));
       assert(await A.p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), '344 패럴랙스 — 가로 넘침 없음');
       const span = await A.p.evaluate(() => scrollSpan().span);
-      await A.p.evaluate(() => scrollTo(0, 0)); await A.p.waitForTimeout(300);
+      await A.p.evaluate(() => scrollTo(0, 0)); await calm(A.p);
       const hit0 = await hits(A.p), poly0 = await polys(A.p);
       for (const [k, got] of hit0) if (got !== 'off') assert.equal(got, k, '패럴랙스 — ' + k + ' 누르는 자리는 그 방');
       /* 같은 굴림 자리의 정지 그림(동작 줄이기)과 다각형 · 누르는 자리가 똑같다 */
       const B = await open({ reducedMotion: 'reduce' });
-      await B.p.goto(BASE + '/?map=cave'); await B.p.waitForFunction(() => document.querySelector('#mapimg').complete); await B.p.waitForTimeout(800);
+      await B.p.goto(BASE + '/?map=cave'); await B.p.waitForFunction(() => document.querySelector('#mapimg').complete); await calm(B.p);
       assert.equal(await B.p.locator('canvas.fx').count(), 0, '동작 줄이기 — 캔버스 없음(정지 그림)');
       assert.deepEqual(B.depth, [], '동작 줄이기 — 깊이 그림도 받지 않는다');
-      await B.p.evaluate(() => scrollTo(0, 0)); await B.p.waitForTimeout(300);
+      await B.p.evaluate(() => scrollTo(0, 0)); await calm(B.p);
       assert.deepEqual(await polys(B.p), poly0, '패럴랙스가 있어도 다각형은 정지 그림 때와 같은 자리');
       assert.deepEqual(await hits(B.p), hit0, '패럴랙스가 있어도 누르는 자리는 정지 그림 때와 같다');
       assert.deepEqual(B.errors, [], '동작 줄이기 오류 없음'); await B.ctx.close();
       /* 굴려도 다각형은 그림 좌표 그대로 — 앨리스는 서 있는 자리의 깊이만큼 밀린다(최대 FX_PX) */
       await A.p.waitForFunction(() => !document.querySelector('#alice').hidden);
-      await A.p.evaluate(s => scrollTo(0, s), span); await A.p.waitForTimeout(2500);
+      await A.p.evaluate(s => scrollTo(0, s), span); await calm(A.p, 6000);
       assert.deepEqual((await polys(A.p)).map(x => x[0]), poly0.map(x => x[0]), '굴려도 다각형 꼭짓점은 그대로');
       const sh = await A.p.evaluate(() => { const t = document.querySelector('#alice').style.translate.split(' ').map(parseFloat), o = fxOff(A.x, A.y); return { t, o, max: FX_PX }; });
       assert(sh.o && sh.t.length === 2 && sh.t.every(Number.isFinite) && Math.abs(sh.t[0] - sh.o[0]) < 0.02 && Math.abs(sh.t[1] - sh.o[1]) < 0.02 && sh.t.every(v => Math.abs(v) <= sh.max), '앨리스는 바닥과 같이 밀린다: ' + JSON.stringify(sh));
       for (const [k, got] of await hits(A.p)) if (got !== 'off') assert.equal(got, k, '굴린 뒤에도 ' + k + ' 누르는 자리는 그 방');
       /* 캔버스가 있어도 방을 누르면 다가가고, 다가간 동안은 캔버스를 숨기고 앨리스는 밀리지 않는다 */
-      await A.p.locator('.room[data-key="review"]').tap(); await A.p.waitForSelector('#map.zoomed', { timeout: 3000 }); await A.p.waitForSelector('#map.zoomed:not(.pushing)', { timeout: 3000 }); await A.p.waitForTimeout(350);
+      await A.p.locator('.room[data-key="review"]').tap(); await A.p.waitForSelector('#map.zoomed', { timeout: 3000 }); await A.p.waitForSelector('#map.zoomed:not(.pushing)', { timeout: 3000 }); await calm(A.p);
       assert.equal(await A.p.evaluate(() => getComputedStyle(document.querySelector('canvas.fx')).opacity), '0', '다가가면(확대가 끝나면) 정지 그림');
       assert.equal(await A.p.evaluate(() => document.querySelector('#alice').style.translate), '', '다가간 동안 앨리스는 밀리지 않는다');
       await A.p.locator('#back').tap(); await A.p.waitForFunction(() => getComputedStyle(document.querySelector('canvas.fx')).opacity === '1');
       /* 왕국은 이번 범위가 아니다 — 캔버스를 걷는다. 대미궁으로 돌아오면 다시 */
-      await A.p.locator('#mapsel button[data-map="kingdom"]').tap(); await A.p.waitForTimeout(300);
+      await A.p.locator('#mapsel button[data-map="kingdom"]').tap(); await calm(A.p);
       assert.equal(await A.p.locator('canvas.fx').count(), 0, '왕국 — 캔버스 없음');
       await A.p.locator('#mapsel button[data-map="cave"]').tap(); await A.p.waitForSelector('canvas.fx.ready', { timeout: 8000 });
       assert.deepEqual(A.errors, [], '패럴랙스 오류 없음');
@@ -295,12 +309,12 @@ const NOW = Date.now(), SEED = {
       await A.ctx.close();
       /* 움직임 끔(AtelierMotion — scene-motion.js) 이면 캔버스 없음 */
       const C = await open({}, () => { window.AtelierMotion = { enabled: () => false }; });
-      await C.p.goto(BASE + '/?map=cave'); await C.p.waitForFunction(() => document.querySelector('#mapimg').complete); await C.p.waitForTimeout(800);
+      await C.p.goto(BASE + '/?map=cave'); await C.p.waitForFunction(() => document.querySelector('#mapimg').complete); await calm(C.p);
       assert.equal(await C.p.locator('canvas.fx').count(), 0, 'AtelierMotion 끔 — 캔버스 없음'); assert.deepEqual(C.errors, [], 'AtelierMotion 끔 오류 없음'); await C.ctx.close();
       /* 깊이 그림을 못 받으면 — 지금처럼 정지 그림, 오류 없이 */
       const D = await open();
       await D.ctx.route('**/img/cave4-depth.webp*', r => r.fulfill({ status: 404, body: '' }));
-      await D.p.goto(BASE + '/?map=cave'); await D.p.waitForFunction(() => document.querySelector('#mapimg').complete); await D.p.waitForTimeout(800);
+      await D.p.goto(BASE + '/?map=cave'); await D.p.waitForFunction(() => document.querySelector('#mapimg').complete); await calm(D.p);
       assert.equal(await D.p.locator('canvas.fx').count(), 0, '깊이 그림 못 받음 — 캔버스 없음'); assert.deepEqual(D.errors, [], '깊이 그림 못 받음 — 오류 없음');
       assert.equal(await D.p.locator('#mapimg').isVisible(), true, '깊이 그림 못 받음 — 그림은 그대로'); await D.ctx.close();
       /* 기울임 입력 — 안드로이드는 기기 기울기(deviceorientation), 권한 창을 띄우는 iOS 는 굴림만(요즘 크롬도 requestPermission 이 있어 이름으로 가른다) */
@@ -309,7 +323,7 @@ const NOW = Date.now(), SEED = {
         const G = await open({ userAgent: ua });
         await G.p.goto(BASE + '/?map=cave'); await G.p.waitForSelector('canvas.fx.ready', { timeout: 8000 });
         for (const [b, g] of [[45, 0], [55, 12]]) { await G.p.evaluate(([b, g]) => dispatchEvent(new DeviceOrientationEvent('deviceorientation', { alpha: 0, beta: b, gamma: g })), [b, g]); await G.p.waitForTimeout(150); }
-        await G.p.waitForTimeout(400);
+        await calm(G.p);
         const t = await G.p.evaluate(() => [FX.tx, FX.ty]);
         assert.equal(Math.abs(t[0]) > 0.2 && Math.abs(t[1]) > 0.1, want, os + ' 기울기로 기울임: ' + t);
         assert.deepEqual(G.errors, [], os + ' 오류 없음'); await G.ctx.close();
@@ -337,7 +351,7 @@ const NOW = Date.now(), SEED = {
       assert(ln.time === 'night' && ln.canvas && ln.lit && ln.anim && ln.cvOpacity === '1', '밤 — 캔버스가 빛을 그리고 움직인다: ' + JSON.stringify(ln));
       assert.deepEqual(N.light.sort(), ['cave4-light-night-glow.webp', 'cave4-light-night-mul.webp'], '밤 — 그 시간대 두 장만 받는다');
       assert(ln.els.length === 2 && ln.els.every(e => e.there && e.ok && !e.shown), '밤 — 캔버스가 그리는 동안 CSS 덮개는 숨는다(두 번 어두워지지 않게): ' + JSON.stringify(ln.els));
-      await N.p.evaluate(() => scrollTo(0, 0)); await N.p.waitForTimeout(300);
+      await N.p.evaluate(() => scrollTo(0, 0)); await calm(N.p);
       const hitN = await hits(N.p), polyN = await polys(N.p);
       for (const [k, got] of hitN) if (got !== 'off') assert.equal(got, k, '밤 — ' + k + ' 누르는 자리는 그 방');
       /* 등불 자리 둘(빛 그림에서 가장 따뜻한 곳 — 위 절반 · 아래 절반)과 빛이 없는 바위 한 곳 */
@@ -361,7 +375,7 @@ const NOW = Date.now(), SEED = {
       const Y = await lightOpen('/?map=cave&time=day'); await Y.p.waitForSelector('canvas.fx.ready', { timeout: 8000 });
       const ly = await lightState(Y.p);
       assert(ly.time === 'day' && !ly.fxlit && !ly.lit && !ly.anim, '낮 — 셰이더에 빛 없음: ' + JSON.stringify(ly)); assert(ly.els.length === 2 && ly.els.every(e => !e.there && !e.shown && !e.src), '낮 — 덮개 없음'); assert.deepEqual(Y.light, [], '낮 — 빛 그림을 받지 않는다');
-      await Y.p.evaluate(() => scrollTo(0, 0)); await Y.p.waitForTimeout(300);
+      await Y.p.evaluate(() => scrollTo(0, 0)); await calm(Y.p);
       assert.deepEqual(await polys(Y.p), polyN, '빛을 그려도 다각형은 낮과 같은 자리'); assert.deepEqual(await hits(Y.p), hitN, '빛을 그려도 누르는 자리는 낮과 같다');
       const rock = [[512, 760], [150, 470], [512, 2330]], dayPx = await fxPx(Y.p, rock, 1000), nightPx = await fxPx(N.p, rock, 1000);
       assert(nightPx.every((c, i) => sum(c) < sum(dayPx[i]) * 0.9), '밤은 낮보다 어둡다(호수 · 방 · 홀): ' + JSON.stringify([dayPx, nightPx]));
@@ -377,7 +391,7 @@ const NOW = Date.now(), SEED = {
       await N.p.locator('#back').tap(); await N.p.waitForSelector('#map:not(.zoomed)'); await N.p.waitForFunction(() => getComputedStyle(document.querySelector('canvas.fx')).opacity === '1');
       assert((await lightState(N.p)).els.every(e => !e.shown), '돌아오면 CSS 덮개는 다시 숨는다');
       /* 왕국으로 바꾸면 빛이 걷히고, 대미궁으로 돌아오면 다시 */
-      await N.p.locator('#mapsel button[data-map="kingdom"]').tap(); await N.p.waitForTimeout(200);
+      await N.p.locator('#mapsel button[data-map="kingdom"]').tap(); await calm(N.p);
       const lk = await lightState(N.p); assert(lk.time === 'day' && !lk.canvas && !lk.fxlit && lk.els.every(e => !e.shown), '왕국 — 빛 없음: ' + JSON.stringify(lk));
       await N.p.locator('#mapsel button[data-map="cave"]').tap(); await N.p.waitForFunction(() => document.querySelector('#stage').classList.contains('fxlit'), null, { timeout: 8000 });
       assert.deepEqual(N.errors, [], '밤 오류 없음');
@@ -386,7 +400,7 @@ const NOW = Date.now(), SEED = {
       for (const t of ['dawn', 'morning']) { const X = await lightOpen('/?map=cave&time=' + t); await X.p.waitForFunction(() => document.querySelector('#stage').classList.contains('fxlit'), null, { timeout: 8000 });
         assert.deepEqual(X.light.sort(), [`cave4-light-${t}-glow.webp`, `cave4-light-${t}-mul.webp`], t + ' — 제 빛 그림 두 장');
         const st = await lightState(X.p); assert.equal(st.anim, t === 'dawn', t + ' — 움직임은 새벽 · 밤만');
-        await X.p.evaluate(() => scrollTo(0, 0)); await X.p.waitForTimeout(300);
+        await X.p.evaluate(() => scrollTo(0, 0)); await calm(X.p);
         const fog = []; for (const ms of [0, 6000, 12000, 24000]) fog.push(sum((await fxPx(X.p, [[512, 800]], ms))[0]));
         if (t === 'dawn') assert(Math.max(...fog) - Math.min(...fog) >= 3, '새벽 — 안개가 흐른다: ' + fog); else assert.equal(Math.max(...fog) - Math.min(...fog), 0, '아침 — 정지: ' + fog);
         if (t === 'morning') { const d0 = await X.p.evaluate(() => FX.drawn); await X.p.waitForTimeout(300); assert.equal(await X.p.evaluate(() => FX.drawn), d0, '아침 — 가만히 두면 다시 그리지 않는다'); }
@@ -395,7 +409,7 @@ const NOW = Date.now(), SEED = {
       for (const [why, opt, init] of [['동작 줄이기', { reducedMotion: 'reduce' }, null],
         ['WebGL 없음', {}, () => { const g = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function (t, ...a) { return /webgl/.test(t) ? null : g.call(this, t, ...a); }; }]]) {
         const R = await lightOpen('/?map=cave&time=night', opt, init);
-        await R.p.waitForFunction(() => document.querySelector('#stage').dataset.time === 'night', null, { timeout: 8000 }); await R.p.waitForTimeout(500);
+        await R.p.waitForFunction(() => document.querySelector('#stage').dataset.time === 'night', null, { timeout: 8000 }); await calm(R.p);
         const lr = await lightState(R.p);
         assert(!lr.canvas && !lr.fxlit && !lr.lit, why + ' — 캔버스 없음: ' + JSON.stringify(lr));
         assert.deepEqual(lr.els.map(e => e.id), ['light-mul', 'light-glow'], why + ' — CSS 덮개 둘');
@@ -406,13 +420,13 @@ const NOW = Date.now(), SEED = {
         /* 밤에도 이름표는 읽힌다 — 덮개 위에 있고, 흰 글자 · 어두운 바탕 그대로 */
         const pinStyle = await R.p.evaluate(() => { const c = getComputedStyle(document.querySelector('.pin[data-key="book"] b')); return [c.color, c.backgroundColor, c.mixBlendMode]; });
         assert.deepEqual([pinStyle[0], pinStyle[2]], ['rgb(255, 255, 255)', 'normal'], why + ' — 이름표 글자는 흰색 그대로'); assert.match(pinStyle[1], /rgba\(0, 0, 0, 0\.[6-9]/, why + ' — 이름표 바탕은 어두운 그대로: ' + pinStyle[1]);
-        await R.p.evaluate(() => scrollTo(0, 0)); await R.p.waitForTimeout(300);
+        await R.p.evaluate(() => scrollTo(0, 0)); await calm(R.p);
         assert.deepEqual(await polys(R.p), polyN, why + ' — 다각형은 그대로'); assert.deepEqual(await hits(R.p), hitN, why + ' — 누르는 자리는 그대로');
         assert.deepEqual(R.errors, [], why + ' 오류 없음'); await R.ctx.close();
       }
       /* 빛 그림을 하나라도 못 받으면 — 낮처럼(셰이더에도 CSS 에도 빛 없음), 오류 없이 */
       const Z = await open(); await Z.ctx.route('**/img/cave4-light-night-glow.webp*', r => r.fulfill({ status: 404, body: '' }));
-      await Z.p.goto(BASE + '/?map=cave&time=night'); await Z.p.waitForSelector('canvas.fx.ready', { timeout: 8000 }); await Z.p.waitForTimeout(600);
+      await Z.p.goto(BASE + '/?map=cave&time=night'); await Z.p.waitForSelector('canvas.fx.ready', { timeout: 8000 }); await calm(Z.p);
       const lz = await lightState(Z.p); assert(lz.time === 'day' && !lz.fxlit && !lz.lit && lz.els.every(e => !e.shown), '빛 그림 못 받음 — 빛 없음: ' + JSON.stringify(lz));
       assert.equal(await Z.p.locator('#mapimg').isVisible(), true, '빛 그림 못 받음 — 그림은 그대로'); assert.deepEqual(Z.errors, [], '빛 그림 못 받음 — 오류 없음'); await Z.ctx.close();
       /* 기기 시각으로 고른다 — 새벽 4~6 · 아침 6~9 · 낮 9~18 · 밤 18~4. 틀린 ?time= 은 기기 시각으로, 옳은 ?time= 은 기기 시각을 이긴다 */
@@ -448,7 +462,7 @@ const NOW = Date.now(), SEED = {
       assert.deepEqual(Q.errors, [], '움직임 끔 오류 없음'); await Q.ctx.close();
       /* 움직임 켬 — 기다림은 그대로(누른 뒤 1.2초 안에 확대 시작 · 문 패널, 그 뒤 0.7초에 확대 끝) */
       const M = await open();
-      await M.p.goto(BASE + '/?map=cave&time=day'); await M.p.waitForSelector('canvas.fx.ready', { timeout: 8000 }); await M.p.waitForFunction(() => !document.querySelector('#alice').hidden); await M.p.waitForTimeout(600);
+      await M.p.goto(BASE + '/?map=cave&time=day'); await M.p.waitForSelector('canvas.fx.ready', { timeout: 8000 }); await M.p.waitForFunction(() => !document.querySelector('#alice').hidden); await calm(M.p);
       await M.p.evaluate(() => { window.__t = { tap: performance.now() }; new MutationObserver(() => { const c = document.querySelector('#map').className, t = window.__t;
         if (/zoomed/.test(c) && !t.zoom) t.zoom = performance.now(); if (/zoomed/.test(c) && !/pushing/.test(c) && t.zoom && !t.end) t.end = performance.now(); }).observe(document.querySelector('#map'), { attributes: true }); });
       await M.p.locator('.room[data-key="game"]').tap(); await M.p.waitForSelector('#map.zoomed.pushing', { timeout: 3000 });
@@ -457,7 +471,7 @@ const NOW = Date.now(), SEED = {
       assert(/gone/.test(m0.alice), '확대와 같이 — 앨리스가 문 쪽으로 사라진다: ' + m0.alice); assert(/\bon\b/.test(m0.glow) && m0.glowAnim === 1, '확대와 같이 — 문 자리에서 방 색 빛이 번진다');
       assert(m0.doors && m0.h2 === q1.h2 && m0.back, '문 패널은 확대와 함께 바로 뜬다(연출을 기다리지 않는다)');
       await M.p.waitForFunction(() => { const gl = FX.gl; return gl.getUniform(gl.getParameter(gl.CURRENT_PROGRAM), FX.u.pk)[0] > 1.2; }, null, { timeout: 1500, polling: 16 });   /* 셰이더의 밀기가 평소(1배)보다 세다 */
-      await M.p.waitForSelector('#map.zoomed:not(.pushing)', { timeout: 3000 }); await M.p.waitForTimeout(350);
+      await M.p.waitForSelector('#map.zoomed:not(.pushing)', { timeout: 3000 }); await calm(M.p);
       const m1 = await zoomState(M.p), tm = await M.p.evaluate(() => window.__t);
       assert(tm.zoom - tm.tap < 1300 && tm.end - tm.zoom < 900, '기다림이 늘지 않는다 — 걷기 ' + Math.round(tm.zoom - tm.tap) + 'ms · 확대 ' + Math.round(tm.end - tm.zoom) + 'ms');
       assert(m1.cv === '0' && !m1.push, '확대가 끝나면 캔버스가 감춰진다(그림이 보인다): ' + JSON.stringify(m1)); assert.equal(m1.aliceOp, '0', '앨리스는 방 안으로 사라졌다');
@@ -469,7 +483,7 @@ const NOW = Date.now(), SEED = {
       await M.p.locator('#back').tap(); await M.p.waitForSelector('#map.pushing:not(.zoomed)', { timeout: 2000 });
       const m2 = await zoomState(M.p); assert(m2.cv === '1' && m2.push && !/gone/.test(m2.alice), '나올 때 — 캔버스가 바로 보이고 밀며 나온다, 앨리스는 다시: ' + JSON.stringify(m2));
       await M.p.waitForFunction(() => { const gl = FX.gl; return gl.getUniform(gl.getParameter(gl.CURRENT_PROGRAM), FX.u.pk)[0] < -1.2; }, null, { timeout: 1500, polling: 16 });   /* 반대 방향 */
-      await M.p.waitForSelector('#map:not(.pushing):not(.zoomed)', { timeout: 3000 }); await M.p.waitForTimeout(400);
+      await M.p.waitForSelector('#map:not(.pushing):not(.zoomed)', { timeout: 3000 }); await calm(M.p);
       const m3 = await zoomState(M.p); assert(m3.cv === '1' && !m3.push && m3.aliceOp === '1' && m3.transform === '', '나온 뒤 — 평소대로: ' + JSON.stringify(m3));
       assert.deepEqual(await pk(M.p), [0, 1], '나온 뒤 — 밀기 0 · 평소 기울임 그대로');
       assert(Math.abs(at[0] - at[2][0]) < 1 && Math.abs(at[1] - at[2][1]) < 1 && await M.p.evaluate(([x, y]) => Math.abs(A.x - x) < 1 && Math.abs(A.y - y) < 1, at), '지도로 돌아오면 앨리스는 그 문 앞');
@@ -480,25 +494,25 @@ const NOW = Date.now(), SEED = {
       await leaveMark(M.p); await M.p.locator('#doorlinks a.main').tap(); await M.p.waitForURL(/game-atelier/);
       const lv = JSON.parse(await M.p.evaluate(() => sessionStorage.getItem('lv')));
       assert(/leaving/.test(lv.cls) && /scale\(1\.06\)/.test(lv.tr) && lv.tr.endsWith(tr0), '문 링크 — 누르면 확대된 방이 더 커지며 사라지기 시작한다(넘어가길 기다리지 않는다): ' + JSON.stringify(lv));
-      await M.p.waitForURL(/game-atelier/); await M.p.goBack(); await M.p.waitForSelector('.room'); await M.p.waitForTimeout(400);
+      await M.p.waitForURL(/game-atelier/); await M.p.goBack(); await M.p.waitForSelector('.room'); await calm(M.p);
       assert(!/leaving/.test(await M.p.evaluate(() => document.querySelector('#map').className)), '뒤로 오면 — 원래대로');
       assert.deepEqual(M.errors, [], '연출 오류 없음 — 한 줄이 들어간 공방으로 넘어갔다 와도 오류가 없다');
       /* 한 줄이 들어간 곳(허브의 즐겨찾기 페이지)으로는 문서 간 전환이 실제로 걸린다 — 들어온 쪽의 pagereveal 에 viewTransition 이 있다 */
       const V = await open({}, () => { addEventListener('pagereveal', e => { try { sessionStorage.setItem('vt:' + location.pathname, e.viewTransition ? '1' : '0'); } catch (x) {} }); });
       await V.p.goto(BASE + '/?map=cave&time=day'); await V.p.waitForSelector('canvas.fx.ready', { timeout: 8000 }); await V.p.waitForFunction(() => !document.querySelector('#alice').hidden);
-      await V.p.evaluate(() => scrollTo(0, scrollSpan().span)); await V.p.waitForTimeout(1200);
+      await V.p.evaluate(() => scrollTo(0, scrollSpan().span)); await calm(V.p);
       await V.p.locator('.room[data-key="fav"]').tap(); await V.p.waitForSelector('#map.zoomed:not(.pushing)', { timeout: 4000 });
-      await V.p.locator('#doorlinks a.main').tap(); await V.p.waitForURL(/favorites\.html/); await V.p.waitForTimeout(500);
+      await V.p.locator('#doorlinks a.main').tap(); await V.p.waitForURL(/favorites\.html/); await calm(V.p);
       assert.equal(await V.p.evaluate(() => sessionStorage.getItem('vt:/favorites.html')), '1', '즐겨찾기 페이지로 — 문서 간 전환이 걸린다');
       /* 여기서 나갈 때는 전환을 걸지 않는다(한 줄의 pageswap) — 지도로 돌아와도 그냥 넘어온다 */
-      await V.p.evaluate(() => location.assign('/?map=cave&time=day')); await V.p.waitForSelector('.room'); await V.p.waitForTimeout(400);
+      await V.p.evaluate(() => location.assign('/?map=cave&time=day')); await V.p.waitForSelector('.room'); await calm(V.p);
       assert.equal(await V.p.evaluate(() => sessionStorage.getItem('vt:/')), '0', '즐겨찾기 → 지도 — 전환 없이 그냥');
       /* 공방 저장소(2026-11-12 한 줄을 넣고 VT_READY 에 더했다)로는 전환이 걸리고, 한 줄이 없는 삼국지 쟁탈전(VT_NOT)으로는 걸지 않는다 — 어느 쪽도 오류 없음 */
       assert(await V.p.evaluate(() => ['/atelier/', '/book-atelier/', '/sam-atelier/', '/pkm-atelier/', '/myth-atelier/', '/game-atelier/', '/element-atelier/', '/style-atelier/', '/blender-cloud/'].every(x => VT_READY.includes(x)) && VT_NOT.includes('/sam-atelier/draft.html')), 'VT_READY 에 공방 아홉 · VT_NOT 에 쟁탈전');
       for (const [to, want] of [['/game-atelier/', '1'], ['/sam-atelier/', '1'], ['/sam-atelier/draft.html', '0']]) {
-        await V.p.evaluate(u => location.assign(u), to); await V.p.waitForURL(u => u.pathname === to); await V.p.waitForTimeout(500);
+        await V.p.evaluate(u => location.assign(u), to); await V.p.waitForURL(u => u.pathname === to); await calm(V.p);
         assert.equal(await V.p.evaluate(u => sessionStorage.getItem('vt:' + u), to), want, to + ' — 문서 간 전환 ' + (want === '1' ? '걸림' : '안 걸림'));
-        await V.p.goBack(); await V.p.waitForSelector('.room'); await V.p.waitForTimeout(300);
+        await V.p.goBack(); await V.p.waitForSelector('.room'); await calm(V.p);
       }
       assert.deepEqual(V.errors, [], '전환 오류 없음'); await V.ctx.close();
       await M.p.evaluate(() => { localStorage.removeItem('atelier_hub_last_v1'); localStorage.setItem('atelier_hub_map_v1', 'cave'); }); await M.ctx.close();

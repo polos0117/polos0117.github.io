@@ -1,5 +1,5 @@
 /* 통합 생성기(prompt.html) — 화면에서 끝까지, 그리고 옛 생성기와 같은 글인가.
-   ① 같은 일상컷 장면을 허브와 그 공방의 옛 생성기(/<공방>/prompt.html)에 넣으면 지시문이 글자 하나 다르지 않다 — 네 공방(게임·책·신화 무기·포켓몬).
+   ① 허브가 네 공방(게임·책·신화 무기·포켓몬)의 일상컷 · 폼 · 개방 · 각성 … 지시문을 화면 오류 없이 짓는다. 옛 생성기와 글자 대조는 tests/prompt-parity.cjs(브라우저 없이) 몫.
    ② 포켓몬으로 단계를 처음부터 — 공방 → 화풍(기본) → 대상 → 출력 → 시대 → … 고른 단계는 칩으로 접히고 누르면 돌아간다.
       해방을 켜면 트리 밖이 까닭과 함께 흐리게 뜨고, 고르면 🔓 와 기록(unlocked)에 남는다. 안 쓰는 값(등 돌림)엔 「안 쓴다」.
    ③ 344×882 · 390×844 · 1280×900 에서 옆으로 넘치지 않고 누르는 자리 44px. 폰(≤768)은 칩 레일 한 줄·아래 고정 막대(이전·해방·랜덤·다음)·판 밑 단추 없음, PC 는 판 밑 단추(docs/PROMPT_MOBILE_PLAN.md ①).
@@ -20,16 +20,12 @@ const server = http.createServer((q, s) => {
 });
 const ESM = { 'https://esm.sh/preact@10.24.3': 'preact/dist/preact.mjs', 'https://esm.sh/preact@10.24.3/hooks': 'preact/hooks/dist/hooks.mjs', 'https://esm.sh/htm@3.1.1': 'htm/dist/htm.mjs' };
 const AXES = { overall_intensity: 'strong', skin_exposure: 'bold', action_level: 'balanced', separates_preference: 'balanced' };
-/* 공방마다 — 대상과 장면, 그 공방 생성기의 저장 꼴·주소 */
+/* 공방마다 — 대상과 장면 */
 const CASES = [
-  { a: 'game', subject: 'pacman', scene: { era: 'now', place: 'street_park', act: 'stroll', ofam: 'everyday', item: 'jeans_tee', frame: 'waist_up', lens: 'portrait85', orient: 'front_3q', pose: '', expr: 'calm', axes: { ...AXES, source_influence: 'subtle' } },
-    store: (k, sc) => ['game_prompt_v1', { last: k, cards: { [k]: { mode: 'casual', scenes: { casual: sc } } } }], url: k => '/game-atelier/prompt.html?game=' + k + '&mode=casual' },
-  { a: 'book', subject: 'kosmos', scene: { era: 'now', place: 'street_cafe', act: 'read_book', ofam: 'everyday', item: '', frame: 'three_quarter', lens: 'natural50', orient: 'side', pose: '', expr: 'soft_smile', axes: { ...AXES, source_influence: 'balanced' } },
-    store: (k, sc) => ['book_prompt_v1', { last: k, cards: { [k]: { mode: 'casual', scenes: { casual: sc } } } }], url: k => '/book-atelier/prompt.html?book=' + k + '&mode=casual' },
-  { a: 'myth', subject: '묠니르', scene: { era: 'now', place: 'street_market', act: 'stroll', ofam: 'everyday', item: '', frame: 'full_body', lens: 'natural50', orient: 'front', pose: '', expr: 'calm', axes: { ...AXES, weapon_influence: 'subtle' } },
-    store: (k, sc) => ['myth_prompt_v1', { __card: k, [k]: { output: 'casual', casual: sc } }], url: () => '/myth-atelier/prompt.html' },
-  { a: 'pkm', subject: '피카츄', scene: { era: 'in_pokemon', place: 'partner_garden', act: 'care_feeding', ofam: 'everyday', item: '', frame: 'three_quarter', lens: 'natural50', orient: 'front', pose: 'offering_food', expr: 'gentle', axes: { ...AXES, source_influence: 'strong' } },
-    store: (k, sc) => ['pkm_prompt_v2', { last: k, cards: { [k]: { mode: 'casual', identityMode: 'reference', scenes: { casual: sc } } } }], url: k => '/pkm-atelier/prompt.html?mech=' + encodeURIComponent(k) }
+  { a: 'game', subject: 'pacman', scene: { era: 'now', place: 'street_park', act: 'stroll', ofam: 'everyday', item: 'jeans_tee', frame: 'waist_up', lens: 'portrait85', orient: 'front_3q', pose: '', expr: 'calm', axes: { ...AXES, source_influence: 'subtle' } } },
+  { a: 'book', subject: 'kosmos', scene: { era: 'now', place: 'street_cafe', act: 'read_book', ofam: 'everyday', item: '', frame: 'three_quarter', lens: 'natural50', orient: 'side', pose: '', expr: 'soft_smile', axes: { ...AXES, source_influence: 'balanced' } } },
+  { a: 'myth', subject: '묠니르', scene: { era: 'now', place: 'street_market', act: 'stroll', ofam: 'everyday', item: '', frame: 'full_body', lens: 'natural50', orient: 'front', pose: '', expr: 'calm', axes: { ...AXES, weapon_influence: 'subtle' } } },
+  { a: 'pkm', subject: '피카츄', scene: { era: 'in_pokemon', place: 'partner_garden', act: 'care_feeding', ofam: 'everyday', item: '', frame: 'three_quarter', lens: 'natural50', orient: 'front', pose: 'offering_food', expr: 'gentle', axes: { ...AXES, source_influence: 'strong' } } }
 ];
 /* 폼 초상·개방(2단계) — 옛 생성기 저장값의 카드 꼴 그대로 넣는다 */
 const FORM_CASES = [
@@ -52,15 +48,6 @@ const FORM_CASES = [
   { a: 'pkm', subject: '피카츄', mode: 'open', card: { form: 'light', baseForm: 'heavy', formOverride: '가슴판만', scenes: { action: { custom: '번개가 둘레로' } } } },
   { a: 'pkm', subject: '뮤츠', mode: 'open', card: { baseForm: 'reference' } }
 ];
-/* 옛 생성기 — 저장 열쇠·꼴·주소 */
-const OLD = {
-  game: (c) => ['/game-atelier/prompt.html?game=' + c.subject + '&mode=' + c.mode, ['game_prompt_v1', { last: c.subject, cards: { [c.subject]: { ...c.card, mode: c.mode } } }]],
-  book: (c) => ['/book-atelier/prompt.html?book=' + c.subject + '&mode=' + c.mode, ['book_prompt_v1', { last: c.subject, cards: { [c.subject]: { ...c.card, mode: c.mode } } }]],
-  myth: (c, style) => ['/myth-atelier/prompt.html', ['myth_prompt_v1', { __card: c.subject, [c.subject]: { ...c.card, output: c.mode, style } }]],
-  /* 옛 pkm 생성기는 액션 한 갈래 — 개방은 폼 「폭주」 */
-  pkm: (c) => ['/pkm-atelier/prompt.html?mech=' + encodeURIComponent(c.subject), ['pkm_prompt_v2', { last: c.subject, cards: { [c.subject]: { ...c.card, mode: 'action', ...(c.mode === 'open' ? { form: 'overdrive' } : {}) } } }]]
-};
-
 (async () => {
   await new Promise(r => server.listen(PORT, '127.0.0.1', r));
   const br = await chromium.launch({ headless: true, ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox', '--disable-dev-shm-usage'] } : {}) });
@@ -94,42 +81,24 @@ const OLD = {
     return { ctx, page, errors };
   };
   try {
-    /* ① 옛 생성기와 같은 글 — 옛 생성기는 preact 를 esm.sh 에서 받는다. 받을 수 없으면(바깥이 막힘) 공방 조립 코드로 직접 견준다 */
-    const esm = !!process.env.ESM_DIR;
+    /* ① 허브가 공방마다 지시문을 짓는다(일상컷 넷 · 폼 · 개방 · 신화 초상 · 각성 · 저주 · 스킨 · 포켓몬 액션 · 폭주) — 화면 오류 없이.
+       옛 생성기 화면을 하나씩 열어 글자 대조하던 것은 2026-11-12 뺐다 — 같은 대조를 tests/prompt-parity.cjs 가
+       그 공방 조립 코드로 브라우저 없이(대상 모두 × 장면) 한다. 여기서는 화면만 */
+    const esm = !!process.env.ESM_DIR;   /* ②-4 계획기 주소만 옛 pkm 생성기와 견준다 */
     for (const c of CASES) {
       const hub = await open('/prompt.html?a=' + c.a + '&s=' + encodeURIComponent(c.subject), ['atelier_hub_prompt_v1', { last: c.a, by: { [c.a]: { subject: c.subject, scene: c.scene } } }]);
       await hub.page.waitForFunction(() => document.getElementById('prompt').value.length > 200, null, { timeout: 15000 });
-      const got = await hub.page.locator('#prompt').inputValue();
-      assert(/SCENE/.test(got), c.a + ' 지시문');
+      assert(/SCENE/.test(await hub.page.locator('#prompt').inputValue()), c.a + ' 지시문');
       assert.deepEqual(hub.errors, [], c.a + ' 허브 오류');
-      /* 견줄 글 — 그 공방 옛 생성기 화면. preact 를 못 받으면(ESM_DIR 없고 바깥이 막힘) 건너뛰고 tests/prompt-parity.cjs 에 맡긴다 */
-      let want = null;
-      if (esm) {
-        const old = await open(c.url(c.subject), c.store(c.subject, c.scene));
-        await old.page.waitForFunction(() => (document.getElementById('prompt-output') || {}).value?.length > 200, null, { timeout: 20000 }).catch(() => {});
-        want = await old.page.locator('#prompt-output').inputValue().catch(() => null);
-        await old.ctx.close();
-      }
-      if (want) { assert.equal(got, want, c.a + ' — 허브와 옛 생성기의 지시문이 다르다'); checks++; }
-      else console.log('  (' + c.a + ' 옛 생성기 화면은 바깥 preact 가 막혀 건너뜀 — tests/prompt-parity.cjs 가 조립 코드로 견준다)');
-      await hub.ctx.close();
+      await hub.ctx.close(); checks++;
     }
-
-    /* ①-2 폼 초상·개방 — 허브 = 옛 생성기 */
     for (const c of FORM_CASES) {
       const hub = await open('/prompt.html?a=' + c.a + '&s=' + encodeURIComponent(c.subject) + '&o=' + c.mode, ['atelier_hub_prompt_v1', { last: c.a, by: { [c.a]: { subject: c.subject, out: c.mode, cards: { [c.subject]: c.card } } } }]);
       await hub.page.waitForFunction(() => document.getElementById('prompt').value.length > 200, null, { timeout: 15000 });
       const got = await hub.page.locator('#prompt').inputValue();
       assert.deepEqual(hub.errors, [], c.a + ' ' + c.mode + ' 허브 오류');
       if (c.card.motifs) assert(got.includes(c.card.motifs), '모티프가 지시문에');
-      await hub.ctx.close();
-      if (!esm) continue;
-      const [url, store] = OLD[c.a](c, 'game_keyart');
-      if (c.a === 'pkm') store[1].cards[c.subject].style = 'glossy_promo';
-      const old = await open(url, store);
-      await old.page.waitForFunction(() => (document.getElementById('prompt-output') || {}).value?.length > 200, null, { timeout: 20000 });
-      assert.equal(got, await old.page.locator('#prompt-output').inputValue(), c.a + ' ' + c.mode + ' ' + c.card.form + ' — 허브와 옛 생성기의 지시문이 다르다');
-      await old.ctx.close(); checks++;
+      await hub.ctx.close(); checks++;
     }
 
     /* ② 포켓몬 처음부터 */
