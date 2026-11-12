@@ -3,7 +3,7 @@
    공방 첫 화면의 Last-Modified 가 마지막으로 다녀간 뒤면 이름표에 새 소식 점을 찍는다. 문을 누르면 다녀간 자국(seen)이 남는다.
    휴대폰 세로(390×844)·가로(844×390)·PC(1280×900)에서 가로로 넘치지 않는다. 지도가 세로로 길어(1:2) 가로 화면에선 너비를 정해 두고 굴려 본다.
    아래 "모든 공방" 목록의 링크가 지도의 문들과 같다. 바깥 그림(각 공방의 그림 저장소)은 받지 않는다 — 404 로 돌린다.
-   시간대 조명(2026-11-12) — 344×882 에서 ?time=night 면 빛 그림 덮개 둘이 서고 누르는 자리가 낮과 같다, ?time=day 면 덮개가 없다, 못 받으면 낮처럼, 기기 시각으로 고른다.
+   시간대 조명(2026-11-12) — 344×882 에서 ?time=night 면 패럴랙스 셰이더가 빛 그림 두 장으로 그리고(등불 깜빡임 · 새벽은 안개 흐름) 누르는 자리가 낮과 같다. 움직임 끔 · WebGL 없음이면 CSS 덮개 둘(정지). ?time=day 면 빛이 없다, 못 받으면 낮처럼, 기기 시각으로 고른다.
    Run: CHROMIUM_PATH=<chrome> node tests/map-screen.cjs   (playwright 가 require 되는 자리에서 — NODE_PATH) */
 const assert = require('node:assert/strict'), http = require('node:http'), fs = require('node:fs'), path = require('node:path');
 const { chromium } = require('playwright');
@@ -35,6 +35,7 @@ const NOW = Date.now(), SEED = {
     for (const [name, vp, mobile] of [['phone-port', { width: 390, height: 844 }, true], ['phone-land', { width: 844, height: 390 }, true], ['pc', { width: 1280, height: 900 }, false]]) {
       const ctx = await br.newContext({ viewport: vp, isMobile: mobile, hasTouch: mobile });
       await ctx.addInitScript(seed => { for (const k in seed) if (!localStorage.getItem(k)) localStorage.setItem(k, JSON.stringify(seed[k])); }, SEED);   /* 없을 때만 — 문을 누른 자국이 남아야 한다 */
+      await ctx.addInitScript(() => { Date.prototype.getHours = function () { return 12; }; });   /* 기기 시각은 한낮으로 못 박는다 — 시간대 조명(새벽 · 밤은 셰이더가 계속 다시 그린다)이 검사 도는 시각에 따라 끼어들지 않게. 시간대는 아래에서 ?time= 으로 따로 본다 */
       await ctx.route('**/*', r => r.request().url().startsWith(BASE) ? r.continue() : r.fulfill({ status: 404, body: '' }));
       const p = await ctx.newPage(), errors = []; p.on('pageerror', e => errors.push(String(e)));
       const press = sel => mobile ? p.locator(sel).first().tap() : p.locator(sel).first().click();
@@ -234,6 +235,7 @@ const NOW = Date.now(), SEED = {
       const fold = { width: 344, height: 882 };
       const open = async (opt = {}, init) => {
         const ctx = await br.newContext({ viewport: fold, isMobile: true, hasTouch: true, ...opt });
+        await ctx.addInitScript(() => { Date.prototype.getHours = function () { return 12; }; });   /* 한낮 — 시간대는 ?time= 으로만 */
         if (init) await ctx.addInitScript(init);
         await ctx.route('**/*', r => r.request().url().startsWith(BASE) ? r.continue() : r.fulfill({ status: 404, body: '' }));
         await ctx.route('**/book-atelier-img/sprites/alice/*', r => r.fulfill({ status: 200, contentType: 'image/png', body: fs.readFileSync(path.join(ROOT, 'icon-192.png')) }));
@@ -309,55 +311,105 @@ const NOW = Date.now(), SEED = {
         assert.equal(Math.abs(t[0]) > 0.2 && Math.abs(t[1]) > 0.1, want, os + ' 기울기로 기울임: ' + t);
         assert.deepEqual(G.errors, [], os + ' 오류 없음'); await G.ctx.close();
       }
-      /* 시간대 조명(2026-11-12, 대미궁만) — 빛 그림 덮개 둘(곱하기 · 더하기)이 그림 · 캔버스 · 앨리스 위, 방 다각형 · 이름표 아래에 서고 누름을 받지 않는다.
-         ?time=night 면 덮개 둘 · 누르는 자리는 낮과 같다, ?time=day 면 덮개 없음(받지도 않는다), 못 받으면 낮처럼, 왕국은 덮개 없음, 기기 시각으로 고른다 */
-      const lightState = p => p.evaluate(() => { const s = document.querySelector('#stage').getBoundingClientRect(), z = e => +getComputedStyle(e).zIndex || 0, inner = document.querySelector('#inner'), pins = document.querySelector('#pins');
-        return { time: document.querySelector('#stage').dataset.time, zAlice: z(document.querySelector('#alice')), zSvg: z(document.querySelector('#svg')), zFx: document.querySelector('canvas.fx') ? z(document.querySelector('canvas.fx')) : 0,
+      /* 시간대 조명(2026-11-12, 대미궁만) — 평소에는 패럴랙스 캔버스의 셰이더가 빛 그림 두 장(mul · glow)으로 한 번에 그린다(선형 공간에서 지도 × mul + glow, 밤 등불 깜빡임 · 새벽 안개 흐름).
+         CSS 덮개 둘(multiply · screen, 정지)은 캔버스가 없을 때(움직임 끔 · WebGL 없음)와 방에 다가간 동안만. 방 다각형 · 이름표 · 누르는 자리는 어느 쪽이든 낮과 같다.
+         ?time=day 면 빛 그림 없음(받지도 않는다), 못 받으면 낮처럼, 왕국은 없음, 기기 시각으로 고른다 */
+      const lightState = p => p.evaluate(() => { const st = document.querySelector('#stage'), s = st.getBoundingClientRect(), z = e => +getComputedStyle(e).zIndex || 0, inner = document.querySelector('#inner'), pins = document.querySelector('#pins'), cv = document.querySelector('canvas.fx');
+        return { time: st.dataset.time, fxlit: st.classList.contains('fxlit'), canvas: !!cv, cvOpacity: cv ? getComputedStyle(cv).opacity : null, lit: FX.lit, anim: FX.anim,
+          zAlice: z(document.querySelector('#alice')), zSvg: z(document.querySelector('#svg')), zFx: cv ? z(cv) : 0,
           pinsOver: !inner.contains(pins) && !!(inner.compareDocumentPosition(pins) & Node.DOCUMENT_POSITION_FOLLOWING),
           els: [...document.querySelectorAll('#inner > img.light')].map(e => { const b = e.getBoundingClientRect(), c = getComputedStyle(e);
-            return { id: e.id, shown: !e.hidden && c.display !== 'none', ok: e.complete && e.naturalWidth === 512 && e.naturalHeight === 1536, blend: c.mixBlendMode, pe: c.pointerEvents, z: z(e), src: e.getAttribute('src') || '',
+            return { id: e.id, there: !e.hidden, shown: !e.hidden && c.display !== 'none', ok: e.complete && e.naturalWidth === 512 && e.naturalHeight === 1536, blend: c.mixBlendMode, pe: c.pointerEvents, z: z(e), src: e.getAttribute('src') || '',
               same: Math.abs(b.width - s.width) < 1 && Math.abs(b.height - s.height) < 1 && Math.abs(b.left - s.left) < 1 && Math.abs(b.top - s.top) < 1 }; }) }; });
       const lightOpen = async (url, opt, init) => { const X = await open(opt, init); X.light = []; X.p.on('request', r => { if (/cave4-light-/.test(r.url())) X.light.push(r.url().replace(/^.*\/img\//, '').replace(/\?.*$/, '')); });
         await X.p.goto(BASE + url); await X.p.waitForSelector('.room'); await X.p.waitForFunction(() => document.querySelector('#mapimg').complete); return X; };
+      /* 캔버스의 그 자리(그림 픽셀) 색 — 그 시각(ms)으로 한 장 그리고 바로 읽는다 */
+      const fxPx = (p, pts, ts) => p.evaluate(([pts, ts]) => { FX.drawn = ''; fxFrame(ts); const gl = FX.gl, cv = FX.cv, o = new Uint8Array(4);
+        return pts.map(([x, y]) => { gl.readPixels(Math.round(x / 1024 * cv.width), Math.round((1 - y / 3072) * cv.height), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, o); return [o[0], o[1], o[2]]; }); }, [pts, ts]);
+      const sum = c => c[0] + c[1] + c[2];
+      /* ── 밤: 셰이더가 그린다 ── */
       const N = await lightOpen('/?map=cave&time=night');
-      await N.p.waitForFunction(() => document.querySelector('#stage').dataset.time === 'night', null, { timeout: 8000 });
+      await N.p.waitForFunction(() => document.querySelector('#stage').classList.contains('fxlit') && document.querySelector('canvas.fx.ready'), null, { timeout: 8000 });
       const ln = await lightState(N.p);
-      assert.deepEqual(ln.els.map(e => e.id), ['light-mul', 'light-glow'], '밤 — 덮개 둘');
-      assert(ln.els.every(e => e.shown && e.ok && e.same && e.pe === 'none'), '밤 — 덮개는 받아졌고(512×1536) 지도 크기로 늘어나 있고 누름을 받지 않는다: ' + JSON.stringify(ln.els));
-      assert.deepEqual(ln.els.map(e => e.blend), ['multiply', 'screen'], '밤 — 곱하기 · 더하기');
-      assert.deepEqual(ln.els.map(e => e.src), ['img/cave4-light-night-mul.webp?v=1', 'img/cave4-light-night-glow.webp?v=1'], '밤 — 밤 빛 그림');
+      assert(ln.time === 'night' && ln.canvas && ln.lit && ln.anim && ln.cvOpacity === '1', '밤 — 캔버스가 빛을 그리고 움직인다: ' + JSON.stringify(ln));
       assert.deepEqual(N.light.sort(), ['cave4-light-night-glow.webp', 'cave4-light-night-mul.webp'], '밤 — 그 시간대 두 장만 받는다');
-      assert(ln.els.every(e => e.z > ln.zAlice && e.z > ln.zFx && e.z < ln.zSvg) && ln.pinsOver, '덮개는 그림 · 캔버스 · 앨리스 위, 방 다각형(SVG) · 이름표 아래: ' + JSON.stringify(ln));
-      /* 밤에도 이름표는 읽힌다 — 덮개 위에 있고, 흰 글자 · 어두운 바탕 그대로 */
-      const pinStyle = await N.p.evaluate(() => { const c = getComputedStyle(document.querySelector('.pin[data-key="book"] b')); return [c.color, c.backgroundColor, c.mixBlendMode]; });
-      assert.deepEqual([pinStyle[0], pinStyle[2]], ['rgb(255, 255, 255)', 'normal'], '밤 — 이름표 글자는 흰색 그대로'); assert.match(pinStyle[1], /rgba\(0, 0, 0, 0\.[6-9]/, '밤 — 이름표 바탕은 어두운 그대로: ' + pinStyle[1]);
+      assert(ln.els.length === 2 && ln.els.every(e => e.there && e.ok && !e.shown), '밤 — 캔버스가 그리는 동안 CSS 덮개는 숨는다(두 번 어두워지지 않게): ' + JSON.stringify(ln.els));
       await N.p.evaluate(() => scrollTo(0, 0)); await N.p.waitForTimeout(300);
       const hitN = await hits(N.p), polyN = await polys(N.p);
       for (const [k, got] of hitN) if (got !== 'off') assert.equal(got, k, '밤 — ' + k + ' 누르는 자리는 그 방');
-      /* 낮 — 덮개 없음, 빛 그림도 받지 않는다. 누르는 자리 · 다각형은 밤과 같다 */
-      const Y = await lightOpen('/?map=cave&time=day'); await Y.p.waitForTimeout(600);
+      /* 등불 자리 둘(빛 그림에서 가장 따뜻한 곳 — 위 절반 · 아래 절반)과 빛이 없는 바위 한 곳 */
+      const spots = await N.p.evaluate(() => { const im = document.querySelector('#light-glow'), c = document.createElement('canvas'); c.width = 512; c.height = 1536; const x = c.getContext('2d'); x.drawImage(im, 0, 0);
+        const d = x.getImageData(0, 0, 512, 1536).data, best = [[-1, 0, 0], [-1, 0, 0]]; let dark = [1e9, 0, 0];
+        for (let j = 40; j < 1500; j += 2) for (let i = 20; i < 492; i += 2) { const k = (j * 512 + i) * 4, w = d[k] - d[k + 2], h = j < 500 ? 0 : j > 900 ? 1 : -1, s = d[k] + d[k + 1] + d[k + 2];
+          if (h >= 0 && w > best[h][0]) best[h] = [w, i * 2, j * 2]; if (s < dark[0] && j > 1000 && j < 1100) dark = [s, i * 2, j * 2]; }
+        return { a: best[0].slice(1), b: best[1].slice(1), dark: dark.slice(1), warm: [best[0][0], best[1][0]], darkSum: dark[0] }; });
+      assert(spots.warm.every(w => w > 60) && spots.darkSum < 12, '빛 그림에서 등불 자리 · 어두운 자리를 찾는다: ' + JSON.stringify(spots));
+      const times = [1000, 1170, 1340, 1510, 1680, 1850, 2020, 2190, 2360, 2530, 2700, 2870], ser = { a: [], b: [], dark: [] };
+      for (const t of times) { const [a, b, d] = await fxPx(N.p, [spots.a, spots.b, spots.dark], t); ser.a.push(sum(a)); ser.b.push(sum(b)); ser.dark.push(sum(d)); }
+      const swing = v => { const lo = Math.min(...v), hi = Math.max(...v); return [(hi - lo) / ((hi + lo) / 2), hi - lo]; };
+      for (const k of ['a', 'b']) { const [rel, abs] = swing(ser[k]); assert(abs >= 3 && rel <= 0.13, '밤 — 등불은 약하게 깜빡인다(±5% 안팎): ' + k + ' ' + JSON.stringify(ser[k])); }
+      assert.equal(swing(ser.dark)[1], 0, '밤 — 빛이 없는 곳은 깜빡이지 않는다: ' + JSON.stringify(ser.dark));
+      const norm = v => { const m = v.reduce((x, y) => x + y, 0) / v.length, d = v.map(x => x - m), n = Math.hypot(...d) || 1; return d.map(x => x / n); };
+      const corr = norm(ser.a).reduce((acc, x, i) => acc + x * norm(ser.b)[i], 0);
+      assert(corr < 0.9, '밤 — 등불마다 박자가 다르다(두 등불의 밝기 흐름이 같이 놀지 않는다): ' + corr.toFixed(3));
+      /* 움직임이 돌고 있다 — 가만히 둬도 다시 그린다 */
+      const d1 = await N.p.evaluate(() => FX.drawn); await N.p.waitForTimeout(400); assert.notEqual(await N.p.evaluate(() => FX.drawn), d1, '밤 — 가만히 둬도 다시 그린다(깜빡임)');
+      /* 낮 — 빛 그림 없음(받지도 않는다). 누르는 자리 · 다각형은 밤과 같고, 밤은 낮보다 어둡다 */
+      const Y = await lightOpen('/?map=cave&time=day'); await Y.p.waitForSelector('canvas.fx.ready', { timeout: 8000 });
       const ly = await lightState(Y.p);
-      assert.equal(ly.time, 'day', '낮'); assert(ly.els.length === 2 && ly.els.every(e => !e.shown && !e.src), '낮 — 덮개 없음: ' + JSON.stringify(ly.els)); assert.deepEqual(Y.light, [], '낮 — 빛 그림을 받지 않는다');
+      assert(ly.time === 'day' && !ly.fxlit && !ly.lit && !ly.anim, '낮 — 셰이더에 빛 없음: ' + JSON.stringify(ly)); assert(ly.els.length === 2 && ly.els.every(e => !e.there && !e.shown && !e.src), '낮 — 덮개 없음'); assert.deepEqual(Y.light, [], '낮 — 빛 그림을 받지 않는다');
       await Y.p.evaluate(() => scrollTo(0, 0)); await Y.p.waitForTimeout(300);
-      assert.deepEqual(await polys(Y.p), polyN, '덮개가 있어도 다각형은 낮과 같은 자리'); assert.deepEqual(await hits(Y.p), hitN, '덮개가 있어도 누르는 자리는 낮과 같다');
+      assert.deepEqual(await polys(Y.p), polyN, '빛을 그려도 다각형은 낮과 같은 자리'); assert.deepEqual(await hits(Y.p), hitN, '빛을 그려도 누르는 자리는 낮과 같다');
+      const rock = [[512, 760], [150, 470], [512, 2330]], dayPx = await fxPx(Y.p, rock, 1000), nightPx = await fxPx(N.p, rock, 1000);
+      assert(nightPx.every((c, i) => sum(c) < sum(dayPx[i]) * 0.9), '밤은 낮보다 어둡다(호수 · 방 · 홀): ' + JSON.stringify([dayPx, nightPx]));
+      const dY = await Y.p.evaluate(() => FX.drawn); await Y.p.waitForTimeout(300); assert.equal(await Y.p.evaluate(() => FX.drawn), dY, '낮 — 가만히 두면 다시 그리지 않는다');
       assert.deepEqual(Y.errors, [], '낮 오류 없음'); await Y.ctx.close();
-      /* 밤에 방을 누르면 다가가고 문이 열린다. 왕국으로 바꾸면 덮개가 걷히고, 대미궁으로 돌아오면 다시 */
+      /* 밤에 방을 누르면 다가간다 — 그동안은 캔버스가 쉬고 CSS 덮개가 맡는다. 돌아오면 다시 셰이더 */
       await N.p.locator('.room[data-key="review"]').tap(); await N.p.waitForSelector('#map.zoomed', { timeout: 3000 });
-      assert.equal(await N.p.locator('.room.on').getAttribute('data-key'), 'review', '밤 — 누르면 그 방으로 다가간다'); assert.equal(await N.p.locator('#doors').isVisible(), true, '밤 — 문 패널이 뜬다'); assert((await lightState(N.p)).els.every(e => e.shown), '다가가도 덮개는 그대로');
-      await N.p.locator('#back').tap(); await N.p.waitForSelector('#map:not(.zoomed)');
+      assert.equal(await N.p.locator('.room.on').getAttribute('data-key'), 'review', '밤 — 누르면 그 방으로 다가간다'); assert.equal(await N.p.locator('#doors').isVisible(), true, '밤 — 문 패널이 뜬다');
+      const lzoom = await lightState(N.p);
+      assert(lzoom.cvOpacity === '0' && lzoom.els.every(e => e.shown && e.pe === 'none'), '다가간 동안 — 캔버스는 쉬고 CSS 덮개가 맡는다(지도와 같이 커져 있다): ' + JSON.stringify(lzoom));
+      assert.deepEqual(lzoom.els.map(e => e.blend), ['multiply', 'screen'], '다가간 동안 — 곱하기 · 더하기');
+      await N.p.locator('#back').tap(); await N.p.waitForSelector('#map:not(.zoomed)'); await N.p.waitForFunction(() => getComputedStyle(document.querySelector('canvas.fx')).opacity === '1');
+      assert((await lightState(N.p)).els.every(e => !e.shown), '돌아오면 CSS 덮개는 다시 숨는다');
+      /* 왕국으로 바꾸면 빛이 걷히고, 대미궁으로 돌아오면 다시 */
       await N.p.locator('#mapsel button[data-map="kingdom"]').tap(); await N.p.waitForTimeout(200);
-      const lk = await lightState(N.p); assert(lk.time === 'day' && lk.els.every(e => !e.shown), '왕국 — 덮개 없음');
-      await N.p.locator('#mapsel button[data-map="cave"]').tap(); await N.p.waitForFunction(() => document.querySelector('#stage').dataset.time === 'night');
-      assert((await lightState(N.p)).els.every(e => e.shown), '대미궁으로 돌아오면 덮개 다시');
+      const lk = await lightState(N.p); assert(lk.time === 'day' && !lk.canvas && !lk.fxlit && lk.els.every(e => !e.shown), '왕국 — 빛 없음: ' + JSON.stringify(lk));
+      await N.p.locator('#mapsel button[data-map="cave"]').tap(); await N.p.waitForFunction(() => document.querySelector('#stage').classList.contains('fxlit'), null, { timeout: 8000 });
       assert.deepEqual(N.errors, [], '밤 오류 없음');
       await N.p.evaluate(() => { localStorage.removeItem('atelier_hub_last_v1'); localStorage.setItem('atelier_hub_map_v1', 'cave'); }); await N.ctx.close();
-      /* 새벽 · 아침도 제 그림 두 장 */
-      for (const t of ['dawn', 'morning']) { const X = await lightOpen('/?map=cave&time=' + t); await X.p.waitForFunction(t => document.querySelector('#stage').dataset.time === t, t, { timeout: 8000 });
-        assert.deepEqual(X.light.sort(), [`cave4-light-${t}-glow.webp`, `cave4-light-${t}-mul.webp`], t + ' — 제 빛 그림 두 장'); assert.deepEqual(X.errors, [], t + ' 오류 없음'); await X.ctx.close(); }
-      /* 덮개 그림을 하나라도 못 받으면 — 낮처럼 덮개 없이, 오류 없이 */
+      /* 새벽 — 안개가 천천히 흐른다(호수 위 한 점이 시간이 가면 달라진다). 아침 — 정지(가만히 두면 다시 그리지 않는다) */
+      for (const t of ['dawn', 'morning']) { const X = await lightOpen('/?map=cave&time=' + t); await X.p.waitForFunction(() => document.querySelector('#stage').classList.contains('fxlit'), null, { timeout: 8000 });
+        assert.deepEqual(X.light.sort(), [`cave4-light-${t}-glow.webp`, `cave4-light-${t}-mul.webp`], t + ' — 제 빛 그림 두 장');
+        const st = await lightState(X.p); assert.equal(st.anim, t === 'dawn', t + ' — 움직임은 새벽 · 밤만');
+        await X.p.evaluate(() => scrollTo(0, 0)); await X.p.waitForTimeout(300);
+        const fog = []; for (const ms of [0, 6000, 12000, 24000]) fog.push(sum((await fxPx(X.p, [[512, 800]], ms))[0]));
+        if (t === 'dawn') assert(Math.max(...fog) - Math.min(...fog) >= 3, '새벽 — 안개가 흐른다: ' + fog); else assert.equal(Math.max(...fog) - Math.min(...fog), 0, '아침 — 정지: ' + fog);
+        if (t === 'morning') { const d0 = await X.p.evaluate(() => FX.drawn); await X.p.waitForTimeout(300); assert.equal(await X.p.evaluate(() => FX.drawn), d0, '아침 — 가만히 두면 다시 그리지 않는다'); }
+        assert.deepEqual(X.errors, [], t + ' 오류 없음'); await X.ctx.close(); }
+      /* ── 캔버스가 없을 때만 CSS 덮개: 움직임 끔(동작 줄이기) · WebGL 없음 — 정지, 그림 · 앨리스 위, 방 다각형 · 이름표 아래, 누름 없음 ── */
+      for (const [why, opt, init] of [['동작 줄이기', { reducedMotion: 'reduce' }, null],
+        ['WebGL 없음', {}, () => { const g = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function (t, ...a) { return /webgl/.test(t) ? null : g.call(this, t, ...a); }; }]]) {
+        const R = await lightOpen('/?map=cave&time=night', opt, init);
+        await R.p.waitForFunction(() => document.querySelector('#stage').dataset.time === 'night', null, { timeout: 8000 }); await R.p.waitForTimeout(500);
+        const lr = await lightState(R.p);
+        assert(!lr.canvas && !lr.fxlit && !lr.lit, why + ' — 캔버스 없음: ' + JSON.stringify(lr));
+        assert.deepEqual(lr.els.map(e => e.id), ['light-mul', 'light-glow'], why + ' — CSS 덮개 둘');
+        assert(lr.els.every(e => e.shown && e.ok && e.same && e.pe === 'none'), why + ' — 덮개는 받아졌고(512×1536) 지도 크기로 늘어나 있고 누름을 받지 않는다: ' + JSON.stringify(lr.els));
+        assert.deepEqual(lr.els.map(e => e.blend), ['multiply', 'screen'], why + ' — 곱하기 · 더하기');
+        assert(lr.els.every(e => e.z > lr.zAlice && e.z < lr.zSvg) && lr.pinsOver, why + ' — 덮개는 그림 · 앨리스 위, 방 다각형(SVG) · 이름표 아래');
+        assert.equal(await R.p.evaluate(() => document.querySelector('#light-glow').getAnimations().length), 0, why + ' — 덮개는 정지');
+        /* 밤에도 이름표는 읽힌다 — 덮개 위에 있고, 흰 글자 · 어두운 바탕 그대로 */
+        const pinStyle = await R.p.evaluate(() => { const c = getComputedStyle(document.querySelector('.pin[data-key="book"] b')); return [c.color, c.backgroundColor, c.mixBlendMode]; });
+        assert.deepEqual([pinStyle[0], pinStyle[2]], ['rgb(255, 255, 255)', 'normal'], why + ' — 이름표 글자는 흰색 그대로'); assert.match(pinStyle[1], /rgba\(0, 0, 0, 0\.[6-9]/, why + ' — 이름표 바탕은 어두운 그대로: ' + pinStyle[1]);
+        await R.p.evaluate(() => scrollTo(0, 0)); await R.p.waitForTimeout(300);
+        assert.deepEqual(await polys(R.p), polyN, why + ' — 다각형은 그대로'); assert.deepEqual(await hits(R.p), hitN, why + ' — 누르는 자리는 그대로');
+        assert.deepEqual(R.errors, [], why + ' 오류 없음'); await R.ctx.close();
+      }
+      /* 빛 그림을 하나라도 못 받으면 — 낮처럼(셰이더에도 CSS 에도 빛 없음), 오류 없이 */
       const Z = await open(); await Z.ctx.route('**/img/cave4-light-night-glow.webp*', r => r.fulfill({ status: 404, body: '' }));
-      await Z.p.goto(BASE + '/?map=cave&time=night'); await Z.p.waitForSelector('.room'); await Z.p.waitForFunction(() => document.querySelector('#mapimg').complete); await Z.p.waitForTimeout(900);
-      const lz = await lightState(Z.p); assert(lz.time === 'day' && lz.els.every(e => !e.shown), '빛 그림 못 받음 — 덮개 없음: ' + JSON.stringify(lz.els));
+      await Z.p.goto(BASE + '/?map=cave&time=night'); await Z.p.waitForSelector('canvas.fx.ready', { timeout: 8000 }); await Z.p.waitForTimeout(600);
+      const lz = await lightState(Z.p); assert(lz.time === 'day' && !lz.fxlit && !lz.lit && lz.els.every(e => !e.shown), '빛 그림 못 받음 — 빛 없음: ' + JSON.stringify(lz));
       assert.equal(await Z.p.locator('#mapimg').isVisible(), true, '빛 그림 못 받음 — 그림은 그대로'); assert.deepEqual(Z.errors, [], '빛 그림 못 받음 — 오류 없음'); await Z.ctx.close();
       /* 기기 시각으로 고른다 — 새벽 4~6 · 아침 6~9 · 낮 9~18 · 밤 18~4. 틀린 ?time= 은 기기 시각으로, 옳은 ?time= 은 기기 시각을 이긴다 */
       for (const [h, want, q] of [[3, 'night'], [4, 'dawn'], [5, 'dawn'], [6, 'morning'], [8, 'morning'], [9, 'day'], [17, 'day'], [18, 'night'], [23, 'night'], [0, 'night'], [12, 'day', 'noon'], [12, 'night', 'night'], [23, 'day', 'day']]) {
@@ -367,7 +419,7 @@ const NOW = Date.now(), SEED = {
         const p = await ctx.newPage(); await p.goto(BASE + '/?map=cave' + (q ? '&time=' + q : '')); await p.waitForSelector('.room');
         assert.equal(await p.evaluate(() => TIME), want, h + '시' + (q ? ' ?time=' + q : '') + ' → ' + want); await ctx.close();
       }
-      console.log('PASS 시간대 조명: ?time=night 덮개 둘(곱하기 · 더하기, 지도 크기, 누름 없음, 앨리스 위 · 다각형 아래) · 누르는 자리 · 다각형은 낮과 같다 · 이름표 그대로 · ?time=day 덮개 없음 · 새벽 · 아침 · 왕국 · 못 받음 · 기기 시각 열 · ?time= 셋');
+      console.log('PASS 시간대 조명: 밤 — 셰이더가 빛을 그린다(CSS 덮개 숨음 · 낮보다 어둡다 · 등불 깜빡임 ±5% · 등불마다 다른 박자 · 빛 없는 곳은 그대로) · 누르는 자리 · 다각형은 낮과 같다 · 다가간 동안은 CSS 덮개 · 새벽 안개 흐름 · 아침 정지 · 낮 빛 없음 · 동작 줄이기 · WebGL 없음이면 CSS 덮개 둘(곱하기 · 더하기 · 정지 · 이름표 그대로) · 왕국 · 못 받음 · 기기 시각 열 · ?time= 셋');
     }
     console.log('PASS 공방 지도: 방 열여섯(공방 열 · 도구 다섯 · 도시공방 준비 중, 두 층 1:3)·칩·이름표·카드 · 지도 고르기(대미궁 · 왕국 — 지명 · 구역 · 기억 · ?map=) · 빛나기·미리보기 · 다가가기·문·주소·Esc·뒤로 가기 · 오늘 불·오늘 줄·오늘의 판·새 소식·다녀간 자국 · 세로/가로/PC 넘침 없음, 가로는 폭을 정해 굴린다 · 깊이 패럴랙스(344×882 — 깊이 그림 · 누르는 자리 그대로 · 앨리스 · 안드로이드 기울기/iOS 는 굴림만 · 움직임 끔/못 받음/왕국은 정지 그림)');
   } finally { await br.close(); server.close(); }
