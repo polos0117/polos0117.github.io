@@ -39,12 +39,14 @@ https://polos0117.github.io/ — 건담 · 삼국지 · 포켓몬 · 신화 무�
     시간대 조명과 겹칠 때: 미는 동안은 셰이더가 빛을 그리고 CSS 덮개는 숨는다. 끝나는 순간 빛 없는 한 장을 그려 두고 CSS 덮개와 같은 프레임에 맞바꾼 뒤 캔버스를 감춘다 — 빛이 든 캔버스와 덮개가 겹쳐 두 번 어두워지거나, 흐려지는 동안 밝기가 출렁이지 않게.
   - **② 앨리스가 문으로** — 문 앞에 닿은 앨리스가 문 쪽(방 가운데 쪽)으로 반 걸음(그림 14px) 걸으며 0.25초에 사라진다(`.alice.gone`). 문 자리에서 방 색 빛이 한 번 번진다(`#doorglow` — `radial-gradient` · `mix-blend-mode: screen` · 0.6초, 덮개 위 · 방 다각형 아래, 누름 없음). 지도로 돌아오면 문 앞에 다시 선다.
   - **③ 공방으로 넘어가는 전환** — 문 링크를 누르면 확대된 방이 살짝 더(1.06배) 커지며 사라진다(`#map.leaving` 0.28초). 누르자마자 넘어가고 그 사이에 흐르는 것이라 기다림이 없다. 공방 페이지는 문서 간 전환(`@view-transition`)의 페이드로 들어온다. 뒤로 와서 다시 보이면(`pageshow`) · 2.5초 안에 못 넘어갔으면 원래대로. 새 탭으로 열기(Ctrl · 가운데 단추)는 건드리지 않는다.
-    - **각 공방 저장소에 넣을 한 줄** — 넘어가는 쪽 페이지의 `<head>` 에도 같은 한 줄이 있어야 문서 간 전환이 된다:
+    - **각 공방 저장소에 넣을 한 줄** — 넘어가는 쪽 페이지의 `<head>` 에도 전환을 받겠다는 한 줄이 있어야 문서 간 전환이 된다(`<title>` 바로 아래에 넣었다):
       ```html
-      <style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }</style>
+      <style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }</style><script>addEventListener('pageswap', e => { const t = e.viewTransition; if (t) { t.skipTransition(); t.ready.catch(() => {}); } }); addEventListener('pagereveal', e => { const t = e.viewTransition; if (t) t.ready.catch(() => {}); });</script>
       ```
       그리고 허브 `index.html` 의 `VT_READY` 에 그 공방 경로를 더한다(예: `'/atelier/'` — 끝이 `/` 면 그 아래 모두). 한 줄이 없는 페이지로 전환을 걸면 크롬이 **그 페이지 콘솔에** 오류(`Transition was aborted … ViewTransition opt-in disabled`)를 남겨서, 허브는 목록에 있는 곳으로 갈 때만 전환을 걸고 나머지는 `pageswap` 에서 그만둔다(지금처럼 그냥 넘어간다 — 방이 커지며 사라지는 것까지는 보인다).
-      지금 목록: 허브 저장소의 `favorites.html` · `status.html` · `sweep.html` · `review.html` · `dot.html` · `prompt.html`(이 여섯에는 한 줄을 넣었다). 공방 저장소(atelier · book · sam · pkm · myth · game · element · style · blender-cloud)는 아직 — 넣는 대로 목록에 더한다.
+      뒤쪽 `<script>` 는 「여기서 나갈 때는 전환을 그만둔다」 — 전환은 지도에서 나갈 때만 걸린다. 이것이 없으면 한 줄을 넣은 페이지끼리(공방 안에서 서재 → 서가처럼) 옮길 때마다 페이드가 걸리고, 그 공방의 움직임 끔(AtelierMotion)도 못 따른다. 공방에서 지도로 돌아올 때도 전과 같이 그냥 넘어온다. 맨 뒤 `pagereveal` 한 마디는 들어오던 전환이 중간에 끊겼을 때(받는 데 4초 넘게 걸림 · 화면 크기가 바뀜) 브라우저가 콘솔에 남기는 오류를 받아 두는 것 — 화면은 어느 쪽이든 그냥 넘어온 것과 같다.
+      지금 목록(2026-11-12): 허브 저장소의 `favorites.html` · `status.html` · `sweep.html` · `review.html` · `dot.html` · `prompt.html`, 그리고 공방 저장소 아홉 — `/atelier/` · `/book-atelier/` · `/sam-atelier/` · `/pkm-atelier/` · `/myth-atelier/` · `/game-atelier/` · `/element-atelier/` · `/style-atelier/` · `/blender-cloud/`(사용자 「각 공방 저장소에도 한 줄 넣고 VT_READY 에 더해줘」 — 그 저장소의 화면 페이지마다 넣었고, 공방마다 `docs/PATCH.md` 에 적었다). 새 페이지를 만들면 그 페이지에도 넣는다.
+      넣지 않은 곳: sam-atelier `draft.html`(삼국지 쟁탈전 — 「게임은 그대로 둔다」)은 `VT_NOT` 에 적어 전환을 걸지 않는다(문은 지금처럼 그냥 넘어간다). atelier 의 옛 주소 이동 페이지(`draft.html` · `sam.html` · `sam/`)와 `paep/`(지도에 문이 없다)도 넣지 않았다.
     - 문서 간 전환을 모르는 브라우저(`CSSViewTransitionRule` 없음)는 ③ 을 통째로 건너뛴다 — 지금처럼 그냥 넘어간다.
   - **움직임 끔**(`AtelierMotion`, 없으면 동작 줄이기)이면 ① ② ③ 모두 없이 전과 같다(③ 은 `#vt` 의 `media` 를 `not all` 로 바꿔 끈다). 캔버스가 없을 때(WebGL 없음 · 깊이 그림 못 받음 · 왕국)는 ① 만 없다.
   - 검사: `tests/map-screen.cjs` 의 344×882 터치 — 확대 동안 `.pushing` · 캔버스 보임 · 셰이더의 밀기가 평소(1배)보다 세다 · 앨리스 `.gone` · 문 빛 한 번 · 문 패널은 확대와 함께 바로 · 누른 뒤 확대 시작까지 1.3초 안 · 확대 0.9초 안(기다림 그대로) · 확대가 끝나면 캔버스가 감춰지고 지도 자리 · 방 다각형 · 누르는 자리 · 문 패널이 움직임 끔 때와 같다 · 나올 때 반대 방향으로 밀고 앨리스는 문 앞에 다시 · 문 링크를 누르면 `.leaving` 과 1.06배 · 뒤로 오면 원래대로 · 한 줄이 없는 공방으로는 오류 없이 그냥 · 즐겨찾기 페이지로는 전환이 실제로 걸린다 · 밤에는 미는 동안 셰이더, 끝나면 CSS 덮개 · 움직임 끔이면 `.pushing` · `.gone` · 문 빛 · `.leaving` 없음.

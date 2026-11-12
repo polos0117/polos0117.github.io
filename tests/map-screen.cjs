@@ -12,10 +12,12 @@ const ROOT = path.resolve(__dirname, '..'), PORT = 8766, BASE = 'http://127.0.0.
 const MIME = { '.html': 'text/html; charset=utf-8', '.webp': 'image/webp', '.png': 'image/png', '.json': 'application/json', '.js': 'text/javascript' };
 const T = require(path.join(ROOT, 'today.js'));
 const LM = new Date(Date.now() - 60e3);   /* 공방들이 "배포된" 때 — 일 분 전 */
+const VT_LINE = "<style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }</style><script>addEventListener('pageswap', e => { const t = e.viewTransition; if (t) { t.skipTransition(); t.ready.catch(() => {}); } }); addEventListener('pagereveal', e => { const t = e.viewTransition; if (t) t.ready.catch(() => {}); });</script>";
 const server = http.createServer((q, s) => {
   const url = new URL(q.url, BASE);
   /* 공방 첫 화면 — 지도가 HEAD 로 Last-Modified 를 묻는 자리(진짜 공방은 다른 저장소) */
-  if (/^\/(atelier|book-atelier|sam-atelier|pkm-atelier|myth-atelier|game-atelier)\/$/.test(url.pathname)) { s.setHeader('Last-Modified', LM.toUTCString()); s.setHeader('Content-Type', 'text/html'); return s.end('<!doctype html><title>room</title>'); }
+  /* 진짜 공방 페이지처럼 「문서 간 전환을 받는 한 줄」을 넣어 둔다(README 「방에 들어가는 연출」) — 삼국지 쟁탈전(draft.html)만 한 줄이 없다 */
+  if (/^\/(atelier|book-atelier|sam-atelier|pkm-atelier|myth-atelier|game-atelier)\/(draft\.html)?$/.test(url.pathname)) { s.setHeader('Last-Modified', LM.toUTCString()); s.setHeader('Content-Type', 'text/html'); return s.end('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>room</title>' + (/draft\.html$/.test(url.pathname) ? '' : VT_LINE)); }
   const f = path.join(ROOT, decodeURIComponent(url.pathname.replace(/\/$/, '/index.html')));
   fs.readFile(f, (e, d) => { if (e) { s.writeHead(404); return s.end(); } s.setHeader('Content-Type', MIME[path.extname(f)] || 'application/octet-stream'); s.setHeader('Last-Modified', LM.toUTCString()); s.end(d); });
 }).listen(PORT);
@@ -480,7 +482,7 @@ const NOW = Date.now(), SEED = {
       assert(/leaving/.test(lv.cls) && /scale\(1\.06\)/.test(lv.tr) && lv.tr.endsWith(tr0), '문 링크 — 누르면 확대된 방이 더 커지며 사라지기 시작한다(넘어가길 기다리지 않는다): ' + JSON.stringify(lv));
       await M.p.waitForURL(/game-atelier/); await M.p.goBack(); await M.p.waitForSelector('.room'); await M.p.waitForTimeout(400);
       assert(!/leaving/.test(await M.p.evaluate(() => document.querySelector('#map').className)), '뒤로 오면 — 원래대로');
-      assert.deepEqual(M.errors, [], '연출 오류 없음 — 전환 한 줄이 목록(VT_READY)에 없는 공방으로는 전환을 걸지 않아 그쪽 콘솔에도 오류가 없다');
+      assert.deepEqual(M.errors, [], '연출 오류 없음 — 한 줄이 들어간 공방으로 넘어갔다 와도 오류가 없다');
       /* 한 줄이 들어간 곳(허브의 즐겨찾기 페이지)으로는 문서 간 전환이 실제로 걸린다 — 들어온 쪽의 pagereveal 에 viewTransition 이 있다 */
       const V = await open({}, () => { addEventListener('pagereveal', e => { try { sessionStorage.setItem('vt:' + location.pathname, e.viewTransition ? '1' : '0'); } catch (x) {} }); });
       await V.p.goto(BASE + '/?map=cave&time=day'); await V.p.waitForSelector('canvas.fx.ready', { timeout: 8000 }); await V.p.waitForFunction(() => !document.querySelector('#alice').hidden);
@@ -488,6 +490,16 @@ const NOW = Date.now(), SEED = {
       await V.p.locator('.room[data-key="fav"]').tap(); await V.p.waitForSelector('#map.zoomed:not(.pushing)', { timeout: 4000 });
       await V.p.locator('#doorlinks a.main').tap(); await V.p.waitForURL(/favorites\.html/); await V.p.waitForTimeout(500);
       assert.equal(await V.p.evaluate(() => sessionStorage.getItem('vt:/favorites.html')), '1', '즐겨찾기 페이지로 — 문서 간 전환이 걸린다');
+      /* 여기서 나갈 때는 전환을 걸지 않는다(한 줄의 pageswap) — 지도로 돌아와도 그냥 넘어온다 */
+      await V.p.evaluate(() => location.assign('/?map=cave&time=day')); await V.p.waitForSelector('.room'); await V.p.waitForTimeout(400);
+      assert.equal(await V.p.evaluate(() => sessionStorage.getItem('vt:/')), '0', '즐겨찾기 → 지도 — 전환 없이 그냥');
+      /* 공방 저장소(2026-11-12 한 줄을 넣고 VT_READY 에 더했다)로는 전환이 걸리고, 한 줄이 없는 삼국지 쟁탈전(VT_NOT)으로는 걸지 않는다 — 어느 쪽도 오류 없음 */
+      assert(await V.p.evaluate(() => ['/atelier/', '/book-atelier/', '/sam-atelier/', '/pkm-atelier/', '/myth-atelier/', '/game-atelier/', '/element-atelier/', '/style-atelier/', '/blender-cloud/'].every(x => VT_READY.includes(x)) && VT_NOT.includes('/sam-atelier/draft.html')), 'VT_READY 에 공방 아홉 · VT_NOT 에 쟁탈전');
+      for (const [to, want] of [['/game-atelier/', '1'], ['/sam-atelier/', '1'], ['/sam-atelier/draft.html', '0']]) {
+        await V.p.evaluate(u => location.assign(u), to); await V.p.waitForURL(u => u.pathname === to); await V.p.waitForTimeout(500);
+        assert.equal(await V.p.evaluate(u => sessionStorage.getItem('vt:' + u), to), want, to + ' — 문서 간 전환 ' + (want === '1' ? '걸림' : '안 걸림'));
+        await V.p.goBack(); await V.p.waitForSelector('.room'); await V.p.waitForTimeout(300);
+      }
       assert.deepEqual(V.errors, [], '전환 오류 없음'); await V.ctx.close();
       await M.p.evaluate(() => { localStorage.removeItem('atelier_hub_last_v1'); localStorage.setItem('atelier_hub_map_v1', 'cave'); }); await M.ctx.close();
       /* 밤(시간대 조명)과 겹쳐도 — 미는 동안은 셰이더가 빛을 그리고(CSS 덮개 숨음), 끝나면 CSS 덮개가 맡는다 */

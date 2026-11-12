@@ -13,7 +13,7 @@
   ② 받은 그림을 저장 이름 그대로 한꺼번에 고르면 항목마다 단계 × 반복 칸에 놓인다. ③ 차례가 있는 항목은 점을 찍어 비율을 재고(2D↔실사는 눈으로 1~5), 갈래 항목은 맞음 · 애매 · 아님.
   ④ 항목마다 판정 — 단계 평균이 차례대로 움직이고 이웃 단계 차이가 같은 단계 안 흔들림보다 크면 「반영됨」. 그림은 이 기기에만, 잰 값은 브라우저에 저장 · JSON 내보내기.
 -->
-<style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }</style>   <!-- 허브 지도의 문에서 넘어올 때 페이드로 들어온다(2026-11-12 — index.html 「방에 들어가는 연출」). 모르는 브라우저는 그냥 넘어온다 -->
+<style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }</style><script>addEventListener('pageswap', e => { const t = e.viewTransition; if (t) { t.skipTransition(); t.ready.catch(() => {}); } }); addEventListener('pagereveal', e => { const t = e.viewTransition; if (t) t.ready.catch(() => {}); });</script>   <!-- 허브 지도의 문에서 넘어올 때 페이드로 들어온다(2026-11-12 — index.html 「방에 들어가는 연출」). 여기서 나갈 때는 전환을 걸지 않는다(공방 저장소에 넣은 것과 같은 한 줄). 모르는 브라우저는 그냥 넘어온다 -->
 <style>
 :root { --bg: #0b0a0e; --card: #18161d; --card2: #211e28; --line: #ffffff1a; --line2: #ffffff33; --text: #f1ece2; --muted: #a8a09a; --gold: #d9b45a; --ok: #8fd9a8; --bad: #ff8f8f; --warn: #f2c46d;
   --sans: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; --mono: ui-monospace, Menlo, Consolas, monospace; }

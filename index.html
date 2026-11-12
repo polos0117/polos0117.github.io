@@ -50,7 +50,7 @@
      평소 기울임은 그동안 0 으로 줄여 끝날 때 정지 그림과 똑같아지고, 확대가 끝나면 캔버스를 0.15초에 감춘다(그림이 보인다). 나올 때는 반대로(바로 캔버스, 안으로 당기며 평소 기울임이 돌아온다).
      시간대 조명과 겹칠 때: 미는 동안은 셰이더가 빛을 그리고(CSS 덮개 숨김), 끝나는 순간 빛 없는 한 장을 그려 두고 CSS 덮개와 맞바꾼 뒤 감춘다 — 두 번 어두워지거나 번쩍이지 않게.
   ② 앨리스가 문으로 — 문 앞에 닿은 앨리스가 문 쪽으로 반 걸음 걸으며 0.25초에 사라지고(확대와 같이 간다), 문 자리에서 방 색(--c) 빛이 한 번 번진다(.doorglow — radial-gradient · screen · 0.6초). 지도로 돌아오면 문 앞에 다시 선다.
-  ③ 공방으로 넘어가는 전환 — 문 링크를 누르면 확대된 방이 살짝 더 커지며 사라지고(.leaving 0.28초 — 넘어가길 기다리지 않는다, 누르자마자 간다) 공방 페이지가 페이드로 들어온다(@view-transition — 그쪽 페이지에도 같은 한 줄이 있어야).
+  ③ 공방으로 넘어가는 전환 — 문 링크를 누르면 확대된 방이 살짝 더 커지며 사라지고(.leaving 0.28초 — 넘어가길 기다리지 않는다, 누르자마자 간다) 공방 페이지가 페이드로 들어온다(@view-transition — 그쪽 페이지에도 같은 한 줄이 있어야). 같은 날 공방 저장소 아홉(atelier · book · sam · pkm · myth · game · element · style · blender-cloud)의 페이지에 한 줄을 넣고 VT_READY 에 더했다(사용자 「각 공방 저장소에도 한 줄 넣고 VT_READY 에 더해줘」) — 삼국지 쟁탈전(draft.html)만 빼고(VT_NOT). 한 줄에는 나갈 때 전환을 그만두는 한 마디를 붙였다: 그냥 두면 공방 안에서 쪽을 옮길 때마다 페이드가 걸리고 그 공방의 움직임 끔도 못 따른다.
      문서 간 전환을 모르는 브라우저는 지금처럼 그냥 넘어간다. 뒤로 와서 다시 보이면(pageshow) 원래대로.
   움직임 끔(AtelierMotion, 없으면 동작 줄이기)이면 ① ② ③ 모두 없이 전과 같다. 왜: 방을 눌러도 그림이 그냥 커지기만 해서 「들어간다」는 느낌이 없었다.
 -->
@@ -997,10 +997,14 @@ function doorBack() { clearTimeout(doorOut.t); if (!map.classList.contains('leav
 doors.addEventListener('click', doorOut);
 addEventListener('pageshow', doorBack);   /* 뒤로 와서 다시 보일 때(bfcache) */
 /* 넘어가는 쪽에 그 한 줄이 없는데 전환을 걸면 브라우저가 그 페이지 콘솔에 오류를 남긴다(「Transition was aborted … opt-in disabled」) — 그래서 한 줄이 들어간 곳(VT_READY)으로 갈 때만 전환을 걸고,
-   나머지는 여기서 그만둔다(지금처럼 그냥 넘어간다). 공방 저장소에 한 줄을 넣으면 그 경로를 여기에 더한다(README 「방에 들어가는 연출」). 끝이 / 면 그 아래 모두 */
-const VT_READY = ['/favorites.html', '/status.html', '/sweep.html', '/review.html', '/dot.html', '/prompt.html'];
+   나머지는 여기서 그만둔다(지금처럼 그냥 넘어간다). 공방 저장소에 한 줄을 넣으면 그 경로를 여기에 더한다(README 「방에 들어가는 연출」). 끝이 / 면 그 아래 모두.
+   그 한 줄에는 「여기서 나갈 때는 전환을 그만둔다」(pageswap)도 들어 있다 — 전환은 이 지도에서 나갈 때만 걸리고, 공방 안에서 쪽을 옮길 때 · 공방에서 지도로 돌아올 때는 전과 같다 */
+const VT_READY = ['/favorites.html', '/status.html', '/sweep.html', '/review.html', '/dot.html', '/prompt.html',
+  '/atelier/', '/book-atelier/', '/sam-atelier/', '/pkm-atelier/', '/myth-atelier/', '/game-atelier/', '/element-atelier/', '/style-atelier/', '/blender-cloud/'];   /* 공방 저장소 아홉(2026-11-12 — 페이지마다 한 줄을 넣었다) */
+/* 목록 아래에 있어도 한 줄이 없는 페이지 — 삼국지 쟁탈전(draft.html)은 「게임은 그대로 둔다」(sam-atelier CLAUDE.md)라 넣지 않았다. 여기로는 전환을 걸지 않는다 */
+const VT_NOT = ['/sam-atelier/draft.html'];
 addEventListener('pageswap', e => { const t = e.viewTransition; if (!t) return;
-  let ok = false; try { const u = new URL(e.activation.entry.url); ok = u.origin === location.origin && VT_READY.some(p => u.pathname === p || (p.endsWith('/') && u.pathname.startsWith(p))); } catch (err) {}
+  let ok = false; try { const u = new URL(e.activation.entry.url); ok = u.origin === location.origin && !VT_NOT.includes(u.pathname) && VT_READY.some(p => u.pathname === p || (p.endsWith('/') && u.pathname.startsWith(p))); } catch (err) {}
   if (!ok) t.skipTransition();
   for (const k of ['ready', 'finished', 'updateCallbackDone']) if (t[k] && t[k].catch) t[k].catch(() => {}); });
 vtSync(); if (window.AtelierMotion && window.AtelierMotion.subscribe) window.AtelierMotion.subscribe(vtSync);

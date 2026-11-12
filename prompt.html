@@ -18,7 +18,7 @@
   일상컷은 트리(/<공방>/data/casual-tree.json) 차례대로 고르고, 단계마다 해방(트리 밖도 보기)·랜덤(트리 안). 폼 초상·개방(game·book)·초상·각성·저주·스킨(myth)·액션·폭주(pkm)는 그 공방 설계대로 — 단계 표는 prompt/steps.js. 옛 생성기는 그대로 둔다.
   지시문은 그 공방 조립 코드가 짓는다(prompt/adapters.js — 옛 생성기와 같은 입력, tests/prompt-parity.cjs). 고른 값은 이 기기에만(atelier_hub_prompt_v1).
 -->
-<style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }</style>   <!-- 허브 지도의 문에서 넘어올 때 페이드로 들어온다(2026-11-12 — index.html 「방에 들어가는 연출」). 모르는 브라우저는 그냥 넘어온다 -->
+<style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }</style><script>addEventListener('pageswap', e => { const t = e.viewTransition; if (t) { t.skipTransition(); t.ready.catch(() => {}); } }); addEventListener('pagereveal', e => { const t = e.viewTransition; if (t) t.ready.catch(() => {}); });</script>   <!-- 허브 지도의 문에서 넘어올 때 페이드로 들어온다(2026-11-12 — index.html 「방에 들어가는 연출」). 여기서 나갈 때는 전환을 걸지 않는다(공방 저장소에 넣은 것과 같은 한 줄). 모르는 브라우저는 그냥 넘어온다 -->
 <style>
 :root {
   --bg: #0b0a0e; --card: #18161d; --card2: #201d26; --line: #ffffff1a; --text: #f1ece2; --muted: #a8a09a; --gold: #d9b45a; --bad: #ff8f80; --good: #9fd6a4;
