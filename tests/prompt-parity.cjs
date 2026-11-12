@@ -1,9 +1,10 @@
 /* 통합 생성기 받침(prompt/adapters.js) — 브라우저 없이.
    ① game·book: 허브가 지은 일상컷 지시문 = 그 공방 계획기의 record()(생성기 「기록 내보내기」 와 같은 상태) — 대상 모두 × 트리 안 장면 셋.
    ② 네 공방: 대상 모두가 기본 화풍으로 지어진다(SCENE 줄) · 트리 안 랜덤 장면 스물이 트리가 고칠 데 없이 지어진다 · 화풍마다 한 번.
-   ③ game·book 폼 초상·개방: 대상·폼·인물 기준·노출 모두, 개방 장면마다, 엉망인 저장값 바로잡기, 랜덤 장면.
+   ③ game·book 폼 초상·개방: 대상·폼·인물 기준·노출 모두(화풍 자료 "sections" 가 켜져 있으면 칸 꼴 — core v4 칸 틀), 개방 장면마다, 엉망인 저장값 바로잡기, 랜덤 장면.
    ④ 신화 무기 초상·각성·저주·스킨: 무기 모두, 단계 표(prompt/steps.js), 자세 표, 스킨 없는 무기, 엉망인 저장값.
    ⑤ 포켓몬 액션·폭주: 1025 마리 모두, 단계 표, 큰 자료(원작 외형·종별 얼굴) 있고 없고, 엉망인 저장값, 랜덤 장면.
+   ⑥ 원소 세계 그림: 카드 모두 × 사는 세계 = 그 공방 생성기(lib/studio.js)와 같은 입력의 글(칸 꼴), 단계 표(실루엣 · 자유 설계 포함), 엉망인 저장값.
    옛 생성기와 같은 글인지는 여기 한 곳에서 본다(2026-11-12 — tests/prompt-screen.cjs 가 옛 생성기 화면을 열어 하던 같은 대조는 뺐다).
    옆 저장소(../game-atelier · ../book-atelier · ../myth-atelier · ../pkm-atelier)가 있어야 한다. Run: node tests/prompt-parity.cjs */
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm'), path = require('node:path');
@@ -72,14 +73,19 @@ for (const k of H.ORDER.filter(x => !H.get(x).noCasual)) {
 }
 /* ③ 폼 초상·개방(game·book) — 대상 모두 × 폼 모두 × 새 인물·이어가기 × 노출 넷, 개방은 개방 장면이 있는 폼마다. 랜덤 연출·외형 열 */
 for (const k of H.ORDER.filter(x => H.get(x).forms)) {   // 폼·개방 받침(game·book)
-  const B = boot(k), { a, d, S, w } = B, def = a.defaultStyle(d, S), R = w.AtelierSceneRandom;
+  const B = boot(k), { a, d, S, w } = B, def = a.defaultStyle(d, S), R = w.AtelierSceneRandom, CF = S.CORE_FRAME;
+  /* 칸 꼴(core v4 칸 틀) — 그 공방 생성기처럼 화풍 자료의 "sections" 스위치를 sectionsOn 으로 읽는다. 켜져 있으면 머리말 + 다섯 칸(STYLE · CHARACTER · COSTUME — 단계 · SCENE · CONSTRAINTS) */
+  const dv = d.style.styles[def], sec = !!(w.AtelierPrompt.sectionsOn && w.AtelierPrompt.sectionsOn({ sections: d.style.sections }, dv.versions.find(v => v.v === dv.current)));
+  assert.equal(sec, !!(d.style.sections && CF), k + ' 기본 화풍의 칸 꼴 스위치');
+  const heads = t => { const h = t.split('\n\n').map(b => b.split('\n')[0]); return [CF.s1, CF.s2, CF.s4, CF.s5].every((x, i, all) => h.indexOf(x) > 0 && (i === 0 || h.indexOf(x) > h.indexOf(all[i - 1]))) && h.some(x => /^3\. COSTUME — /.test(x)); };
   let n = 0;
   for (const s of a.subjects(d)) for (const f of a.forms(d)) {
     for (const identityMode of ['create', 'reference']) for (const exposure of S.FORM_EXPOSURE_KEYS) {
       const t = a.buildCard(w, d, s.key, def, 'form', { form: f.key, identityMode, baseForm: a.forms(d)[0].key, exposure });
-      assert(t.length > 200 && t.includes(a.facts(d, s.key, f.key).look.slice(0, 10)), k + ' ' + s.key + ' ' + f.key + ' 폼 지시문에 설계표 모습'); n++;
+      assert(t.length > 200 && t.includes(a.facts(d, s.key, f.key).look.slice(0, 10)), k + ' ' + s.key + ' ' + f.key + ' 폼 지시문에 설계표 모습');
+      if (sec) assert(heads(t), k + ' ' + s.key + ' ' + f.key + ' 폼 — 칸 꼴(머리말 + 다섯 칸)'); n++;
     }
-    if (a.facts(d, s.key, f.key).open) { assert(/OPEN/.test(a.buildCard(w, d, s.key, def, 'open', { form: f.key })), k + ' 개방'); n++; }
+    if (a.facts(d, s.key, f.key).open) { const t = a.buildCard(w, d, s.key, def, 'open', { form: f.key }); assert(/OPEN/.test(t) && (!sec || heads(t)), k + ' 개방'); n++; }
   }
   /* 저장값이 엉망이어도 기본으로(없는 폼·갈래·노출) */
   const s0 = a.subjects(d)[0].key, bad = a.card(d, s0, S, { form: 'nope', identityMode: 'x', exposure: 'huge', params: 'no', scenes: { form: 3 } });
@@ -142,9 +148,14 @@ for (const k of H.ORDER.filter(x => H.get(x).forms)) {   // 폼·개방 받침(g
   console.log('  pkm: 액션·폭주 지시문 ' + n + ' · 단계 표 · 큰 자료 있고 없고 · 카드 바로잡기 · 랜덤 장면 10');
   checks++;
 }
-/* ⑥ 원소(5단계) — 카드 55 × 사는 세계, 단계 표(세계 · 덧붙임), 일상컷은 허브 갈래가 아니다(그 공방 생성기로 가는 문), 엉망인 저장값 */
+/* ⑥ 원소(5단계) — 카드 모두 × 사는 세계가 그 공방 생성기(lib/studio.js)와 같은 입력으로 지은 글 = 칸 꼴(머리말 + 다섯 칸 — core 칸 틀), 단계 표(세계 · 장면 · 자세 · 실루엣 · 설계 줄 · 외형 · 덧붙임),
+   일상컷은 허브 갈래가 아니다(그 공방 생성기로 가는 문), 엉망인 저장값 */
 {
-  const ST = require('../prompt/steps.js'), B = boot('element'), { a, d, S, w } = B, def = a.defaultStyle(d, S);
+  const ST = require('../prompt/steps.js'), B = boot('element'), { a, d, S, w } = B, def = a.defaultStyle(d, S), P = w.AtelierPrompt, CF = S.CORE_FRAME;
+  assert(CF && CF.s1 && CF.s5, '원소 core 칸 틀(CORE_FRAME)');
+  /* 그 공방 생성기의 세계 그림 입력 — lib/studio.js: P.build(D, S, 카드, 세계, {style, notes, look: P.normLook(…), shot: P.normShot(…)}) */
+  const studio = (k, c) => P.build(d.design, d.style, k, c.world, { style: def, notes: c.notes, look: P.normLook(c.looks[c.world]), shot: P.normShot(d.design, k, c.world, c.shots[c.world]) });
+  const heads = wk => JSON.stringify([CF.s1, CF.s2, CF.s3.replace('{costume}', 'COSTUME').replace('{genre}', S.WORLDS.find(x => x.key === wk).en), CF.s4, CF.s5]);
   const word = (k, fb) => { const t = w.W ? w.W(k) : ''; return t && t !== k ? t : fb; };
   const subs = a.subjects(d); assert(subs.length >= 40, '원소 카드 수 ' + subs.length);
   let n = 0;
@@ -152,47 +163,65 @@ for (const k of H.ORDER.filter(x => H.get(x).forms)) {   // 폼·개방 받침(g
     const g = a.subject(d, s.key); assert(g && g.ko === s.ko.replace(' 가문주', ''), s.key + ' 대상');
     const ws = a.worlds(d, s.key); assert(ws.length >= 1 && ws.length <= 3, s.key + ' 세계 수');
     for (const wk of ws) {
-      const t = a.buildCard(w, d, s.key, def, 'world', { world: wk, notes: { scene: 'a windy ridge' } });
-      assert(t.startsWith('CONCEPT: ') && t.includes(g.element.en) && t.includes('SCENE NOTE: a windy ridge') && (wk !== 'mecha' || t.includes('MECHA DESIGN')), s.key + ' ' + wk); n++;
+      const cw = a.card(d, s.key, S, { world: wk, notes: { scene: 'a windy ridge' } }), t = a.buildCard(w, d, s.key, def, 'world', cw), Bk = t.split('\n\n');
+      assert.equal(t, studio(s.key, cw), s.key + ' ' + wk + ' — 원소 생성기와 같은 글');
+      assert(Bk.length === 6 && Bk[0].startsWith('A full-body vertical 2:3') && Bk[0].includes(g.element.en), s.key + ' ' + wk + ' 머리말 + 다섯 칸');
+      assert.equal(JSON.stringify(Bk.slice(1).map(b => b.split('\n')[0])), heads(wk), s.key + ' ' + wk + ' 칸 머리 차례');
+      assert(Bk[4].split('\n').includes('SCENE NOTE: a windy ridge'), s.key + ' ' + wk + ' 덧붙임은 4칸(장면)'); n++;
     }
     const card = a.card(d, s.key, S, { world: ws[0] });
     const steps = ST.element('world', { A: a, D: d, S, P: w.AtelierPrompt, w: word, subject: s.key, g, card, rnd: l => l[0] });
-    assert.deepEqual(steps.map(x => x.key), ['world', 'scene', 'pose', 'design', 'look', 'notes'], s.key + ' 단계 표');
+    assert.deepEqual(steps.map(x => x.key), ['world', 'scene', 'pose', 'sil', 'design', 'look', 'notes'], s.key + ' 단계 표 — 그 공방 생성기 차례');
     assert(steps[1].parts[1].opts().length >= 3 && steps[2].parts[1].opts().length === 1 + S.WORLD_POSES.length, s.key + ' 장면·자세 선택지');
+    assert.equal(steps[3].parts[1].opts().length, 2 + S.SILHOUETTES[ws[0]].length, s.key + ' 실루엣 선택지(설계값 · 자유 · 그 세계 갈래)');
     assert.equal(steps[0].parts[1].opts().length, ws.length, s.key + ' 세계 선택지');
     steps.forEach(st => { st.shown(); st.parts.forEach(p => { if (typeof p.opts === 'function') p.opts(); }); });
     /* 설계 줄 — 체크의 메모가 설계표 look 의 어휘, 노출 고르개는 표의 열쇠. 외형 — 네 묶음 */
-    const design = steps[3], look = steps[4];
+    const design = steps[4], look = steps[5];
     assert(design.parts[1].note.includes(S.VOCAB_EN.hair_color[w.AtelierPrompt.lookOf(g, card.world).silhouette.hair_color]), s.key + ' 실루엣 메모에 설계 머리색');
     assert.equal(JSON.stringify(design.parts[3].opts.map(o => o[0])), JSON.stringify(S.EXPOSURE_KEYS), s.key + ' 노출 고르개');   // vm 영역 배열은 deepEqual 이 못 견준다
     assert.equal(JSON.stringify(look.parts[2].groups.map(gr => gr.key)), JSON.stringify(['base', 'build', 'face', 'hair']), s.key + ' 외형 네 묶음');
   }
-  /* 외형 칸이 지시문에 — 세계마다 따로, 직접 고른 머리색이 실루엣을 이기고 IDENTITY 에, 끄면 빠진다, 노출 */
+  /* 외형 칸이 지시문에 — 세계마다 따로, 직접 고른 머리색이 실루엣을 이기고 Chosen look 줄에, 끄면 빠진다, 노출 */
   {
     const c = a.card(d, 'fe', S, { world: 'mecha', looks: { mecha: { params: { 'hair color': 'silver', bogus: 'x' }, exposure: 'low' }, fantasy: { faceDesignOn: false } }, shots: { mecha: { scene: 'foundry', time: 'night', pose: 'stride', expr: 'confident', zz: 1 }, fantasy: { scene: 'foundry' } } });
     assert.equal(JSON.stringify(c.shots.mecha), '{"scene":"foundry","time":"night","pose":"stride","expr":"confident"}', '장면 칸 바로잡기');
+    const tod = key => S.WORLD_TIMES.find(r => r.key === key).en;
     assert.equal(JSON.stringify(Object.keys(c.looks).sort()), '["fantasy","mecha"]'); assert.equal(JSON.stringify(c.looks.mecha.params), '{"hair color":"silver"}', '모르는 열쇠는 버린다');
     const t = a.buildCard(w, d, 'fe', def, 'world', c);
-    assert(t.includes('IDENTITY (chosen details override the automatic look)\nhair color: silver') && !t.includes('iron-grey hair') && t.includes('EXPOSURE (low)') && t.includes('\nFACE '), '메카 외형 ' + t.slice(0, 80));
-    assert(t.includes('SETTING (this card): the orbital foundry floor') && t.includes('TIME & WEATHER: night') && t.includes('Mid-stride') && t.includes('EXPRESSION: level brow'), '메카 장면·시간대·자세·표정');
+    assert.equal(t, studio('fe', c), '메카 — 원소 생성기와 같은 글');
+    assert(t.includes('\nChosen look (overrides the automatic look): hair color: silver.') && !t.includes('iron-grey hair') && t.includes('\nExposure (low)') && t.includes('\nFace — her own: '), '메카 외형 ' + t.slice(0, 80));
+    assert(t.includes('\nThis card: the orbital foundry floor') && t.includes(tod('night')) && t.includes('\nPose: Mid-stride') && /\nExpression: /.test(t), '메카 장면·시간대·자세·표정');
+    const ex2 = Object.keys(S.EXPRESSION_DETAIL).find(k => k !== 'confident' && !t.includes(S.EXPRESSION_DETAIL[k].split('.')[0]));
+    assert.notEqual(t, a.buildCard(w, d, 'fe', def, 'world', Object.assign({}, c, { shots: { mecha: Object.assign({}, c.shots.mecha, { expr: ex2 }) } })), '표정 칸이 지시문에');
     c.world = 'fantasy';
     const t2 = a.buildCard(w, d, 'fe', def, 'world', c);
-    assert(!t2.includes('\nFACE ') && t2.includes('iron-grey hair') && t2.includes('EXPOSURE (bold)') && !t2.includes('IDENTITY (') && !t2.includes('SETTING (this card)') && t2.includes('Standing, card-ready pose'), '판타지는 그 세계의 외형·장면 칸(메카 장면 열쇠는 판타지에 없다)');
+    assert.equal(t2, studio('fe', c), '판타지 — 원소 생성기와 같은 글');
+    assert(!t2.includes('\nFace — her own') && t2.includes('iron-grey hair') && t2.includes('\nExposure (bold)') && !t2.includes('Chosen look') && !t2.includes('\nThis card: ') && t2.includes('\nPose: ' + S.WORLD_SHORT.pose.replace(/[.;:]+$/, '').trim()), '판타지는 그 세계의 외형·장면 칸(메카 장면 열쇠는 판타지에 없다)');
     const steps0 = ST.element('world', { A: a, D: d, S, P: w.AtelierPrompt, w: word, subject: 'fe', g: a.subject(d, 'fe'), card: c, rnd: l => l[0] });
     steps0[1].parts[1].set('forge'); steps0[1].parts[2].set('dawn'); steps0[2].parts[1].set('kneel');
-    const t3 = a.buildCard(w, d, 'fe', def, 'world', c); assert(t3.includes('SETTING (this card): inside the great forge') && t3.includes('TIME & WEATHER: first light of dawn') && t3.includes('Down on one knee'), '장면·자세 단계가 그 세계 칸을 고친다');
+    const t3 = a.buildCard(w, d, 'fe', def, 'world', c); assert(t3.includes('\nThis card: inside the great forge') && t3.includes(tod('dawn')) && t3.includes('\nPose: Down on one knee'), '장면·자세 단계가 그 세계 칸을 고친다');
     assert.match(steps0[1].shown(), /대장간 안 · 새벽/); assert.match(steps0[2].shown(), /한쪽 무릎/);
+    /* 실루엣 단계 — 비우면 카드 설계값, 「자유」면 실루엣 줄 없이(자유 설계), 갈래를 고르면 그 실루엣 */
+    const own = P.silOf(a.subject(d, 'fe'), 'fantasy', {}), pick = S.SILHOUETTES.fantasy.find(r => r.key !== (own || {}).key);
+    assert(own && t3.includes('\nSilhouette: ' + own.en) && steps0[3].shown() === '설계값 · ' + own.ko, '실루엣 — 카드 설계값');
+    steps0[3].parts[1].set('free'); const tf = a.buildCard(w, d, 'fe', def, 'world', c);
+    assert(!tf.includes('\nSilhouette: ') && steps0[3].shown() === '자유' && tf === studio('fe', c), '실루엣 자유 — 줄 없이');
+    steps0[3].parts[1].set(pick.key); const tp = a.buildCard(w, d, 'fe', def, 'world', c);
+    assert(tp.includes('\nSilhouette: ' + pick.en) && steps0[3].shown() === pick.ko && tp === studio('fe', c), '실루엣 갈래를 고르면 그것');
+    assert.equal(JSON.parse(JSON.stringify(a.card(d, 'fe', S, c).shots.fantasy)).frame, pick.key, '실루엣은 저장값에 남는다');
+    steps0[3].parts[1].set('');
     const steps = ST.element('world', { A: a, D: d, S, P: w.AtelierPrompt, w: word, subject: 'fe', g: a.subject(d, 'fe'), card: c, rnd: l => l[0] });
-    steps[3].parts[2].set(true); assert(a.buildCard(w, d, 'fe', def, 'world', c).includes('\nFACE '), '설계 줄 체크가 그 세계 칸을 고친다');
-    steps[4].parts[1].items[0].run(); assert(Object.keys(c.looks.fantasy.params).length > 5 && !c.looks.fantasy.params['hair color'] && !c.looks.fantasy.params['face shape'], '외형 무작위는 설계가 쥔 칸을 비워 둔다');
-    steps[4].parts[1].items[1].run(); assert.equal(JSON.stringify(c.looks.fantasy.params), '{}', '외형 초기화');
+    steps[4].parts[2].set(true); assert(a.buildCard(w, d, 'fe', def, 'world', c).includes('\nFace — her own: '), '설계 줄 체크가 그 세계 칸을 고친다');
+    steps[5].parts[1].items[0].run(); assert(Object.keys(c.looks.fantasy.params).length > 5 && !c.looks.fantasy.params['hair color'] && !c.looks.fantasy.params['face shape'], '외형 무작위는 설계가 쥔 칸을 비워 둔다');
+    steps[5].parts[1].items[1].run(); assert.equal(JSON.stringify(c.looks.fantasy.params), '{}', '외형 초기화');
   }
   assert.equal(a.buildCard(w, d, 'fe', def, 'world', a.card(d, 'fe', S, null)), '', '세계를 안 고르면 지시문이 없다');
   assert.equal(a.buildCard(w, d, 'fe', def, 'casual', { world: 'fantasy' }), '', '일상컷은 허브 갈래가 아니다');
   assert(a.outputs().some(o => o.key === 'casual' && /element-atelier\/prompt\.html/.test(o.href)), '일상컷은 그 공방 생성기로 가는 문');
   const bad = a.card(d, 'fe-steel-bridge', S, { world: 'fantasy', notes: 'x' });
   assert.equal(bad.world, '', '철교는 판타지에 안 산다 — 비운다'); assert.deepEqual(bad.notes, { scene: '', outfit: '', custom: '' }, '덧붙임 바로잡기');
-  console.log('  element: 세계 지시문 ' + n + ' · 카드 ' + subs.length + ' · 단계 표(세계·장면·자세·설계 줄·외형·덧붙임) · 장면·시간대·자세·표정(세계마다) · 외형 칸(세계마다·이김·끄기·노출·무작위) · 일상컷 문 · 카드 바로잡기');
+  console.log('  element: 세계 지시문 ' + n + '(칸 꼴 · 원소 생성기와 같은 글) · 카드 ' + subs.length + ' · 단계 표(세계·장면·자세·실루엣·설계 줄·외형·덧붙임) · 장면·시간대·자세·표정(세계마다) · 외형 칸(세계마다·이김·끄기·노출·무작위) · 일상컷 문 · 카드 바로잡기');
   checks++;
 }
 console.log('PASS 통합 생성기 받침: game·book 계획기와 같은 글 · 네 공방 대상·랜덤·화풍 · game·book 폼·개방 · 신화 초상·각성·저주·스킨 · 포켓몬 액션·폭주 · 원소 세계 그림 — ' + checks + '가지');

@@ -200,7 +200,7 @@
     return list.concat(sceneSteps(x, sc, 'action'));
   }
 
-  /* ── element: 세계 그림 ── 세계(판타지·스팀펑크·메카 — 주민은 사는 세계만) → 장면(그 세계의 장소 변주 · 시간대) → 자세·표정 → 설계 줄(실루엣·얼굴 싣기 · 노출) → 외형(game 과 같은 외형 선택지 — 그 공방 lib/look-spec.js) → 덧붙임.
+  /* ── element: 세계 그림 ── 세계(판타지·스팀펑크·메카 — 주민은 사는 세계만) → 장면(그 세계의 장소 변주 · 시간대) → 자세·표정 → 실루엣(카드 설계값 · 자유 · 그 세계 갈래 — 그 공방 생성기 sil 단계) → 설계 줄(실루엣·얼굴 싣기 · 노출) → 외형(game 과 같은 외형 선택지 — 그 공방 lib/look-spec.js) → 덧붙임.
      외형은 세계마다 사람이 다르니 세계마다 따로(card.looks[세계]). 지시문은 그 공방 lib/prompt-element.js build 가 짓는다 */
   function element(out, x) {
     var A = x.A, D = x.D, S = x.S, P = x.P, w = x.w, c = x.card, g = x.g || {}, n = g.nation || {};
@@ -220,6 +220,12 @@
     var sceneOpts = function () { return [{ v: '', ko: w('studio.scene.auto', '세계 글대로'), sub: w('studio.scene.auto.sub', '설계표의 세계 글이 정한 장소') }].concat(scenes().map(function (r) { return { v: r.key, ko: r.ko, sub: r.en }; })); };
     var poseOpts = function () { return [{ v: '', ko: w('studio.pose.auto', '카드 자세'), sub: S.POSE_DEFAULT || '' }].concat((S.WORLD_POSES || []).map(function (r) { return { v: r.key, ko: r.ko, sub: r.en }; })); };
     var exprOpts = (S.EXPRESSION_OPTIONS || []).filter(function (o) { return o[0]; });
+    /* 실루엣 — 비우면 카드 설계값(근본 · 가문주의 sil.<세계>, 주민은 없음), 'free' 면 실루엣 없이(자유 설계), 아니면 그 세계 갈래. 그 공방 lib/studio.js 의 sil 단계와 같은 선택지 */
+    var sils = function () { return (S.SILHOUETTES || {})[c.world] || []; };
+    var silAuto = function () { return P && P.silOf && g.nation && c.world ? P.silOf(g, c.world, {}) : null; };
+    var silOpts = function () { var d0 = silAuto(), free = w('studio.sil.free.sub', '실루엣을 정하지 않는다 — 세계 차림대로');
+      return [{ v: '', ko: w('studio.sil.auto', '카드 설계값'), sub: d0 ? w('studio.sil.auto.sub', '이 카드 몫 실루엣 — {name}').replace('{name}', d0.ko) : free }, { v: 'free', ko: w('studio.sil.free', '자유'), sub: free }]
+        .concat(sils().map(function (r) { return { v: r.key, ko: r.ko, sub: r.kot || r.en }; })); };
     return [
       { key: 'world', ko: '세계', shown: function () { return c.world ? w('world.' + c.world, WK[c.world] || c.world) : '—'; },
         parts: [{ type: 'note', text: g.tier === 'citizen' ? '주민은 사는 세계만. 얼굴·생김새·자세는 세계마다 따로 뽑는다.' : '얼굴·생김새·자세는 세계마다 따로 뽑는다.' },
@@ -235,6 +241,10 @@
           { type: 'pick', opts: poseOpts, get: function () { return sh().pose || ''; }, set: function (v) { sh().pose = v; } },
           { type: 'select', id: 'expr', ko: w('studio.shot.expr', '표정'), opts: [['', w('prompt.auto', '자동')]].concat(exprOpts), get: function () { return sh().expr || ''; }, set: function (v) { sh().expr = v; } }],
         random: function () { var o = (S.WORLD_POSES || []).map(function (r) { return r.key; }).filter(function (v) { return v !== sh().pose; }); if (o.length) sh().pose = x.rnd(o); } },
+      { key: 'sil', ko: w('studio.step.sil', '실루엣'), shown: function () { var f = sh().frame || '', r = P && P.silOf && g.nation && c.world ? P.silOf(g, c.world, sh()) : null; return !r ? w('studio.sil.free', '자유') : f ? r.ko : w('studio.sil.design', '설계값 · {name}').replace('{name}', r.ko); },
+        parts: [{ type: 'note', text: w('studio.note.sil', '옷 · 갑옷의 큰 덩어리 모양. 안 고르면 카드 설계값, 「자유」면 실루엣 없이.') },
+          { type: 'pick', opts: silOpts, get: function () { return sh().frame || ''; }, set: function (v) { sh().frame = v; } }],
+        random: function () { var o = sils().map(function (r) { return r.key; }).filter(function (v) { return v !== sh().frame; }); if (o.length) sh().frame = x.rnd(o); } },
       { key: 'design', ko: w('studio.step.design', '설계 줄'), next: true,
         shown: function () { var l = lk(); return [l.silhouetteOn ? w('studio.design.sil', '실루엣') : w('studio.design.sil.off', '실루엣 끔'), l.faceDesignOn ? w('studio.design.face', '얼굴') : w('studio.design.face.off', '얼굴 끔'), w('studio.exposure.' + (l.exposure || 'auto'), l.exposure || '노출 자동')].join(' · '); },
         parts: [{ type: 'note', text: w('studio.note.design', '설계표의 외형 성향(팔레트 색 → 머리·눈 색)을 싣는다. 끄면 그 묶음을 빼고, 외형에서 직접 고른 항목이 이긴다.') + (why ? '\n' + w('studio.design.why', '왜 이 외형인가 — {why}').replace('{why}', why) : '') },

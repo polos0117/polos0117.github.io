@@ -1,5 +1,5 @@
 /* 도트 재생기 v2(sprite-actor.js) — 다섯 공방이 같이 쓰는 자리: 카드 열쇠로 찾기(actorFor · forCard) · 여러 인물의 바닥(floor) · 뛰쳐나오기(popOut).
-   인물은 book 서재 세 인물(옆의 ../book-atelier/data/sprites.json · ../book-atelier-img/sprites) — 실제 Pages 처럼 같은 출처의 /<저장소>/ 로 내준다.
+   인물은 book 서재 인물들(옆의 ../book-atelier/data/sprites.json · ../book-atelier-img/sprites — 몇 명인지 · 차례는 자료에서 센다) — 실제 Pages 처럼 같은 출처의 /<저장소>/ 로 내준다.
    - floor: 좁으면 둘·넓으면 셋, 인물마다 제 몫 안에서 걷는다, 날마다 차례가 돈다(seed), keys 로 거르기, 누르면 onSelect(카드 열쇠), pause/resume, 폭이 바뀌면 다시 세운다
    - grow: 화소 배율 2.625(폴드)에서 도트가 1.14배 — mount(기본)·floor({grow:true})가 공간을 늘려 머리가 안 잘린다 · grow:false 면 그대로 · 치우면 되돌린다
    - popOut: 요소에서 튀어나와 바닥에 내려앉고(뛰는 동안 쉰다) 화면을 가로질러 걷는다 · 누르면 onSelect · close(true) 는 되돌아 뛰어 들어가고 판을 치운다 ·
@@ -10,6 +10,10 @@ const { chromium } = require('playwright');
 const ROOT = path.resolve(__dirname, '..'), SIB = path.resolve(ROOT, '..'), PORT = +(process.env.SPRITE_PORT || 8773), BASE = 'http://127.0.0.1:' + PORT;
 const MIME = { '.html': 'text/html; charset=utf-8', '.png': 'image/png', '.json': 'application/json', '.js': 'text/javascript', '.css': 'text/css' };
 if (!fs.existsSync(path.join(SIB, 'book-atelier/data/sprites.json')) || !fs.existsSync(path.join(SIB, 'book-atelier-img/sprites'))) { console.log('(옆에 book-atelier · book-atelier-img 가 없어 건너뜀)'); process.exit(0); }
+/* 바닥에 설 차례 — 자료 그대로 센다: 그릴 수 있는 인물(states · cell) 중 카드마다 앞선 한 명(alice_classic 은 alice 에 밀린다), 열쇠 차례. 인물이 늘면(2026-11 뤼팽) 여기만 따라 바뀐다 */
+const BOOK = JSON.parse(fs.readFileSync(path.join(SIB, 'book-atelier/data/sprites.json'), 'utf8'));
+const ROSTER = (() => { const seen = {}; return Object.keys(BOOK.actors || {}).filter(k => { const v = BOOK.actors[k]; if (!v || !v.states || !v.cell) return false; const c = v.card || v.book || k; if (seen[c]) return false; return (seen[c] = true); }).sort(); })();
+if (ROSTER.length < 3) { console.log('(book 도트 인물이 셋보다 적어 건너뜀: ' + ROSTER.join(', ') + ')'); process.exit(0); }
 
 const PAGE = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="/sprite-actor.css"><style>body{margin:0;background:#222;min-height:100vh}#floor{position:relative;height:200px;margin-top:40px;background:#333}
@@ -59,13 +63,13 @@ const server = http.createServer((q, s) => {
     /* floor — 좁으면 둘, 제 몫 안에서 */
     let who = await page.evaluate(() => F.list().map(x => x.key));
     assert.equal(who.length, 2, '좁으면 둘');
-    assert.deepEqual(who, ['alice', 'chunhyang'], 'seed 0 — 열쇠 차례 첫 둘');
+    assert.deepEqual(who, ROSTER.slice(0, 2), 'seed 0 — 열쇠 차례 첫 둘(' + ROSTER.join(' · ') + ')');
     const lanes = await page.evaluate(() => { const w = document.getElementById('floor').clientWidth; return F.list().map(x => { const d = x.actor.debug(); return [d.x / w]; }); });
     assert(lanes[0][0] < 0.5 && lanes[1][0] > 0.5, '제 몫: ' + JSON.stringify(lanes));
     await page.waitForFunction(() => F.list().some(x => x.actor.debug().state === 'walk'), null, { timeout: 8000 });
-    const btn = page.locator('#floor .sprite-actor[data-who="chunhyang"]');
-    assert.equal(await btn.getAttribute('aria-label'), '책 chunhyang');
-    await btn.click(); assert.deepEqual(await page.evaluate(() => picked), ['chunhyang'], '누르면 카드 열쇠');
+    const second = ROSTER[1], btn = page.locator('#floor .sprite-actor[data-who="' + second + '"]');
+    assert.equal(await btn.getAttribute('aria-label'), '책 ' + second);
+    await btn.click(); assert.deepEqual(await page.evaluate(() => picked), [second], '누르면 카드 열쇠');
     await page.evaluate(() => F.pause('test'));
     assert(await page.evaluate(() => F.list().every(x => !x.actor.running)), 'pause');
     await page.evaluate(() => F.resume('test'));
@@ -74,6 +78,7 @@ const server = http.createServer((q, s) => {
     await page.waitForFunction(() => F.list().length === 3);
     await page.evaluate(() => F.ready());
     assert.equal(await page.locator('#floor .sprite-actor').count(), 3, '넓으면 셋 — 다시 세운다(앞의 것은 치운다)');
+    assert.deepEqual(await page.evaluate(() => F.list().map(x => x.key)), ROSTER.slice(0, 3), '넓어도 seed 0 차례 그대로 첫 셋');
     const other = await page.evaluate(() => { const G = AtelierSprite.floor(document.createElement('div'), data, { seed: 1, keys: ['sunzi', 'alice'], count: 5 }); const k = G.list().map(x => x.key); G.destroy(); return k; });
     assert.deepEqual(other, ['sunzi', 'alice'], 'keys 로 거르고 seed 로 돈다');
     const empty = await page.evaluate(() => AtelierSprite.floor(document.createElement('div'), { actors: {} }, {}).list().length);

@@ -82,9 +82,11 @@
         if (!d.style.styles[style]) style = this.defaultStyle(d);
         var st = d.style.styles[style], ver = st.versions.filter(function (v) { return v.v === st.current; })[0];
         var c = this.card(d, k, S, card), scene = c.scenes[mode];
-        /* 옛 생성기 lib/prompt-ui.js 의 result — {...카드, ...장면, 대상, 트리, 폼, 기준 폼, 화풍 글, …}. 첨부 화풍 그림은 허브에선 안 쓴다 */
+        /* 옛 생성기 lib/prompt-ui.js 의 result — {...카드, ...장면, 대상, 트리, 폼, 기준 폼, 화풍 글, …}. 첨부 화풍 그림은 허브에선 안 쓴다.
+           칸 꼴(2026-11-11 — core v4 칸 틀): 화풍 자료 꼭대기 "sections"(판의 "sections": false 는 그 판만 끔)를 그 공방 sectionsOn 으로 읽어 넘기고, 판의 avoid 는 5칸 Avoid 로 */
         var input = Object.assign({}, c, { style: style, version: st.current, mode: mode, casualN: 1, attachStyleRef: false }, scene, { tree: d.tree, stage: stageOf(d, c.form), baseStage: stageOf(d, c.baseForm),
-          styleText: ver.text, styleCheck: ver.check || '', styleRef: false, outputMode: mode, identityMode: mode !== 'form' || c.identityMode === 'reference' ? 'reference' : 'create',
+          styleText: ver.text, styleCheck: ver.check || '', styleRef: false, sections: P.sectionsOn ? P.sectionsOn({ sections: d.style.sections }, ver) : false, styleAvoid: ver.avoid || [],
+          outputMode: mode, identityMode: mode !== 'form' || c.identityMode === 'reference' ? 'reference' : 'create',
           params: Object.keys(c.params).map(function (p) { return [p, c.params[p]]; }) }, extra(ver));
         input[subjectKey] = g;
         return P.buildPrompt(input);
@@ -134,7 +136,8 @@
       },
       data: { cards: 'data/card.json', group: 'data/group.json', skill: 'data/skill.json', tree: 'data/casual-tree.json' },
       subjects: function (d) { return d.cards.cards.map(function (c) { return { key: c.name, ko: c.name, sub: c.en }; }); },
-      styles: function (d, S) { return S.STYLES.map(function (r) { return { key: r[0], ko: r[1] }; }); },
+      /* 고르개는 그 공방 생성기처럼 살아 있는 화풍만(LIVE_STYLES — 2026-11-11 그림 없던 화풍을 내림). 옛 판엔 STYLES 그대로 */
+      styles: function (d, S) { return (S.LIVE_STYLES || S.STYLES).map(function (r) { return { key: r[0], ko: r[1] }; }); },
       defaultStyle: function (d, S) { return S.DEFAULT_STYLE; },
       subject: function (d, k) { return d.cards.cards.filter(function (c) { return c.name === k; })[0] || null; },
       tables: function (S) {
@@ -190,7 +193,8 @@
         return P.buildPrompt(input);
       },
       subjects: function (d) { return d.cards.cards.character.map(function (c) { return { key: c.name, ko: c.name, sub: String(c.no).padStart(4, '0') + ' · ' + c.en }; }); },
-      styles: function (d, S) { return S.ART_STYLES.map(function (r) { return { key: r[0], ko: r[1] }; }); },
+      /* 고르개는 그 공방 생성기처럼 살아 있는 화풍만(LIVE_STYLES — 내린 화풍은 등록 이름 읽기에만 남는다). 기본은 그 공방 DEFAULT_STYLE(지금 애니 2.5D 광택) */
+      styles: function (d, S) { return (S.LIVE_STYLES || S.ART_STYLES).map(function (r) { return { key: r[0], ko: r[1] }; }); },
       defaultStyle: function (d, S) { return S.DEFAULT_STYLE; },
       subject: function (d, k) { return d.cards.cards.character.filter(function (c) { return c.name === k; })[0] || null; },
       tables: tablesStd,
@@ -205,13 +209,14 @@
     }
   };
   /* 원소(element-atelier, 2026-10-30) — 대상은 카드(근본 `fe` · 가문주 `fe-steel` · 주민 `fe-steel-sword`), 갈래는 세계 그림(판타지·스팀펑크·메카) 하나.
-     일상컷은 그 공방 생성기가 트리 버전2 로 고른다(허브 일상컷 단계는 버전1 칸) — 허브에선 그 생성기로 가는 문(href)만 둔다(noCasual). */
+     세계 그림은 그 공방 생성기(lib/studio.js)와 같은 입력으로 P.build 가 짓는다 — 기본 화풍이면 칸 꼴(머리말 + 다섯 칸, 2026-11-11). 단계도 그 생성기 차례(세계 · 장면 · 자세 · 실루엣 · 설계 줄 · 외형 · 덧붙임).
+     일상컷(일곱 장 — 자유 설계 컷 포함)은 그 공방 생성기가 트리 버전2 로 고른다(허브 일상컷 단계는 버전1 칸) — 허브에선 그 생성기로 가는 문(href)만 둔다(noCasual). */
   A.element = {
     key: 'element', repo: 'element-atelier', ko: '원소', noCasual: true,
     libs: ['lib/words.js', 'lib/prompt-spec.js', 'lib/look-spec.js', 'lib/casual-tree.js', 'lib/prompt-element.js'],
     data: { design: 'data/element-design.json', style: 'data/style.json', tree: 'data/casual-tree.json' },
     outputs: function () { return [{ key: 'world', ko: '세계 그림', note: '판타지 · 스팀펑크 · 메카 한 장 — 설계표가 짓고 덧붙임만 더한다' },
-      { key: 'casual', ko: '일상컷', note: '트리 버전2 — 원소 공방 생성기에서 고른다', href: '/element-atelier/prompt.html?card={s}&o=casual' }]; },
+      { key: 'casual', ko: '일상컷', note: '일곱 장(자유 설계 컷 둘) · 트리 버전2 — 원소 공방 생성기에서 고른다', href: '/element-atelier/prompt.html?card={s}&o=casual' }]; },
     /* 카드 열쇠 → {tier, nation, family, citizen, ko, en, element} — 그 공방 lib/prompt-element.js card() 와 같은 규칙(여기선 창 없이 설계표만으로) */
     subject: function (d, k) {
       var p = String(k || '').split('-'), n = (d.design.nations || []).filter(function (x) { return x.key === p[0]; })[0], e = (d.design.elements || []).filter(function (x) { return x.key === p[0]; })[0];
@@ -237,7 +242,8 @@
       });
       return out;
     },
-    styles: function (d) { return Object.keys(d.style.styles).map(function (k) { return { key: k, ko: d.style.styles[k].name }; }); },
+    /* 내린 화풍(retired)은 그 공방 생성기 고르개처럼 뺀다 — 기록은 남는다 */
+    styles: function (d) { return Object.keys(d.style.styles).filter(function (k) { return !d.style.styles[k].retired; }).map(function (k) { return { key: k, ko: d.style.styles[k].name }; }); },
     defaultStyle: function (d) { return d.style['default'] && d.style.styles[d.style['default']] ? d.style['default'] : Object.keys(d.style.styles)[0]; },
     /* 일상컷 단계는 허브에 없다 — 표는 뼈대만(허브가 장면을 바로잡을 때 close 를 본다) */
     tables: function (S) { return { frames: [], lenses: [], poses: [], orients: [], exprs: rows(S.EXPRESSION_OPTIONS || []), axes: axesStd(S), close: S.CLOSE_FRAMES || [] }; },
@@ -253,8 +259,8 @@
         return o;
       };
       ws.forEach(function (wk) { if (lk[wk]) c.looks[wk] = norm(lk[wk]); });
-      /* 장면·시간대·자세·표정 — 세계마다(열쇠 검사는 그 공방 normShot 이 지시문을 지을 때) */
-      var sh = obj(x.shots); ws.forEach(function (wk) { if (sh[wk]) { var o = obj(sh[wk]), r = {}; ['scene', 'time', 'pose', 'expr'].forEach(function (f) { if (typeof o[f] === 'string' && o[f]) r[f] = o[f]; }); c.shots[wk] = r; } });
+      /* 장면·시간대·자세·표정·실루엣(frame — 실루엣 열쇠 · 'free' 자유 설계 · 비우면 카드 설계값) — 세계마다(열쇠 검사는 그 공방 normShot 이 지시문을 지을 때) */
+      var sh = obj(x.shots); ws.forEach(function (wk) { if (sh[wk]) { var o = obj(sh[wk]), r = {}; ['scene', 'time', 'pose', 'expr', 'frame'].forEach(function (f) { if (typeof o[f] === 'string' && o[f]) r[f] = o[f]; }); c.shots[wk] = r; } });
       /* 지금 세계의 외형 칸은 늘 있다 — 단계 표가 바로 고친다 */
       if (c.world && !c.looks[c.world]) c.looks[c.world] = norm(null);
       return c;

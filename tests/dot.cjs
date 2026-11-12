@@ -335,8 +335,12 @@ function sourceHash() {
     if (A.key === 'book') { const al = list.find(c => c.key === 'alice'); assert.equal(al.id, 'alice'); assert.equal(al.name, '이상한 나라의 앨리스'); assert(al.files.some(f => f.file === 'alice_end_literary_fantasy_f.webp')); }
     if (A.key === 'pkm') {
       const pk = list.find(c => c.key === '피카츄'); assert.equal(pk.id, 'pikachu');
-      const doc2 = doc.where && Object.keys(doc.where)[0];
-      if (doc2) { const f = list.flatMap(c => c.files).find(f => f.file === doc2); assert(f.url.startsWith('/pkm-atelier-img-2/img/'), '둘째 저장소 그림'); }
+      /* 그림 저장소가 여럿(where: 파일 → 저장소 번호, 없으면 0 번) — 모든 그림이 제 저장소 주소로, 등록부가 쓰는 번호마다 한 장 이상 보고 번호는 주소 차례 안에 */
+      const files = list.flatMap(c => c.files), where = doc.where || {}, used = new Set(Object.values(where));
+      assert(Math.max(0, ...used) < A.bases.length, 'pkm 등록부 저장소 번호 ' + [...used].join(',') + ' 가 주소 차례(' + A.bases.length + ') 안에');
+      const off = files.filter(f => !f.url.startsWith(A.bases[where[f.file] || 0]));
+      assert.equal(off.length, 0, 'pkm 그림 주소가 제 저장소가 아니다: ' + off.slice(0, 2).map(f => f.file + ' → ' + f.url).join(', '));
+      for (const n of used) assert(files.some(f => where[f.file] === n && f.url.startsWith('/pkm-atelier-img-' + (n + 1) + '/img/')), 'pkm ' + (n + 1) + '째 저장소 그림');
       /* 그림 저장소를 더하면 pkm-atelier 의 BASES 와 같은 차례로 붙인다 — 빠지면 그 저장소 그림이 첫 저장소 주소로 깨진다(2026-10-31 넷째) */
       const imgjs = path.join(ROOT, '..', 'pkm-atelier', 'lib', 'img.js');
       if (fs.existsSync(imgjs)) assert.deepEqual(A.bases, (fs.readFileSync(imgjs, 'utf8').match(/var BASES = \[([^\]]*)\]/)[1].match(/'[^']+'/g) || []).map(s => s.slice(1, -1).replace('https://polos0117.github.io', '')), 'pkm 그림 저장소 차례');

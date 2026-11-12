@@ -48,6 +48,7 @@ const { chromium } = require('playwright');
 
   /* 세계 그림 하나 열기 */
   const doc = JSON.parse(fs.readFileSync(path.join(SIB, 'element-atelier/data/img.json'), 'utf8'));
+  R.useStyles(R.project('element'), JSON.parse(fs.readFileSync(path.join(SIB, 'element-atelier/data/style.json'), 'utf8')));   // 화면처럼 그 공방 화풍 표로
   const first = R.candidates(R.project('element'), doc, { limit: 40 }).find(c => !c.info.cut);
   await page.fill('#q', first.info.card);
   const tileSel = '.tile:has-text("' + first.info.place + '")';
@@ -100,21 +101,26 @@ const { chromium } = require('playwright');
 
   /* 지시문 — 기록에서 불러오기(원소 기록 주소를 짐작) → 트리 → 마디 고르기 → 요청 → 명령문 */
   await page.click('[data-tab="prompt"]');
-  assert.match(await page.inputValue('#rec-url'), new RegExp('/element-atelier-img/records/' + first.info.card + '/' + first.info.slot + '\\.game_keyart-ui\\.json'));
+  /* 기록 주소는 그 그림의 화풍 열쇠대로(원소 기본 jp_paint_anime · 그 전 game_keyart — 화풍 표에서 읽는다) */
+  const recPath = '/element-atelier-img/records/' + first.info.card + '/' + first.info.slot + '.' + first.info.style + '-ui.json';
+  assert.equal(await page.inputValue('#rec-url'), recPath);
   await page.click('#rec-load');
   await page.waitForSelector('.tree [data-node]');
   const heads = await page.$$eval('.tree > ul > li > .row .nd', n => n.map(x => x.textContent));
-  assert(heads.some(h => /STYLE/.test(h)) && heads.some(h => /CONCEPT/.test(h)), '머리말 줄이 트리 첫 단');
-  await page.click('.tree .nd:has-text("STYLE") >> nth=0');
-  assert.match(await page.textContent('.quote'), /STYLE:/);
+  /* 지시문 꼴은 그 기록대로 — 칸 꼴(원소 jp_paint_anime 부터: 머리말 + 「1. STYLE」 … 「5. CONSTRAINTS」 절, 절 안에 「Face proportions:」 같은 머리말 줄) · 줄 꼴(CONCEPT: · STYLE: 줄) */
+  const recText = JSON.parse(fs.readFileSync(path.join(SIB, recPath), 'utf8')).prompt, sec = /\n\n1\. STYLE\n/.test(recText);
+  const tops = sec ? ['1. STYLE', '5. CONSTRAINTS'] : ['STYLE', 'CONCEPT'], key = sec ? 'Face proportions' : 'STYLE', where = sec ? '1. STYLE › Face proportions' : 'STYLE';
+  assert(tops.every(t => heads.some(h => h.includes(t))), '머리말 줄 · 절이 트리 첫 단 ' + JSON.stringify(heads));
+  await page.click('.tree .nd:has-text("' + key + '") >> nth=0');
+  assert.match(await page.textContent('.quote'), new RegExp(key + ':'));
   await page.selectOption('#r-action', 'replace');
-  await page.fill('#r-text', 'STYLE: soft painted 2.5D key art');
+  await page.fill('#r-text', key + ': soft painted 2.5D key art');
   await page.fill('#r-why', '세션 2D 쏠림');
   await page.click('#r-add');
   await page.waitForSelector('.reqs li');
-  const cmd = await page.inputValue('#cmd');
+  const cmd = await page.inputValue('#cmd'), rx = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   assert.match(cmd, /^\[원소의 섬\] /);
-  assert.match(cmd, /1\. \[STYLE\] 「STYLE: .*」 을\(를\) 「STYLE: soft painted 2\.5D key art」 로 바꿔줘 \(까닭: 세션 2D 쏠림\)/);
+  assert.match(cmd, new RegExp('1\\. \\[' + rx(where) + '\\] 「' + rx(key) + ': .*」 을\\(를\\) 「' + rx(key) + ': soft painted 2\\.5D key art」 로 바꿔줘 \\(까닭: 세션 2D 쏠림\\)'));
   assert.match(cmd, /검수에서 나온 것: 손\(확인됨\) 왼손 손가락 여섯/);
   /* 머리만 · 다 펴기 */
   await page.click('#t-close'); const fold = await page.$$eval('.tree [data-node]', n => n.length);

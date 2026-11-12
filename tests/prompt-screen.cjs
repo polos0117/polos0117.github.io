@@ -5,7 +5,7 @@
    ③ 344×882 · 390×844 · 1280×900 에서 옆으로 넘치지 않고 누르는 자리 44px. 폰(≤768)은 칩 레일 한 줄·아래 고정 막대(이전·해방·랜덤·다음)·판 밑 단추 없음, PC 는 판 밑 단추(docs/PROMPT_MOBILE_PLAN.md ①).
    옆 저장소(../game-atelier · ../book-atelier · ../myth-atelier · ../pkm-atelier)를 같은 출처의 /<저장소>/ 로 내준다 — 실제 Pages 와 같은 꼴.
    Run: CHROMIUM_PATH=<chrome> NODE_PATH=<playwright 가 있는 node_modules> node tests/prompt-screen.cjs   (HUB_PORT 로 자리 바꾸기, 기본 8783) */
-const assert = require('node:assert/strict'), http = require('node:http'), fs = require('node:fs'), path = require('node:path');
+const assert = require('node:assert/strict'), http = require('node:http'), fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
 const { chromium } = require('playwright');
 const ROOT = path.resolve(__dirname, '..'), SIB = path.resolve(ROOT, '..'), PORT = +(process.env.HUB_PORT || 8783), BASE = 'http://127.0.0.1:' + PORT;
 const MIME = { '.html': 'text/html; charset=utf-8', '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.json': 'application/json', '.js': 'text/javascript', '.wasm': 'application/wasm', '.css': 'text/css' };
@@ -105,7 +105,11 @@ const FORM_CASES = [
     const s = await open('/prompt.html'), p = s.page;
     await p.waitForSelector('.opt[href="?a=pkm"]'); await p.click('.opt[href="?a=pkm"]');
     await p.waitForSelector('[data-open="style"]');
-    assert.match(await p.locator('[data-open="style"]').textContent(), /글로시 프로모/, '화풍은 그 공방 기본');
+    /* 그 공방 기본 화풍(lib/prompt-spec.js DEFAULT_STYLE — 지금 애니 2.5D 광택)의 이름 — 그 공방 파일에서 읽는다 */
+    const pkmDef = (() => { const H = require('../prompt/adapters.js'), a = H.get('pkm'), w = { console }; w.window = w; vm.createContext(w);
+      for (const f of ['lib/words.js', 'lib/prompt-spec.js']) vm.runInContext(fs.readFileSync(path.join(SIB, a.repo, f), 'utf8'), w);
+      const S = w.AtelierSpec, k = a.defaultStyle(null, S); return a.styles(null, S).find(x => x.key === k).ko; })();
+    assert.equal((await p.locator('[data-open="style"]').textContent()).replace(/^\s*화풍\s*/, '').trim(), pkmDef, '화풍은 그 공방 기본(' + pkmDef + ')');
     /* 대상은 다 있고 페이지 스크롤로 끝까지 — 안에 따로 스크롤하는 상자가 없다(앞 120 만 그려 못 내려갔다) */
     assert.equal(await p.locator('[data-subject]').count(), 1025, '포켓몬 1025 다');
     assert(await p.evaluate(() => { const e = document.querySelector('.opts.people'); return e.scrollHeight <= e.clientHeight + 1 && getComputedStyle(e).overflowY === 'visible'; }), '대상 목록 안 스크롤 상자 없음');
@@ -223,7 +227,11 @@ const FORM_CASES = [
       assert.equal(await p.locator('input[type="checkbox"][data-part]').count(), 0, '이어가기엔 실루엣·얼굴 줄이 없다');
       await p.fill('[data-field="lookNote"]', '소매를 짧게');
       assert.equal(await p.locator('[data-field="lookNote"]').evaluate(e => e === document.activeElement), true, '쓰는 동안 칸이 그대로');
-      assert((await p.locator('#prompt').inputValue()).includes('FORM NOTE: 소매를 짧게'), '폼 요청이 지시문에');
+      /* 게임 화풍 자료 "sections" 가 켜져 있으면 칸 꼴(core v4) — 3칸 안 「Form note:」, 끄면 줄 꼴 「FORM NOTE:」 */
+      const gameSec = !!JSON.parse(fs.readFileSync(path.join(SIB, 'game-atelier/data/style.json'), 'utf8')).sections;
+      const formText = await p.locator('#prompt').inputValue();
+      assert(formText.includes((gameSec ? 'Form note: ' : 'FORM NOTE: ') + '소매를 짧게'), '폼 요청이 지시문에');
+      if (gameSec) assert(/\n\n1\. STYLE\n[\s\S]*\n\n2\. CHARACTER\n[\s\S]*\n\n3\. COSTUME — [^\n]+\n[\s\S]*\n\n4\. SCENE\n[\s\S]*\n\n5\. CONSTRAINTS\n/.test(formText), '게임 폼 — 칸 꼴(머리말 + 다섯 칸)');
       await p.click('[data-next="design"]'); assert.equal(await now(), 'action', '이어가기는 외형을 건너뛴다');
       await p.selectOption('select[data-sel][data-part="1"]', 'melee');
       assert.equal(await p.locator('select[data-sel]').count(), 2 + (await p.evaluate(() => window.AtelierSpec.ACTION_CONTROLS.length)), '갈래를 고르면 예시가 열린다');
@@ -277,7 +285,7 @@ const FORM_CASES = [
       await k.ctx.close(); checks += 6;
     }
 
-    /* ②-5 원소 — 세계 그림: 대상(주민) → 세계(사는 세계만) → 덧붙임 → 지시문. 일상컷은 그 공방 생성기로 가는 문(href) */
+    /* ②-5 원소 — 세계 그림: 대상(주민) → 세계(사는 세계만) → 장면 → 자세 → 실루엣 → 설계 줄 → 외형 → 덧붙임 → 지시문(칸 꼴). 일상컷은 그 공방 생성기로 가는 문(href) */
     {
       const e = await open('/prompt.html?a=element&s=fe-steel-bridge'), p = e.page, now = () => p.evaluate(() => window.AtelierHubPrompt.state().open);
       await p.waitForSelector('[data-open="out"]'); await p.click('[data-open="out"]');
@@ -287,7 +295,12 @@ const FORM_CASES = [
       assert.equal(await p.locator('#panel .opt[data-pick]').count(), 2, '철교는 판타지에 안 산다 — 세계 둘');
       await p.click('[data-pick="mecha"]'); assert.equal(await now(), 'scene', '세계 다음 장면');
       await p.selectOption('#panel select[data-sel]', 'night'); await p.click('[data-pick="foundry"]'); assert.equal(await now(), 'pose', '장면 다음 자세');
-      await p.selectOption('#panel select[data-sel]', 'confident'); await p.click('[data-pick="stride"]'); assert.equal(await now(), 'design', '자세 다음 설계 줄');
+      await p.selectOption('#panel select[data-sel]', 'confident'); await p.click('[data-pick="stride"]'); assert.equal(await now(), 'sil', '자세 다음 실루엣(원소 생성기 차례)');
+      /* 실루엣 — 카드 설계값(주민은 없음) · 자유 · 그 세계 갈래. 갈래 하나를 고른다 */
+      assert.deepEqual(await p.locator('#panel .opt[data-pick]').evaluateAll(l => l.slice(0, 2).map(e => e.dataset.pick)), ['', 'free'], '실루엣 — 설계값 · 자유 먼저');
+      const silOpt = p.locator('#panel .opt[data-pick]').nth(2), silKey = await silOpt.getAttribute('data-pick'), silKo = (await silOpt.locator('b').textContent()).trim();
+      await silOpt.click(); assert.equal(await now(), 'design', '실루엣 다음 설계 줄');
+      assert.equal(await p.evaluate(() => window.AtelierHubPrompt.state().card.shots.mecha.frame), silKey, '실루엣이 카드에');
       assert.equal(await p.locator('#panel input[type="checkbox"]').count(), 2, '실루엣·얼굴 싣기');
       await p.selectOption('#panel select[data-sel]', 'low');
       await p.click('[data-next="design"]'); assert.equal(await now(), 'look', '설계 줄 다음 외형');
@@ -298,16 +311,23 @@ const FORM_CASES = [
       await p.fill('[data-field="scene"]', 'a windy ridge');
       await p.click('[data-next="notes"]'); assert.equal(await now(), 'done');
       const t = await p.locator('#prompt').inputValue();
-      assert(t.startsWith('CONCEPT: a citizen of the Iron Nation, of the Steel House.') && t.includes('MECHA DESIGN') && t.includes('SCENE NOTE: a windy ridge'), '원소 세계 지시문');
-      assert(t.includes('EXPOSURE (low)') && t.includes('hair color: silver') && t.includes('\nFACE ') && !t.includes('brushed-steel silver hair'), '설계 줄·외형 칸이 지시문에 ' + t.slice(0, 120));
-      assert(t.includes('SETTING (this card): the orbital foundry floor') && t.includes('TIME & WEATHER: night') && t.includes('Mid-stride') && t.includes('EXPRESSION: level brow'), '장면·시간대·자세·표정이 지시문에');
+      /* 칸 꼴(원소 기본 화풍 — 머리말 + 다섯 칸), 글은 그 공방 조립(lib/prompt-element.js)이 같은 카드로 지은 것 그대로 */
+      const elWant = (() => { const H = require('../prompt/adapters.js'), a = H.get('element'), dir = path.join(SIB, a.repo), w = { console: { log() {}, warn() {}, error() {} } }; w.window = w; vm.createContext(w);
+        for (const f of a.libs) vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), w);
+        const d = {}; for (const [n, f] of Object.entries(a.data)) d[n] = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
+        return st => a.buildCard(w, d, 'fe-steel-bridge', st.style, 'world', st.card); })();
+      assert.equal(t, elWant(await p.evaluate(() => JSON.parse(JSON.stringify(window.AtelierHubPrompt.state())))), '원소 세계 지시문 = 그 공방 조립');
+      assert(t.startsWith('A full-body vertical 2:3') && t.includes('a citizen of the Iron Nation, of the Steel House.') && t.includes('\n\n3. COSTUME — MECHA\n') && t.includes('\nSCENE NOTE: a windy ridge'), '원소 세계 지시문 — 칸 꼴');
+      assert(t.includes('\nExposure (low)') && t.includes('Chosen look (overrides the automatic look): hair color: silver.') && t.includes('\nFace — her own: ') && !t.includes('brushed-steel silver hair'), '설계 줄·외형 칸이 지시문에 ' + t.slice(0, 120));
+      assert(t.includes('\nThis card: the orbital foundry floor') && t.includes('night — ') && t.includes('\nPose: Mid-stride') && t.includes('\nExpression: ') && t.includes('\nSilhouette: '), '장면·시간대·자세·표정·실루엣이 지시문에');
+      assert((await p.locator('[data-open="sil"]').textContent()).includes(silKo), '실루엣 칩 ' + silKo);
       assert.match(await p.locator('[data-open="scene"]').textContent(), /궤도 주조소 · 밤/, '장면 칩');
       assert.match(await p.locator('[data-open="look"]').textContent(), /1칸/, '외형 칩');
       assert.match(await p.locator('[data-open="world"]').textContent(), /메카/, '세계 칩');
       await p.reload(); await p.waitForSelector('[data-open="out"]');
       assert.equal(await now(), 'done'); assert.equal(await p.locator('#prompt').inputValue(), t, '새로 고쳐도 남는다');
       assert.deepEqual(e.errors, []);
-      await e.ctx.close(); checks += 13;
+      await e.ctx.close(); checks += 17;
     }
 
     /* ②-3 신화 무기 — 액션 한 장(설계 언어·붙일 문단·자세·외형·장면 메모) · 각성 · 스킨(스킨·상태) */
@@ -326,17 +346,22 @@ const FORM_CASES = [
       await p.click('[data-next="look"]'); assert.equal(await now(), 'notes');
       await p.fill('[data-field="scene"]', 'stormy cliff');
       const t = await p.locator('#prompt').inputValue();
-      assert(t.includes('SCENE NOTE: stormy cliff') && t.includes('POSTURE:') && /cloth/.test(t), '초상 지시문');
+      /* 신화 지시문 칸 꼴 스위치(그 공방 lib/prompt-spec.js SECTIONS.on — core v4 칸 틀) — 켜져 있으면 머리말 + 다섯 칸, 줄 머리는 「Scene note:」 꼴 */
+      const mythSec = (() => { const w = { console: { log() {}, warn() {}, error() {} } }; w.window = w; vm.createContext(w);
+        for (const f of ['lib/words.js', 'lib/prompt-spec.js', 'lib/prompt-myth.js']) vm.runInContext(fs.readFileSync(path.join(SIB, 'myth-atelier', f), 'utf8'), w);
+        return w.AtelierPrompt.sectionsOn({}); })(), MH = h => mythSec ? h.charAt(0) + h.slice(1).toLowerCase() : h;
+      assert(t.includes(MH('SCENE NOTE') + ': stormy cliff') && t.includes(MH('POSTURE') + ':') && /cloth/.test(t), '초상 지시문');
+      if (mythSec) assert(['1. STYLE', '2. CHARACTER', '3. COSTUME — ', '4. SCENE', '5. CONSTRAINTS'].every(h => t.includes('\n\n' + h)), '초상 — 칸 꼴(머리말 + 다섯 칸)');
       await p.click('[data-next="notes"]'); assert.equal(await now(), 'done');
       /* 각성 — 장면 메모만, 같은 카드(메모가 남는다) */
       await p.click('[data-open="out"]'); await p.click('[data-out-mode="awaken"]');
       assert.equal(await p.locator('[data-field="scene"]').inputValue(), 'stormy cliff', '갈래끼리 같은 카드');
-      assert(!(await p.locator('#prompt').inputValue()).includes('POSTURE:'), '각성엔 자세가 없다');
+      assert(!(await p.locator('#prompt').inputValue()).includes(MH('POSTURE') + ':'), '각성엔 자세가 없다');
       /* 스킨 — 스킨·상태 */
       await p.click('[data-open="out"]'); await p.click('[data-out-mode="skin"]'); assert.equal(await now(), 'skin');
       await p.click('[data-pick="frost"]'); assert.equal(await now(), 'sstate');
       await p.click('[data-pick="cursed"]');
-      assert((await p.locator('#prompt').inputValue()).includes('SKIN NOTE'), '스킨 저주 지시문');
+      assert((await p.locator('#prompt').inputValue()).includes(MH('SKIN NOTE') + ':'), '스킨 저주 지시문');
       /* 스킨 없는 무기 — 알리고 지시문은 없다 */
       await p.click('[data-open="subject"]'); await p.fill('#find', '묠니르'); await p.click('[data-subject="묠니르"]');
       await p.click('[data-out-mode="skin"]');

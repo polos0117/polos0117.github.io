@@ -1,5 +1,5 @@
 /* 그림 검수판(review.js) — 셈만. 화면은 tests/review-screen.cjs.
-   파일 이름 읽기(옆 공방 저장소의 등록부 전부) · 후보 · 체크리스트(묶음 합치기 · 2:3 자동 판정) · 지시문 트리(원문 자리) · 명령문 · 상태 옮기기(잠금 · 승인 조건) · 중복.
+   파일 이름 읽기(옆 공방 저장소의 등록부 전부 · 화풍 열쇠는 그 공방 화풍 표) · 후보 · 체크리스트(묶음 합치기 · 2:3 자동 판정) · 지시문 트리(원문 자리) · 명령문 · 상태 옮기기(잠금 · 승인 조건) · 중복.
    Run: node tests/review.cjs   (옆 저장소가 없으면 등록부 대목만 건너뜀) */
 const assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path');
 const ROOT = path.resolve(__dirname, '..'), SIB = path.resolve(ROOT, '..'), R = require(path.join(ROOT, 'review.js'));
@@ -27,14 +27,27 @@ assert.equal(R.parseFile(my, '관창의_창_game_keyart_f_skin_frost_cursed.webp
 assert.equal(R.parseFile(sm, '강유_fantasy_kr_mmorpg_f.webp').slot, 'fantasy');
 assert.equal(R.parseFile(pk, 'readme.txt'), null);
 assert.equal(R.parseFile(pk, '제크로무_unknown_style_f.webp'), null, '모르는 화풍 열쇠는 읽지 않는다');
+/* 화풍 열쇠는 그 공방 표(data/style.json)에서 — 내린 화풍도, 긴 열쇠가 먼저(anime_25d_gloss 는 anime_25d 가 아니다) */
+{
+  const q = Object.assign({}, pk, { styles: pk.styles.slice() });
+  assert.equal(R.useStyles(q, { styles: [] }), false); assert.equal(R.useStyles(q, { styles: 'x' }), false); assert.deepEqual(q.styles, pk.styles, '표가 비거나 꼴이 다르면 사본 그대로');
+  assert.equal(R.useStyles(q, { styles: [{ key: 'anime_25d' }, { key: 'anime_25d_gloss' }, { key: 'glossy_promo', retired: '2026-11-11' }, { key: 'Bad Key' }] }), true);
+  assert.deepEqual(q.styles, ['anime_25d', 'anime_25d_gloss', 'glossy_promo'], '표 열쇠(내린 것 포함, 이상한 열쇠 뺌)');
+  assert.deepEqual(R.parseFile(q, '가디_anime_25d_gloss_f_casual1.webp'), { card: '가디', slot: '', cut: 'casual1', style: 'anime_25d_gloss', place: 'casual1' });
+  assert.equal(R.parseFile(q, '가디_light_anime_25d_f.webp').style, 'anime_25d');
+  assert.equal(R.parseFile(q, '가디_light_mecha_cinematic_keyart_f.webp'), null, '표에 없는 열쇠');
+}
 
 /* 그림 주소 — 포켓몬은 where 로 저장소 */
 assert.equal(R.imageURL(pk, 'a_light_glossy_promo_f.webp', { where: { 'a_light_glossy_promo_f.webp': 3 } }), 'https://polos0117.github.io/pkm-atelier-img-4/img/a_light_glossy_promo_f.webp');
 assert.equal(R.imageURL(el, "o'x_fantasy_game_keyart_f.webp", {}, true), 'https://polos0117.github.io/element-atelier-img/img/thumb/o%27x_fantasy_game_keyart_f.webp');
 
-/* 옆 공방 저장소의 등록부 — 모든 등록 파일을 읽고, 후보는 최근 날부터 */
+/* 옆 공방 저장소의 등록부 — 모든 등록 파일을 읽고(화풍 열쇠는 공방마다 그 공방 표), 후보는 최근 날부터 */
+for (const p of R.PROJECTS) assert.equal(p.styleTable, 'data/style.json', p.key + ' 화풍 표');
 const have = R.PROJECTS.filter(p => fs.existsSync(path.join(SIB, p.repo, 'data/img.json')));
 for (const p of have) {
+  /* 화면(review.html)처럼 화풍 표가 있는 공방은 표를 먼저 읽는다 */
+  if (p.styleTable && fs.existsSync(path.join(SIB, p.repo, p.styleTable))) assert(R.useStyles(p, JSON.parse(fs.readFileSync(path.join(SIB, p.repo, p.styleTable), 'utf8'))), p.key + ' 화풍 표 ' + p.styleTable);
   const doc = JSON.parse(fs.readFileSync(path.join(SIB, p.repo, 'data/img.json'), 'utf8'));
   const files = Object.keys(doc.added || {});
   const bad = files.filter(f => !R.parseFile(p, f));

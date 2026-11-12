@@ -7,6 +7,7 @@
    AtelierReview.checklist(p, item, custom)  → 그 작업의 검수 항목(묶음을 합친 것, 중복 id 는 한 번)
    AtelierReview.autoCheck(meta, p)           → 그림 파일 자체로 판정할 수 있는 항목(비율 · 크기 · 형식)
    AtelierReview.parseFile(p, file)           → {card, slot, style, cut} — 파일 이름 규칙대로
+   AtelierReview.useStyles(p, table)          → 그 공방 화풍 표(p.styleTable — /<저장소>/data/style.json)의 열쇠로 p.styles 를 바꾼다(내린 화풍 포함)
    AtelierReview.candidates(p, imgDoc, opt)   → 최신 작업 후보(등록부 added 날짜 순) + 우선순위
    AtelierReview.parsePrompt(text)            → 지시문 트리(머리말 줄 · 번호 목록 · 갈래 글머리 · 마디)
    AtelierReview.composeCommand(ctx, reqs)    → 고쳐 달라는 명령문(한국어)
@@ -71,19 +72,21 @@
   var PROJECTS = [
     { key: 'pkm', name: '포켓몬 연구소', c: '#f4c542', repo: 'pkm-atelier', unit: '포켓몬',
       imgRepos: ['pkm-atelier-img', 'pkm-atelier-img-2', 'pkm-atelier-img-3', 'pkm-atelier-img-4'], upload: 'pkm-atelier-img-4', claims: false,
-      styles: ['glossy_promo', 'mecha_cinematic_keyart', 'cinematic_semi_real', 'game_keyart', 'glossy_kr_game', 'game_cgi', 'semi_real_paint', 'photoreal', 'anime_illust', 'cel_anime', 'painterly', 'retro_anime', 'ink_wash', 'bright_catalog'],
+      /* 화풍 열쇠는 공방마다 그 공방 표(styleTable — pkm 은 lib/prompt-spec.js ART_STYLES 에서 뽑은 것, 내린 화풍도 옛 이름 읽기에 남는다)를 읽는다(useStyles). styles 는 표를 못 받을 때의 사본(2026-11-12) */
+      styleTable: 'data/style.json',
+      styles: ['cinematic_semi_real', 'game_keyart', 'glossy_kr_game', 'glossy_promo', 'mecha_cinematic_keyart', 'game_cgi', 'semi_real_paint', 'photoreal', 'anime_illust', 'cel_anime', 'painterly', 'retro_anime', 'ink_wash', 'bright_catalog', 'anime_gloss', 'gloss_daylight', 'anime_25d', 'anime_25d_gloss'],
       slots: ['light_overdrive', 'heavy_overdrive', 'mobility_overdrive', 'light', 'heavy', 'mobility'], webp: { q: 85, m: 6 },
       ruleSets: BASE_SETS.concat(['text-none', 'no-creature', 'casual-ref']),
       rules: [
         '한 포켓몬 = 폼 셋(경장 · 중장 · 고기동) + 폭주 셋 + 일상컷. 기준은 경장, 폭주는 그 폼 그림을 첨부해 같은 구도.',
-        '화풍 열쇠는 그림마다 생성 기록대로(기본 glossy_promo). 외형으로 화풍을 추정해 파일 이름에 넣지 않는다.',
+        '화풍 열쇠는 그림마다 생성 기록대로(기본 anime_25d_gloss — 그 전 캐릭터는 시작한 화풍 그대로). 외형으로 화풍을 추정해 파일 이름에 넣지 않는다.',
         '지시문은 생성기 · 지시문 묶음(tools/prompt-pack.cjs)의 출력 그대로 — 세션이 고쳐 쓰지 않았는지 prompt-pack submitted 로 대조.',
         '원작 생물 · 두 번째 인물 · 글자 없음. 모티프는 판 · 언더슈트 · 머리 · 장신구로만.',
         '다시 그린 그림은 앞 그림의 sha256 을 records/<캐릭터>-<날짜>-*/replacement.json 에, 앞 판은 git 이력에 남긴다.'],
       gen: ['세로 2:3 · 1024×1536', 'WebP 품질 85 · method 6', '그림 저장소: pkm-atelier-img-4(새로 올리는 곳)', '일상컷은 경장 그림을 첨부(얼굴 · 화풍을 첨부에 맡기는 STYLE · FACE · 표정 줄)', '안전 필터: 같은 지시문 한 번 더 → 노출 한 단계씩 → 계획 한 번 바꿈 → 보고'],
       post: steps(['원본 PNG → WebP(품질 85 · method 6) — PNG 는 올리지 않는다', '기록 폴더 records/<캐릭터>-<날짜>-<종류>/ 에 지시문 · qa.json · classification.json', '교체면 replacement.json 에 앞 그림 sha256 · 날짜 · 까닭', 'pkm-atelier-img-4 main 에 커밋 하나로 올림(강제 push 없음)', '그림 등록 워크플로가 썸네일 · data/img.json 을 올렸는지 확인']) },
     { key: 'book', name: '책의 서재', c: '#e39b6b', repo: 'book-atelier', unit: '책',
-      imgRepos: ['book-atelier-img'], claims: true, styles: ['literary_fantasy'],
+      imgRepos: ['book-atelier-img'], claims: true, styleTable: 'data/style.json', styles: ['literary_fantasy'],
       slots: ['begin_open', 'middle_open', 'end_open', 'begin', 'middle', 'end'], webp: { q: 90, m: 6 },
       ruleSets: BASE_SETS.concat(['text-none']),
       rules: [
@@ -95,7 +98,7 @@
       gen: ['세로 2:3 · 1024×1536', 'WebP 품질 90 · method 6', '잠금: tools/image-claim.cjs claim → done', '안전 필터: 다시 → 노출 낮춤 → 계획 한 번 바꿈'],
       post: steps(['WebP(품질 90 · method 6), 기록에 원본 sha256', '교체면 그림 저장소 records/replacement.json 에 앞 sha256 · 까닭', 'book-atelier-img main 에 커밋 하나', 'image-claim done <책> --execution <id>', '썸네일 · 등록부 갱신 확인']) },
     { key: 'game', name: '게임 오락실', c: '#ff6ad5', repo: 'game-atelier', unit: '게임',
-      imgRepos: ['game-atelier-img'], claims: true, styles: ['glossy_kr_game'],
+      imgRepos: ['game-atelier-img'], claims: true, styleTable: 'data/style.json', styles: ['glossy_kr_game'],
       slots: ['title_open', 'middle_open', 'ending_open', 'title', 'middle', 'ending'], webp: { q: 90, m: 6 },
       ruleSets: BASE_SETS.concat(['text-none']),
       rules: [
@@ -107,7 +110,7 @@
       gen: ['세로 2:3 · 1024×1536', 'WebP 품질 90 · method 6', '잠금: tools/image-claim.cjs', '안전 필터: 다시 → 노출 낮춤 → 계획 한 번 바꿈'],
       post: steps(['WebP(품질 90 · method 6), 기록에 원본 sha256', '교체면 replacement.json', 'game-atelier-img main 에 커밋 하나', 'image-claim done <게임> --execution <id>', '썸네일 · 등록부 갱신 확인']) },
     { key: 'element', name: '원소의 섬', c: '#5fd3e8', repo: 'element-atelier', unit: '카드',
-      imgRepos: ['element-atelier-img'], claims: true, styles: ['game_keyart', 'game_cgi', 'cinematic_keyart'],
+      imgRepos: ['element-atelier-img'], claims: true, styleTable: 'data/style.json', styles: ['game_keyart', 'game_cgi', 'cinematic_keyart', 'jp_paint_anime'],
       slots: ['fantasy', 'steampunk', 'mecha'], worldSlots: true, webp: { q: 90, m: 6 },
       ruleSets: BASE_SETS.concat(['text-element', 'casual-ref']),
       rules: [
@@ -115,11 +118,11 @@
         '그 원소의 기호와 원자 번호는 읽혀도 된다 — 그 밖의 글자 · 숫자 · 로고는 안 된다.',
         '세계(판타지 · 스팀펑크 · 메카)마다 다른 사람. 세계 그림은 기준 그림 없이 한 장씩.',
         '일상컷은 세계 그림을 첨부(세계마다 다섯 장). 세계 그림이 없으면 일상컷을 만들지 않는다.',
-        '기본 화풍 game_keyart. 화풍 판은 기록 styleVersion 에.'],
+        '기본 화풍 jp_paint_anime(그 전 그림은 game_keyart 그대로). 화풍 판은 기록 styleVersion 에.'],
       gen: ['세로 2:3 · 1024×1536', 'WebP 품질 90 · method 6', '기록: records/<카드>/<세계>[-casualN].<화풍>-ui.json', '잠금: tools/image-claim.cjs claim · done', '교체: records/replacement.json + img/thumb/<파일> 지우기'],
       post: steps(['WebP(품질 90 · method 6), 기록 JSON(prompt · styleVersion · generation{png_sha256 · prompt_sha256 · ref_sha256} · qa · acceptance)', '교체면 records/replacement.json 에 {file · replaced · old_webp_sha256 · old_png_sha256 · old_date · why}, img/thumb/<파일> 지움', 'element-atelier-img main 에 커밋 하나', 'image-claim done <카드> --execution <id>', '썸네일 워크플로 성공 확인']) },
     { key: 'myth', name: '신화 무기 대장간', c: '#d9b45a', repo: 'myth-atelier', unit: '무기',
-      imgRepos: ['myth-atelier-img'], claims: true, styles: ['game_keyart', 'cinematic_semi_real', 'glossy_kr_game', 'game_cgi', 'semi_real_paint', 'glossy_promo', 'mecha_cinematic_keyart', 'photoreal', 'anime_illust', 'cel_anime', 'painterly', 'retro_anime', 'ink_wash', 'bright_catalog'],
+      imgRepos: ['myth-atelier-img'], claims: true, styleTable: 'data/style.json', styles: ['game_keyart', 'cinematic_semi_real', 'glossy_kr_game', 'game_cgi', 'semi_real_paint', 'glossy_promo', 'mecha_cinematic_keyart', 'photoreal', 'anime_illust', 'cel_anime', 'painterly', 'retro_anime', 'ink_wash', 'bright_catalog'],
       slots: [], webp: { q: 90, m: 6 },
       ruleSets: BASE_SETS.concat(['text-none', 'casual-ref']),
       rules: [
@@ -130,7 +133,7 @@
       gen: ['세로 2:3 · 1024×1536', 'WebP 품질 90', '잠금: tools/image-claim.cjs', '일상컷은 액션 그림 첨부(STYLE · FACE 줄)'],
       post: steps(['WebP(품질 90), 기록에 원본 sha256', '교체면 replacement.json', 'myth-atelier-img main 에 커밋 하나', 'image-claim done', '썸네일 · 등록부 갱신 확인']) },
     { key: 'sam', name: '삼국지 군막', c: '#c9a227', repo: 'sam-atelier', unit: '장수',
-      imgRepos: ['sam-atelier-img'], claims: true, styles: ['kr_mmorpg', 'game_keyart', 'glossy_kr_game'],
+      imgRepos: ['sam-atelier-img'], claims: true, styleTable: 'data/style.json', styles: ['kr_mmorpg', 'game_keyart', 'glossy_kr_game'],
       slots: ['samguk', 'fantasy', 'mecha'], worldSlots: true, webp: { q: 90, m: 6 },
       ruleSets: BASE_SETS.concat(['text-sam', 'no-creature', 'casual-ref']),
       rules: [
@@ -155,6 +158,15 @@
     for (var j = 0; j < slots.length; j++) { var t = '_' + slots[j]; if (head.length > t.length && head.slice(-t.length) === t) { slot = slots[j]; head = head.slice(0, -t.length); break; } }
     var where = cut ? (slot ? slot + ' · ' + cut : cut) : (slot || '기본');
     return { card: head, slot: slot, cut: cut, style: style, place: where };
+  }
+  /* 공방 화풍 표 → 화풍 열쇠. 표 꼴 둘 — {styles: [{key, name, retired?}]}(pkm · myth) · {styles: {열쇠: {name, versions, retired?}}}(book · game · element · sam).
+     내린(retired) 화풍도 옛 파일 이름을 읽으려 넣는다. 표가 비었거나 꼴이 다르면 그대로 둔다(사본) — 바꿨으면 true */
+  function useStyles(p, table) {
+    var st = table && table.styles, rows = Array.isArray(st) ? st.map(function (r) { return r && r.key; }) : st && typeof st === 'object' ? Object.keys(st) : [], keys = [];
+    rows.forEach(function (k) { if (typeof k === 'string' && /^[a-z0-9_]+$/.test(k) && keys.indexOf(k) < 0) keys.push(k); });
+    if (!p || !keys.length) return false;
+    p.styles = keys;
+    return true;
   }
   function slotKey(item) { return [item.project, item.card, item.place || item.slot || ''].join('|'); }
 
@@ -391,7 +403,7 @@
   }
 
   var API = { RULESETS: RULESETS, ERROR_TYPES: ERROR_TYPES, VERDICTS: VERDICTS, SCOPES: SCOPES, COMMIT: COMMIT, PUSH: PUSH, STATUSES: STATUSES, PRIORITY: PRIORITY, ACTIONS: ACTIONS, PROJECTS: PROJECTS,
-    project: project, parseFile: parseFile, slotKey: slotKey, imageURL: imageURL, candidates: candidates, ruleSet: ruleSet, checklist: checklist, autoCheck: autoCheck,
+    project: project, parseFile: parseFile, useStyles: useStyles, slotKey: slotKey, imageURL: imageURL, candidates: candidates, ruleSet: ruleSet, checklist: checklist, autoCheck: autoCheck,
     parsePrompt: parsePrompt, flatten: flatten, findNode: findNode, pathOf: pathOf, composeCommand: composeCommand,
     lockedFor: lockedFor, readOnly: readOnly, approveProblems: approveProblems, transition: transition, duplicates: duplicates, claimState: claimState,
     postSteps: postSteps, matches: matches, sortItems: sortItems, newItem: newItem, mergeLedger: mergeLedger };
