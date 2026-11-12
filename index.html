@@ -27,6 +27,12 @@
   {d, n, w, daily, at, seen} 한 칸을 적고(today.js — 다섯 저장소에 같은 파일, 약속은 README 「오늘 기록」), 지도는 그걸 읽어 오늘 다녀간 방에 불을 켜고
   이름표 아래 "오늘 n판 · w승"을, 문 패널에 「오늘의 판」(?daily — 날짜가 씨앗) 을 둔다. 공방의 첫 화면을 HEAD 로 물어 Last-Modified 가 마지막으로
   다녀간 뒤(seen)라면 이름표에 초록 점 — 새 소식. 문을 누르면 그 방에 다녀간 자국(seen)을 남긴다.
+  깊이 패럴랙스(2026-11-12, 대미궁만) — 은은한 2.5D 입체감(화려한 3D 전환이 아니라). #mapimg 위에 WebGL 캔버스(canvas.fx)를 얹고 셰이더가 깊이 그림 img/cave4-depth.webp 만큼
+  UV 를 민다: (깊이 − 0.5) × 세기 × 기울임, 가장 많이 밀려도 화면 8px. 깊이 그림은 blender-cloud cave_hub 구조의 깊이 렌더(blender-cloud-img 2026-11-11_cave2-depth.png — cave4 와 같은 구조)에서
+  위층→아래층 큰 세로 기울기를 하이패스로 빼고 국소 높낮이만 남긴 흑백(흰색 = 가깝다, 0.5 = 바위 바닥 — 그래서 바위는 제자리), 만든 셈은 tools/cave4-depth.py.
+  기울임 = 굴림(굴리며 보기의 짚는 높이 기준 — 344×882 처럼 지도가 화면보다 조금만 긴 폰도 다 쓴다) + PC 마우스 · 안드로이드 기기 기울기(iOS 는 권한 창이 떠서 굴림만).
+  방 다각형 · 이름표 · 누르는 자리(SVG)는 캔버스 위라 그대로, 앨리스는 서 있는 자리의 깊이만큼 같이 밀린다. 다가간 동안 · 움직임 끔(AtelierMotion, 없으면 동작 줄이기) ·
+  WebGL 없음 · 깊이 그림 못 받음 · 왕국 → 지금처럼 정지 그림. 숨은 탭 · 화면 밖이면 그리지 않는다. 왜: 칠한 그림이 평평해 두 층 · 호수 · 계단의 높낮이가 잘 안 읽혔다.
 -->
 <style>
 :root {
@@ -160,6 +166,10 @@ body.zoomed .rail { opacity: 0; pointer-events: none; }
 .alice[hidden] { display: none; }
 .alice i { display: block; width: 100%; height: 100%; background-repeat: no-repeat; }
 .alice.flip i { transform: scaleX(-1); }
+/* 깊이 패럴랙스(2026-11-12, 대미궁만) — 그림 위에 얹는 WebGL 캔버스. 다각형 · 이름표 · 누르는 자리는 그 위(SVG)라 움직이지 않는다. 다가가면 정지 그림으로 */
+.inner > canvas.fx { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; opacity: 0; transition: opacity .3s; }
+.inner > canvas.fx.ready { opacity: 1; }
+.map.zoomed .inner > canvas.fx { opacity: 0; }
 /* 머리의 「즐겨찾기 n」 — 글줄 높이는 그대로 두고 누르는 자리만 44px */
 .head p a#fav-link { display: inline-flex; align-items: center; min-height: 44px; margin: -12px -6px; padding: 0 6px; border-radius: 8px; }
 .head p a#fav-link:focus-visible { outline: 2px solid var(--gold); outline-offset: -4px; }
@@ -397,6 +407,7 @@ function build() {
   }
   buildRail();
   if (typeof aliceMap === 'function') aliceMap();
+  if (typeof fxMap === 'function') fxMap();
 }
 /* 길 · 등불 — 지도마다 ways(SVG path) 수만큼 등불이 오간다 */
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -514,6 +525,7 @@ function leave(push) {
   if (was) scrollToRoom(was);
   aliceHold();
   requestAnimationFrame(onScroll);
+  fxKick();
 }
 rooms.addEventListener('click', e => { const a = e.target.closest('.room'); if (!a) return; e.preventDefault(); if (on === a.dataset.key) leave(true); else go(a.dataset.key); });
 stage.addEventListener('click', e => { if (on && !e.target.closest('.room.on')) leave(true); });
@@ -619,6 +631,9 @@ function aliceDraw() {
   if (A.sheet !== sheet) { A.sheet = sheet; A.frame = 0; A.ft = 0; A.i.style.backgroundImage = `url(${ALICE.base + st.file})`; A.i.style.backgroundSize = (st.frames * 100) + '% 100%'; }
   A.i.style.backgroundPosition = (A.frame / (st.frames - 1) * 100) + '% 0';
   A.el.style.left = (A.x / IW * 100) + '%'; A.el.style.top = (A.y / IH * 100) + '%';
+  /* 깊이 패럴랙스 — 서 있는 자리의 바닥이 밀린 만큼 같이(바닥에서 떠 보이지 않게) */
+  const o = fxOff(A.x, A.y), t = o ? o[0].toFixed(2) + 'px ' + o[1].toFixed(2) + 'px' : '';
+  if (A.el.style.translate !== t) A.el.style.translate = t;
 }
 function aliceTick(ts) {
   const dt = Math.min(0.05, (ts - (A.last || ts)) / 1000); A.last = ts;
@@ -647,6 +662,164 @@ function aliceLoad() {
     A.ok = true; aliceMap(); onScroll(); requestAnimationFrame(aliceTick);
   }).catch(() => { A.ok = false; A.el.hidden = true; });
 }
+
+/* ── 깊이 패럴랙스(2026-11-12, 대미궁만) — 은은한 2.5D. 그림 위에 WebGL 캔버스를 얹고, 셰이더가 깊이 그림(img/cave4-depth.webp — blender-cloud cave_hub 깊이 렌더에서
+   층의 큰 세로 기울기를 빼고 국소 높낮이만 남긴 흑백, 흰색 = 가깝다 · 0.5 = 바위 바닥, tools/cave4-depth.py)만큼 UV 를 민다: (깊이 − 0.5) × 세기 × 기울임.
+   기울임 = 굴림(그 자리가 굴리며 보기의 「짚는 높이」(mapYAtCenter)에서 지도 높이의 FX_HALF 만큼 떨어지면 끝까지 — 눈이 짚는 높이를 내려다보는 셈. 화면 가운데가 아니라
+   짚는 높이인 까닭: 344×882 처럼 지도가 화면보다 조금만 긴 폰은 다 굴려도 204px 라 화면 기준이면 거의 안 움직였다(±2px) — 짚는 높이는 어느 기기든 0 → 3072 를 다 쓴다)
+   + PC 는 마우스 자리, 안드로이드는 기기 기울기(deviceorientation — 권한 창을 띄우는 iOS 는 쓰지 않는다).
+   가장 많이 밀려도 화면에서 FX_PX(8px) — 바위 바닥(0.5)은 제자리라 다각형 · 이름표 · 누르는 자리(SVG, 캔버스 위)와 어긋나지 않는다. 앨리스는 서 있는 자리의 깊이만큼 같이.
+   그리는 때는 기울임이 바뀔 때뿐(굴림 · 마우스 · 기울기 · 크기). 숨은 탭 · 화면 밖 · 다가간 동안은 그리지 않는다.
+   움직임 끔(AtelierMotion, 없으면 동작 줄이기) · WebGL 없음 · 깊이 그림 못 받음 · 왕국 → 캔버스를 만들지 않는다(지금처럼 정지 그림) */
+const FX_PX = 8, FX_HALF = 0.25, FX_DEPTH = 'img/cave4-depth.webp?v=1';
+const FX = { cv: null, gl: null, u: null, ok: false, fail: false, dimg: null, dpx: null, dw: 0, dh: 0, vis: true, raf: 0, last: 0, ro: null, io: null,
+  cy: 0, tx: 0, ty: 0, wx: 0, wy: 0, drawn: '', gyro: null };
+const fxClamp = v => v < -1 ? -1 : v > 1 ? 1 : v;
+function fxMotion() {
+  const M = window.AtelierMotion; if (M && M.enabled) { try { return !!M.enabled(); } catch (e) {} }
+  try { return !matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return true; }
+}
+const fxWant = () => MAP === 'cave' && !FX.fail && fxMotion();
+/* 깊이 그림 — 한 번 받는다. 앨리스용으로 256×768 로 줄인 값도 한 벌(자리마다 깊이를 CPU 에서 읽는다) */
+function fxLoadDepth() {
+  if (FX.dimg || FX.loading) return; FX.loading = true;
+  const im = new Image(); im.decoding = 'async';
+  im.onload = () => {
+    try { const c = document.createElement('canvas'); c.width = FX.dw = 256; c.height = FX.dh = 768; const x = c.getContext('2d'); x.drawImage(im, 0, 0, 256, 768); FX.dpx = x.getImageData(0, 0, 256, 768).data; } catch (e) { FX.dpx = null; }
+    FX.dimg = im; fxMap();
+  };
+  im.onerror = () => { FX.fail = true; fxMap(); };
+  im.src = FX_DEPTH;
+}
+function fxDepthAt(x, y) {
+  if (!FX.dpx) return 0.5;
+  const i = Math.min(FX.dw - 1, Math.max(0, Math.round(x / IW * FX.dw))), j = Math.min(FX.dh - 1, Math.max(0, Math.round(y / IH * FX.dh)));
+  return FX.dpx[(j * FX.dw + i) * 4] / 255;
+}
+/* 그 자리(그림 픽셀)가 화면에서 밀리는 양(무대 CSS px) — 셰이더와 같은 셈. 앨리스가 쓴다 */
+function fxOff(x, y) {
+  if (!FX.ok || on) return null;
+  const d = fxDepthAt(x, y) - 0.5, tx = fxClamp(FX.tx), ty = fxClamp(fxClamp((y / IH - FX.cy) / FX_HALF) + FX.ty);
+  return [2 * FX_PX * tx * d, 2 * FX_PX * ty * d];
+}
+const FX_VS = 'attribute vec2 a; varying vec2 v; void main() { v = vec2(a.x * 0.5 + 0.5, 0.5 - a.y * 0.5); gl_Position = vec4(a, 0.0, 1.0); }';
+const FX_FS = `#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+varying vec2 v; uniform sampler2D img, dep; uniform vec2 k, tilt, view;   /* view = (짚는 높이, FX_HALF) — 그림 높이 0~1 */
+void main() {
+  vec2 t = clamp(vec2(tilt.x, clamp((v.y - view.x) / view.y, -1.0, 1.0) + tilt.y), -1.0, 1.0), o = k * t, uv = v;
+  for (int i = 0; i < 3; i++) uv = v - o * (texture2D(dep, uv).r - 0.5);
+  gl_FragColor = vec4(texture2D(img, clamp(uv, 0.0, 1.0)).rgb, 1.0);
+}`;
+function fxMount() {
+  if (FX.cv) return;
+  const img = $('#mapimg');
+  if (!img.complete || !img.naturalWidth || !/cave4\.webp/.test(img.currentSrc || img.src)) { img.addEventListener('load', fxMap, { once: true }); return; }
+  const cv = document.createElement('canvas'); cv.className = 'fx'; cv.setAttribute('aria-hidden', 'true');
+  const opt = { alpha: false, antialias: false, depth: false, stencil: false, premultipliedAlpha: false, powerPreference: 'low-power' };
+  let gl = null, gl2 = false;
+  try { gl = cv.getContext('webgl2', opt); gl2 = !!gl; if (!gl) gl = cv.getContext('webgl', opt) || cv.getContext('experimental-webgl', opt); } catch (e) { gl = null; }
+  if (!gl || gl.getParameter(gl.MAX_TEXTURE_SIZE) < IH) { FX.fail = true; return; }
+  const sh = (t, src) => { const s = gl.createShader(t); gl.shaderSource(s, src); gl.compileShader(s); return gl.getShaderParameter(s, gl.COMPILE_STATUS) ? s : null; };
+  const vs = sh(gl.VERTEX_SHADER, FX_VS), fs = sh(gl.FRAGMENT_SHADER, FX_FS), pr = gl.createProgram();
+  if (!vs || !fs) { FX.fail = true; return; }
+  gl.attachShader(pr, vs); gl.attachShader(pr, fs); gl.linkProgram(pr);
+  if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) { FX.fail = true; return; }
+  gl.useProgram(pr);
+  const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  const al = gl.getAttribLocation(pr, 'a'); gl.enableVertexAttribArray(al); gl.vertexAttribPointer(al, 2, gl.FLOAT, false, 0, 0);
+  const tex = (unit, im, mip) => {
+    const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, im);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    if (mip) gl.generateMipmap(gl.TEXTURE_2D);   /* WebGL2 만 — 1024 폭을 폰 화면 폭으로 줄일 때 반짝임이 없게. WebGL1 은 2의 거듭제곱이 아니라 밉맵이 안 된다 */
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, mip ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR);
+  };
+  try { tex(0, img, gl2); tex(1, FX.dimg, false); } catch (e) { FX.fail = true; return; }
+  if (gl.getError() !== gl.NO_ERROR) { FX.fail = true; return; }
+  gl.uniform1i(gl.getUniformLocation(pr, 'img'), 0); gl.uniform1i(gl.getUniformLocation(pr, 'dep'), 1);
+  FX.u = { k: gl.getUniformLocation(pr, 'k'), tilt: gl.getUniformLocation(pr, 'tilt'), view: gl.getUniformLocation(pr, 'view') };
+  cv.addEventListener('webglcontextlost', () => { if (FX.cv !== cv) return; FX.fail = true; fxUnmount(); });   /* 기기가 GPU 를 거둬 가면 — 정지 그림으로 */
+  img.after(cv); FX.cv = cv; FX.gl = gl; FX.ok = true; FX.drawn = '';
+  if (window.ResizeObserver) { FX.ro = new ResizeObserver(() => fxKick(true)); FX.ro.observe(stage); }
+  if (window.IntersectionObserver) { FX.io = new IntersectionObserver(es => { FX.vis = es[es.length - 1].isIntersecting; if (FX.vis) fxKick(); }); FX.io.observe(stage); }
+  fxGyro(true); fxKick(true);
+}
+function fxUnmount() {
+  if (FX.ro) FX.ro.disconnect(); if (FX.io) FX.io.disconnect(); FX.ro = FX.io = null;
+  if (FX.raf) cancelAnimationFrame(FX.raf); FX.raf = 0;
+  const cv = FX.cv, gl = FX.gl; FX.cv = FX.gl = FX.u = null; FX.ok = false; fxGyro(false);
+  if (gl) { const x = gl.getExtension('WEBGL_lose_context'); if (x && !gl.isContextLost()) x.loseContext(); }   /* 텍스처(그림 1024×3072)를 곧장 돌려준다 */
+  if (cv) cv.remove();
+  if (A.el.style.translate) A.el.style.translate = '';
+}
+/* 지도 · 움직임 설정이 바뀔 때 — 있어야 하면 세우고, 아니면 걷는다 */
+function fxMap() {
+  if (!fxWant()) return fxUnmount();
+  if (!FX.dimg) return fxLoadDepth();
+  fxMount();
+}
+function fxKick(resize) {
+  if (resize) FX.drawn = '';
+  if (FX.ok && !FX.raf) FX.raf = requestAnimationFrame(fxFrame);
+}
+function fxFrame(ts) {
+  FX.raf = 0;
+  if (!FX.ok || document.hidden || !FX.vis || on) { FX.last = 0; return; }
+  const dt = FX.last ? Math.min(0.1, (ts - FX.last) / 1000) : 0.016; FX.last = ts;
+  /* 마우스 · 기울기는 부드럽게 따라간다(0.12초) — 손떨림에 화면이 떨지 않게 */
+  const a = 1 - Math.exp(-dt / 0.12);
+  FX.tx += (FX.wx - FX.tx) * a; FX.ty += (FX.wy - FX.ty) * a;
+  const settling = Math.abs(FX.wx - FX.tx) > 0.002 || Math.abs(FX.wy - FX.ty) > 0.002;
+  if (!settling) { FX.tx = FX.wx; FX.ty = FX.wy; }
+  const W = stage.clientWidth, H = stage.clientHeight;
+  if (W < 2 || H < 2) return;
+  FX.cy = Math.min(1, Math.max(0, mapYAtCenter() / IH));
+  const gl = FX.gl, cv = FX.cv, dpr = Math.min(window.devicePixelRatio || 1, 2.5, IW / W), cw = Math.round(W * dpr), ch = Math.round(H * dpr);
+  if (cv.width !== cw || cv.height !== ch) { cv.width = cw; cv.height = ch; FX.drawn = ''; }
+  const key = [cw, ch, FX.cy.toFixed(4), FX.tx.toFixed(3), FX.ty.toFixed(3)].join();
+  if (key !== FX.drawn) {
+    FX.drawn = key;
+    gl.viewport(0, 0, cw, ch);
+    gl.uniform2f(FX.u.k, 2 * FX_PX / W, 2 * FX_PX / H); gl.uniform2f(FX.u.tilt, FX.tx, FX.ty); gl.uniform2f(FX.u.view, FX.cy, FX_HALF);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    if (!cv.classList.contains('ready')) cv.classList.add('ready');
+  }
+  if (settling) fxKick();
+}
+/* PC — 마우스 자리(화면 가운데에서 얼마나). 눈이 마우스 쪽으로 가니 가까운 것은 반대로 */
+addEventListener('pointermove', e => { if (e.pointerType !== 'mouse' || !FX.ok) return; FX.wx = -fxClamp((e.clientX / innerWidth - 0.5) * 2) * 0.8; FX.wy = -fxClamp((e.clientY / innerHeight - 0.5) * 2) * 0.5; fxKick(); }, { passive: true });
+document.documentElement.addEventListener('mouseleave', () => { FX.wx = FX.wy = 0; fxKick(); });
+/* 안드로이드 — 기기 기울기. 처음 쥔 각도를 기준으로(천천히 따라가 다시 가운데로), ±20° 면 끝까지. 권한을 물어야 하는 곳(iOS)은 굴림만 */
+function fxGyroOK() {
+  /* requestPermission 이 있는지로 가르면 안 된다 — 요즘 크롬(안드로이드)에도 있다(묻지 않고 바로 허락). 그래서 이름으로: 안드로이드만, iOS · iPadOS(맥 이름에 터치)는 굴림만 */
+  try { const ua = navigator.userAgent || '', ios = /iP(hone|ad|od)/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    return !ios && /Android/i.test(ua) && 'DeviceOrientationEvent' in window; } catch (e) { return false; }
+}
+function fxOrient(e) {
+  if (e.beta == null || e.gamma == null) return;
+  const g = FX.gyro, now = performance.now(), ang = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+  let x = e.gamma, y = e.beta;
+  if (ang === 90) { x = e.beta; y = -e.gamma; } else if (ang === 270 || ang === -90) { x = -e.beta; y = e.gamma; }
+  if (!g.t) { g.x0 = x; g.y0 = y; } else { const a = Math.min(1, (now - g.t) / 1000 / 2.5); g.x0 += (x - g.x0) * a; g.y0 += (y - g.y0) * a; }
+  g.t = now;
+  const wx = -fxClamp((x - g.x0) / 20), wy = -fxClamp((y - g.y0) / 20) * 0.6;
+  if (Math.abs(wx - FX.wx) > 0.01 || Math.abs(wy - FX.wy) > 0.01) { FX.wx = wx; FX.wy = wy; fxKick(); }
+}
+function fxGyro(onOff) {
+  if (onOff && !FX.gyro && fxGyroOK()) { FX.gyro = { t: 0, x0: 0, y0: 0 }; addEventListener('deviceorientation', fxOrient); }
+  else if (!onOff && FX.gyro) { removeEventListener('deviceorientation', fxOrient); FX.gyro = null; FX.wx = FX.wy = FX.tx = FX.ty = 0; }
+}
+addEventListener('scroll', () => fxKick(), { passive: true });
+addEventListener('resize', () => fxKick(true));
+document.addEventListener('visibilitychange', () => { if (!document.hidden) fxKick(); });
+/* 움직임 설정이 바뀌면 — 끄면 캔버스를 걷고 정지 그림, 켜면 다시 */
+if (window.AtelierMotion && window.AtelierMotion.subscribe) window.AtelierMotion.subscribe(fxMap);
+try { const mq = matchMedia('(prefers-reduced-motion: reduce)'); mq.addEventListener ? mq.addEventListener('change', fxMap) : mq.addListener(fxMap); } catch (e) {}
 
 /* 지도 고르기 — 다가가 있었으면 그 방 그대로 새 지도에서 다가간다 */
 function setMap(k) {

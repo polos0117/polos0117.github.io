@@ -227,6 +227,88 @@ const NOW = Date.now(), SEED = {
       assert.deepEqual(errors, [], name + ' 오류 없음');
       await ctx.close();
     }
-    console.log('PASS 공방 지도: 방 열여섯(공방 열 · 도구 다섯 · 도시공방 준비 중, 두 층 1:3)·칩·이름표·카드 · 지도 고르기(대미궁 · 왕국 — 지명 · 구역 · 기억 · ?map=) · 빛나기·미리보기 · 다가가기·문·주소·Esc·뒤로 가기 · 오늘 불·오늘 줄·오늘의 판·새 소식·다녀간 자국 · 세로/가로/PC 넘침 없음, 가로는 폭을 정해 굴린다');
+    /* 깊이 패럴랙스(2026-11-12, 대미궁만) — 접는 폰 커버 344×882 터치에서: 깊이 그림을 받아 캔버스가 서고, 다각형 · 누르는 자리는 그대로, 앨리스는 바닥과 같이 밀리고,
+       움직임 끔(동작 줄이기 · AtelierMotion) · 깊이 그림 못 받음 · 왕국이면 캔버스가 없다(정지 그림) */
+    {
+      const fold = { width: 344, height: 882 };
+      const open = async (opt = {}, init) => {
+        const ctx = await br.newContext({ viewport: fold, isMobile: true, hasTouch: true, ...opt });
+        if (init) await ctx.addInitScript(init);
+        await ctx.route('**/*', r => r.request().url().startsWith(BASE) ? r.continue() : r.fulfill({ status: 404, body: '' }));
+        await ctx.route('**/book-atelier-img/sprites/alice/*', r => r.fulfill({ status: 200, contentType: 'image/png', body: fs.readFileSync(path.join(ROOT, 'icon-192.png')) }));
+        const p = await ctx.newPage(), errors = [], depth = []; p.on('pageerror', e => errors.push(String(e)));
+        p.on('response', r => { if (/cave4-depth\.webp/.test(r.url())) depth.push(r.status()); });
+        return { ctx, p, errors, depth };
+      };
+      /* 다각형 · 누르는 자리 — 이름표 가운데를 누르면 그 방의 다각형이 받는다(캔버스는 누름을 받지 않는다) */
+      const hits = p => p.evaluate(() => [...document.querySelectorAll('.pin')].map(pin => { const r = pin.querySelector('b').getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+        if (y < 0 || y > innerHeight) return [pin.dataset.key, 'off'];
+        const pins = document.querySelector('#pins'); pins.style.visibility = 'hidden'; const el = document.elementFromPoint(x, y); pins.style.visibility = '';
+        return [pin.dataset.key, el && el.closest('.room') ? el.closest('.room').dataset.key : el && el.tagName]; }));
+      const polys = p => p.evaluate(() => [...document.querySelectorAll('.room polygon')].map(e => { const r = e.getBoundingClientRect(); return [e.getAttribute('points'), [r.x, r.y, r.width, r.height].map(v => Math.round(v * 10) / 10)]; }));
+
+      const A = await open();
+      await A.p.goto(BASE + '/?map=cave'); await A.p.waitForSelector('#stage canvas.fx.ready', { timeout: 8000 });
+      assert.deepEqual(A.depth, [200], '패럴랙스 — 깊이 그림을 받는다');
+      const fx = await A.p.evaluate(() => { const c = document.querySelector('canvas.fx'), b = c.getBoundingClientRect(), s = document.querySelector('#stage').getBoundingClientRect();
+        return { pe: getComputedStyle(c).pointerEvents, under: c.previousElementSibling.id, over: c.nextElementSibling.id, same: Math.abs(b.width - s.width) < 1 && Math.abs(b.height - s.height) < 1, w: c.width, cw: b.width }; });
+      assert.equal(fx.pe, 'none', '캔버스는 누름을 받지 않는다'); assert.deepEqual([fx.under, fx.over], ['mapimg', 'svg'], '캔버스는 그림 바로 위 · 다각형(SVG) 아래');
+      assert(fx.same && fx.w >= fx.cw && fx.w <= 1024, '캔버스는 무대 크기 그대로, 그림 폭(1024)을 넘지 않는다: ' + JSON.stringify(fx));
+      assert(await A.p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), '344 패럴랙스 — 가로 넘침 없음');
+      const span = await A.p.evaluate(() => scrollSpan().span);
+      await A.p.evaluate(() => scrollTo(0, 0)); await A.p.waitForTimeout(300);
+      const hit0 = await hits(A.p), poly0 = await polys(A.p);
+      for (const [k, got] of hit0) if (got !== 'off') assert.equal(got, k, '패럴랙스 — ' + k + ' 누르는 자리는 그 방');
+      /* 같은 굴림 자리의 정지 그림(동작 줄이기)과 다각형 · 누르는 자리가 똑같다 */
+      const B = await open({ reducedMotion: 'reduce' });
+      await B.p.goto(BASE + '/?map=cave'); await B.p.waitForFunction(() => document.querySelector('#mapimg').complete); await B.p.waitForTimeout(800);
+      assert.equal(await B.p.locator('canvas.fx').count(), 0, '동작 줄이기 — 캔버스 없음(정지 그림)');
+      assert.deepEqual(B.depth, [], '동작 줄이기 — 깊이 그림도 받지 않는다');
+      await B.p.evaluate(() => scrollTo(0, 0)); await B.p.waitForTimeout(300);
+      assert.deepEqual(await polys(B.p), poly0, '패럴랙스가 있어도 다각형은 정지 그림 때와 같은 자리');
+      assert.deepEqual(await hits(B.p), hit0, '패럴랙스가 있어도 누르는 자리는 정지 그림 때와 같다');
+      assert.deepEqual(B.errors, [], '동작 줄이기 오류 없음'); await B.ctx.close();
+      /* 굴려도 다각형은 그림 좌표 그대로 — 앨리스는 서 있는 자리의 깊이만큼 밀린다(최대 8px) */
+      await A.p.waitForFunction(() => !document.querySelector('#alice').hidden);
+      await A.p.evaluate(s => scrollTo(0, s), span); await A.p.waitForTimeout(2500);
+      assert.deepEqual((await polys(A.p)).map(x => x[0]), poly0.map(x => x[0]), '굴려도 다각형 꼭짓점은 그대로');
+      const sh = await A.p.evaluate(() => { const t = document.querySelector('#alice').style.translate.split(' ').map(parseFloat), o = fxOff(A.x, A.y); return { t, o }; });
+      assert(sh.o && sh.t.length === 2 && sh.t.every(Number.isFinite) && Math.abs(sh.t[0] - sh.o[0]) < 0.02 && Math.abs(sh.t[1] - sh.o[1]) < 0.02 && sh.t.every(v => Math.abs(v) <= 8), '앨리스는 바닥과 같이 밀린다: ' + JSON.stringify(sh));
+      for (const [k, got] of await hits(A.p)) if (got !== 'off') assert.equal(got, k, '굴린 뒤에도 ' + k + ' 누르는 자리는 그 방');
+      /* 캔버스가 있어도 방을 누르면 다가가고, 다가간 동안은 캔버스를 숨기고 앨리스는 밀리지 않는다 */
+      await A.p.locator('.room[data-key="review"]').tap(); await A.p.waitForSelector('#map.zoomed', { timeout: 3000 }); await A.p.waitForTimeout(500);
+      assert.equal(await A.p.evaluate(() => getComputedStyle(document.querySelector('canvas.fx')).opacity), '0', '다가가면 정지 그림');
+      assert.equal(await A.p.evaluate(() => document.querySelector('#alice').style.translate), '', '다가간 동안 앨리스는 밀리지 않는다');
+      await A.p.locator('#back').tap(); await A.p.waitForFunction(() => getComputedStyle(document.querySelector('canvas.fx')).opacity === '1');
+      /* 왕국은 이번 범위가 아니다 — 캔버스를 걷는다. 대미궁으로 돌아오면 다시 */
+      await A.p.locator('#mapsel button[data-map="kingdom"]').tap(); await A.p.waitForTimeout(300);
+      assert.equal(await A.p.locator('canvas.fx').count(), 0, '왕국 — 캔버스 없음');
+      await A.p.locator('#mapsel button[data-map="cave"]').tap(); await A.p.waitForSelector('canvas.fx.ready', { timeout: 8000 });
+      assert.deepEqual(A.errors, [], '패럴랙스 오류 없음');
+      await A.p.evaluate(() => { localStorage.removeItem('atelier_hub_last_v1'); localStorage.setItem('atelier_hub_map_v1', 'cave'); });
+      await A.ctx.close();
+      /* 움직임 끔(AtelierMotion — scene-motion.js) 이면 캔버스 없음 */
+      const C = await open({}, () => { window.AtelierMotion = { enabled: () => false }; });
+      await C.p.goto(BASE + '/?map=cave'); await C.p.waitForFunction(() => document.querySelector('#mapimg').complete); await C.p.waitForTimeout(800);
+      assert.equal(await C.p.locator('canvas.fx').count(), 0, 'AtelierMotion 끔 — 캔버스 없음'); assert.deepEqual(C.errors, [], 'AtelierMotion 끔 오류 없음'); await C.ctx.close();
+      /* 깊이 그림을 못 받으면 — 지금처럼 정지 그림, 오류 없이 */
+      const D = await open();
+      await D.ctx.route('**/img/cave4-depth.webp*', r => r.fulfill({ status: 404, body: '' }));
+      await D.p.goto(BASE + '/?map=cave'); await D.p.waitForFunction(() => document.querySelector('#mapimg').complete); await D.p.waitForTimeout(800);
+      assert.equal(await D.p.locator('canvas.fx').count(), 0, '깊이 그림 못 받음 — 캔버스 없음'); assert.deepEqual(D.errors, [], '깊이 그림 못 받음 — 오류 없음');
+      assert.equal(await D.p.locator('#mapimg').isVisible(), true, '깊이 그림 못 받음 — 그림은 그대로'); await D.ctx.close();
+      /* 기울임 입력 — 안드로이드는 기기 기울기(deviceorientation), 권한 창을 띄우는 iOS 는 굴림만(요즘 크롬도 requestPermission 이 있어 이름으로 가른다) */
+      for (const [os, ua, want] of [['안드로이드', 'Mozilla/5.0 (Linux; Android 14; SM-F956N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36', true],
+        ['iOS', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1', false]]) {
+        const G = await open({ userAgent: ua });
+        await G.p.goto(BASE + '/?map=cave'); await G.p.waitForSelector('canvas.fx.ready', { timeout: 8000 });
+        for (const [b, g] of [[45, 0], [55, 12]]) { await G.p.evaluate(([b, g]) => dispatchEvent(new DeviceOrientationEvent('deviceorientation', { alpha: 0, beta: b, gamma: g })), [b, g]); await G.p.waitForTimeout(150); }
+        await G.p.waitForTimeout(400);
+        const t = await G.p.evaluate(() => [FX.tx, FX.ty]);
+        assert.equal(Math.abs(t[0]) > 0.2 && Math.abs(t[1]) > 0.1, want, os + ' 기울기로 기울임: ' + t);
+        assert.deepEqual(G.errors, [], os + ' 오류 없음'); await G.ctx.close();
+      }
+    }
+    console.log('PASS 공방 지도: 방 열여섯(공방 열 · 도구 다섯 · 도시공방 준비 중, 두 층 1:3)·칩·이름표·카드 · 지도 고르기(대미궁 · 왕국 — 지명 · 구역 · 기억 · ?map=) · 빛나기·미리보기 · 다가가기·문·주소·Esc·뒤로 가기 · 오늘 불·오늘 줄·오늘의 판·새 소식·다녀간 자국 · 세로/가로/PC 넘침 없음, 가로는 폭을 정해 굴린다 · 깊이 패럴랙스(344×882 — 깊이 그림 · 누르는 자리 그대로 · 앨리스 · 안드로이드 기울기/iOS 는 굴림만 · 움직임 끔/못 받음/왕국은 정지 그림)');
   } finally { await br.close(); server.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
