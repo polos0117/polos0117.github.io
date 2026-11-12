@@ -30,3 +30,7 @@
 | PixiJS | 그림 한 장에 효과(홀로 · 출렁임 · 입자 · 전환) | 도감(특히 pkm 홀로 카드), 원소 입자 | 가벼움 · 기존 도감에 붙이기 쉬움 |
 | three.js | 카드 · 공간을 3D 로 | 3D 카드, 원소 3D 전시관 | 손이 많이 감 · 그림 많으면 모바일 무거움 |
 | Phaser | 게임(뽑기 · 대전 · 맞추기) | 원소 물질 만들기 같은 놀이 | 게임을 만들 때만 |
+
+## 만들 때 쓸 스킬 (2026-11-12)
+
+허브 `.claude/skills/` 에 PixiJS · three.js · Phaser 스킬 열 개를 넣어 뒀어(Apache-2.0, 목록 · 출처는 [`.claude/skills/GAMEDEV-SKILLS.md`](../.claude/skills/GAMEDEV-SKILLS.md)). 허브에서 연 세션이면 바로 써. 최신 문서는 Context7 로 확인해.
