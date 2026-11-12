@@ -4,6 +4,7 @@
    휴대폰 세로(390×844)·가로(844×390)·PC(1280×900)에서 가로로 넘치지 않는다. 지도가 세로로 길어(1:2) 가로 화면에선 너비를 정해 두고 굴려 본다.
    아래 "모든 공방" 목록의 링크가 지도의 문들과 같다. 바깥 그림(각 공방의 그림 저장소)은 받지 않는다 — 404 로 돌린다.
    시간대 조명(2026-11-12) — 344×882 에서 ?time=night 면 패럴랙스 셰이더가 빛 그림 두 장으로 그리고(등불 깜빡임 · 새벽은 안개 흐름) 누르는 자리가 낮과 같다. 움직임 끔 · WebGL 없음이면 CSS 덮개 둘(정지). ?time=day 면 빛이 없다, 못 받으면 낮처럼, 기기 시각으로 고른다.
+   방에 들어가는 연출(2026-11-12) — 344×882 에서 확대 0.7초 동안 캔버스를 보인 채 밀고, 끝나면 감춘다. 앨리스가 문으로 사라지고 문 빛. 기다림은 그대로. 끝난 뒤 누르는 자리 · 문 패널은 움직임 끔 때와 같다. 움직임 끔이면 연출 없음.
    Run: CHROMIUM_PATH=<chrome> node tests/map-screen.cjs   (playwright 가 require 되는 자리에서 — NODE_PATH) */
 const assert = require('node:assert/strict'), http = require('node:http'), fs = require('node:fs'), path = require('node:path');
 const { chromium } = require('playwright');
@@ -279,8 +280,8 @@ const NOW = Date.now(), SEED = {
       assert(sh.o && sh.t.length === 2 && sh.t.every(Number.isFinite) && Math.abs(sh.t[0] - sh.o[0]) < 0.02 && Math.abs(sh.t[1] - sh.o[1]) < 0.02 && sh.t.every(v => Math.abs(v) <= sh.max), '앨리스는 바닥과 같이 밀린다: ' + JSON.stringify(sh));
       for (const [k, got] of await hits(A.p)) if (got !== 'off') assert.equal(got, k, '굴린 뒤에도 ' + k + ' 누르는 자리는 그 방');
       /* 캔버스가 있어도 방을 누르면 다가가고, 다가간 동안은 캔버스를 숨기고 앨리스는 밀리지 않는다 */
-      await A.p.locator('.room[data-key="review"]').tap(); await A.p.waitForSelector('#map.zoomed', { timeout: 3000 }); await A.p.waitForTimeout(500);
-      assert.equal(await A.p.evaluate(() => getComputedStyle(document.querySelector('canvas.fx')).opacity), '0', '다가가면 정지 그림');
+      await A.p.locator('.room[data-key="review"]').tap(); await A.p.waitForSelector('#map.zoomed', { timeout: 3000 }); await A.p.waitForSelector('#map.zoomed:not(.pushing)', { timeout: 3000 }); await A.p.waitForTimeout(350);
+      assert.equal(await A.p.evaluate(() => getComputedStyle(document.querySelector('canvas.fx')).opacity), '0', '다가가면(확대가 끝나면) 정지 그림');
       assert.equal(await A.p.evaluate(() => document.querySelector('#alice').style.translate), '', '다가간 동안 앨리스는 밀리지 않는다');
       await A.p.locator('#back').tap(); await A.p.waitForFunction(() => getComputedStyle(document.querySelector('canvas.fx')).opacity === '1');
       /* 왕국은 이번 범위가 아니다 — 캔버스를 걷는다. 대미궁으로 돌아오면 다시 */
@@ -367,6 +368,7 @@ const NOW = Date.now(), SEED = {
       /* 밤에 방을 누르면 다가간다 — 그동안은 캔버스가 쉬고 CSS 덮개가 맡는다. 돌아오면 다시 셰이더 */
       await N.p.locator('.room[data-key="review"]').tap(); await N.p.waitForSelector('#map.zoomed', { timeout: 3000 });
       assert.equal(await N.p.locator('.room.on').getAttribute('data-key'), 'review', '밤 — 누르면 그 방으로 다가간다'); assert.equal(await N.p.locator('#doors').isVisible(), true, '밤 — 문 패널이 뜬다');
+      await N.p.waitForSelector('#map.zoomed:not(.pushing)', { timeout: 3000 }); await N.p.waitForTimeout(350);   /* 밀고 들어가는 0.7초 동안은 아직 셰이더가 빛을 그린다 */
       const lzoom = await lightState(N.p);
       assert(lzoom.cvOpacity === '0' && lzoom.els.every(e => e.shown && e.pe === 'none'), '다가간 동안 — 캔버스는 쉬고 CSS 덮개가 맡는다(지도와 같이 커져 있다): ' + JSON.stringify(lzoom));
       assert.deepEqual(lzoom.els.map(e => e.blend), ['multiply', 'screen'], '다가간 동안 — 곱하기 · 더하기');
@@ -420,6 +422,87 @@ const NOW = Date.now(), SEED = {
         assert.equal(await p.evaluate(() => TIME), want, h + '시' + (q ? ' ?time=' + q : '') + ' → ' + want); await ctx.close();
       }
       console.log('PASS 시간대 조명: 밤 — 셰이더가 빛을 그린다(CSS 덮개 숨음 · 낮보다 어둡다 · 등불 깜빡임 ±5% · 등불마다 다른 박자 · 빛 없는 곳은 그대로) · 누르는 자리 · 다각형은 낮과 같다 · 다가간 동안은 CSS 덮개 · 새벽 안개 흐름 · 아침 정지 · 낮 빛 없음 · 동작 줄이기 · WebGL 없음이면 CSS 덮개 둘(곱하기 · 더하기 · 정지 · 이름표 그대로) · 왕국 · 못 받음 · 기기 시각 열 · ?time= 셋');
+      /* 방에 들어가는 연출(2026-11-12, 대미궁만) — ① 확대 0.7초 동안 캔버스를 보인 채 셰이더가 그 방 쪽으로 세게 밀고(.pushing), 끝나면 캔버스를 감춘다 ② 앨리스가 문 쪽으로 사라지고 문 자리에서 방 색 빛
+         ③ 문 링크를 누르면 확대된 방이 더 커지며 사라진다(.leaving) + @view-transition. 기다림은 늘지 않는다. 확대가 끝난 뒤의 누르는 자리 · 문 패널은 움직임 끔 때와 같다. 움직임 끔이면 연출 없음 */
+      const zoomState = p => p.evaluate(() => { const m = document.querySelector('#map'), cv = document.querySelector('canvas.fx'), a = document.querySelector('#alice'), g = document.querySelector('#doorglow'), on = document.querySelector('.room.on polygon');
+        const s = document.querySelector('#stage').getBoundingClientRect(), hit = document.elementFromPoint(s.left + s.width / 2, s.top + s.height / 2), r = on ? on.getBoundingClientRect() : null;
+        return { cls: m.className, cv: cv ? getComputedStyle(cv).opacity : null, push: !!FX.push, alice: a.className, aliceOp: getComputedStyle(a).opacity, glow: g.className, glowAnim: g.getAnimations().length,
+          transform: document.querySelector('#inner').style.transform, hit: hit && hit.closest('.room') ? hit.closest('.room').dataset.key : hit && hit.tagName, rect: r ? [r.x, r.y, r.width, r.height].map(v => Math.round(v)) : null,
+          doors: getComputedStyle(document.querySelector('#doors')).display !== 'none', h2: (document.querySelector('#doors h2') || {}).textContent, links: [...document.querySelectorAll('#doorlinks a')].map(x => x.getAttribute('href')), back: !!document.querySelector('#back'),
+          overflow: document.documentElement.scrollWidth > innerWidth + 1, vt: document.getElementById('vt').media, vtRule: /@view-transition\s*\{\s*navigation:\s*auto/.test([...document.getElementById('vt').sheet.cssRules].map(x => x.cssText).join(' ')) }; });
+      const pk = p => p.evaluate(() => { const gl = FX.gl; return [...gl.getUniform(gl.getParameter(gl.CURRENT_PROGRAM), FX.u.pk)]; });
+      /* 움직임 끔(동작 줄이기) — 연출 없이 전과 같다. 견줄 기준으로 쓴다 */
+      const Q = await open({ reducedMotion: 'reduce' });
+      await Q.p.goto(BASE + '/?map=cave&time=day'); await Q.p.waitForSelector('.room'); await Q.p.waitForFunction(() => !document.querySelector('#alice').hidden);
+      await Q.p.locator('.room[data-key="game"]').tap(); await Q.p.waitForSelector('#map.zoomed', { timeout: 3000 });
+      const q0 = await zoomState(Q.p); await Q.p.waitForTimeout(400); const q1 = await zoomState(Q.p);
+      for (const q of [q0, q1]) { assert(!/pushing|leaving/.test(q.cls) && !q.push, '움직임 끔 — 밀기 없음: ' + q.cls); assert(!/gone/.test(q.alice) && q.aliceOp === '1', '움직임 끔 — 앨리스는 그대로: ' + q.alice); assert(!/\bon\b/.test(q.glow) && q.glowAnim === 0, '움직임 끔 — 문 빛 없음'); }
+      assert.equal(q1.vt, 'not all', '움직임 끔 — 문서 간 전환도 끈다'); assert(q1.vtRule, '전환 한 줄은 머리에 있다');
+      /* 문 링크를 누른 그 순간의 모습을 남겨 두고(누름 처리가 끝난 뒤 · 넘어가기 전) 넘어간 쪽에서 읽는다 — 넘어가는 때는 기기마다 달라 기다려서 볼 수 없다 */
+      const leaveMark = p => p.evaluate(() => document.addEventListener('click', () => { try { sessionStorage.setItem('lv', JSON.stringify({ cls: document.querySelector('#map').className, tr: document.querySelector('#inner').style.transform })); } catch (e) {} }));
+      await leaveMark(Q.p); await Q.p.locator('#doorlinks a.main').tap();
+      await Q.p.waitForURL(/game-atelier/);
+      assert(!/leaving/.test(JSON.parse(await Q.p.evaluate(() => sessionStorage.getItem('lv'))).cls), '움직임 끔 — 문 링크를 눌러도 그대로 넘어간다');
+      assert.deepEqual(Q.errors, [], '움직임 끔 오류 없음'); await Q.ctx.close();
+      /* 움직임 켬 — 기다림은 그대로(누른 뒤 1.2초 안에 확대 시작 · 문 패널, 그 뒤 0.7초에 확대 끝) */
+      const M = await open();
+      await M.p.goto(BASE + '/?map=cave&time=day'); await M.p.waitForSelector('canvas.fx.ready', { timeout: 8000 }); await M.p.waitForFunction(() => !document.querySelector('#alice').hidden); await M.p.waitForTimeout(600);
+      await M.p.evaluate(() => { window.__t = { tap: performance.now() }; new MutationObserver(() => { const c = document.querySelector('#map').className, t = window.__t;
+        if (/zoomed/.test(c) && !t.zoom) t.zoom = performance.now(); if (/zoomed/.test(c) && !/pushing/.test(c) && t.zoom && !t.end) t.end = performance.now(); }).observe(document.querySelector('#map'), { attributes: true }); });
+      await M.p.locator('.room[data-key="game"]').tap(); await M.p.waitForSelector('#map.zoomed.pushing', { timeout: 3000 });
+      const m0 = await zoomState(M.p);
+      assert(m0.cv === '1' && m0.push, '확대 동안 — 캔버스를 숨기지 않고 밀고 있다: ' + JSON.stringify(m0));
+      assert(/gone/.test(m0.alice), '확대와 같이 — 앨리스가 문 쪽으로 사라진다: ' + m0.alice); assert(/\bon\b/.test(m0.glow) && m0.glowAnim === 1, '확대와 같이 — 문 자리에서 방 색 빛이 번진다');
+      assert(m0.doors && m0.h2 === q1.h2 && m0.back, '문 패널은 확대와 함께 바로 뜬다(연출을 기다리지 않는다)');
+      await M.p.waitForFunction(() => { const gl = FX.gl; return gl.getUniform(gl.getParameter(gl.CURRENT_PROGRAM), FX.u.pk)[0] > 1.2; }, null, { timeout: 1500, polling: 16 });   /* 셰이더의 밀기가 평소(1배)보다 세다 */
+      await M.p.waitForSelector('#map.zoomed:not(.pushing)', { timeout: 3000 }); await M.p.waitForTimeout(350);
+      const m1 = await zoomState(M.p), tm = await M.p.evaluate(() => window.__t);
+      assert(tm.zoom - tm.tap < 1300 && tm.end - tm.zoom < 900, '기다림이 늘지 않는다 — 걷기 ' + Math.round(tm.zoom - tm.tap) + 'ms · 확대 ' + Math.round(tm.end - tm.zoom) + 'ms');
+      assert(m1.cv === '0' && !m1.push, '확대가 끝나면 캔버스가 감춰진다(그림이 보인다): ' + JSON.stringify(m1)); assert.equal(m1.aliceOp, '0', '앨리스는 방 안으로 사라졌다');
+      assert.deepEqual([m1.transform, m1.rect, m1.hit, m1.h2, m1.links, m1.doors, m1.back], [q1.transform, q1.rect, q1.hit, q1.h2, q1.links, q1.doors, q1.back], '확대가 끝난 뒤 — 지도 자리 · 방 다각형 · 누르는 자리 · 문 패널은 움직임 끔 때와 같다');
+      assert.equal(m1.hit, 'game', '확대가 끝난 뒤 — 가운데를 누르면 그 방'); assert(!m1.overflow, '확대 — 가로 넘침 없음'); assert(m1.vt !== 'not all' && m1.vtRule, '움직임 켬 — 문서 간 전환 한 줄이 켜져 있다');
+      assert.deepEqual(await pk(M.p), [0, 0], '확대가 끝나면 밀기도 평소 기울임도 0 — 정지 그림과 똑같은 한 장');
+      /* 나올 때는 반대로 — 바로 캔버스, 밀며 나오고, 앨리스는 문 앞에 다시 선다 */
+      const at = await M.p.evaluate(() => [A.x, A.y, A.nav.n[A.nav.doors.game]]);
+      await M.p.locator('#back').tap(); await M.p.waitForSelector('#map.pushing:not(.zoomed)', { timeout: 2000 });
+      const m2 = await zoomState(M.p); assert(m2.cv === '1' && m2.push && !/gone/.test(m2.alice), '나올 때 — 캔버스가 바로 보이고 밀며 나온다, 앨리스는 다시: ' + JSON.stringify(m2));
+      await M.p.waitForFunction(() => { const gl = FX.gl; return gl.getUniform(gl.getParameter(gl.CURRENT_PROGRAM), FX.u.pk)[0] < -1.2; }, null, { timeout: 1500, polling: 16 });   /* 반대 방향 */
+      await M.p.waitForSelector('#map:not(.pushing):not(.zoomed)', { timeout: 3000 }); await M.p.waitForTimeout(400);
+      const m3 = await zoomState(M.p); assert(m3.cv === '1' && !m3.push && m3.aliceOp === '1' && m3.transform === '', '나온 뒤 — 평소대로: ' + JSON.stringify(m3));
+      assert.deepEqual(await pk(M.p), [0, 1], '나온 뒤 — 밀기 0 · 평소 기울임 그대로');
+      assert(Math.abs(at[0] - at[2][0]) < 1 && Math.abs(at[1] - at[2][1]) < 1 && await M.p.evaluate(([x, y]) => Math.abs(A.x - x) < 1 && Math.abs(A.y - y) < 1, at), '지도로 돌아오면 앨리스는 그 문 앞');
+      for (const [k, got] of await hits(M.p)) if (got !== 'off') assert.equal(got, k, '나온 뒤 — ' + k + ' 누르는 자리는 그 방');
+      /* 문 링크 — 누르자마자 간다(기다리지 않는다). 그 사이 확대된 방이 살짝 더 커지며 사라진다. 뒤로 오면 원래대로 */
+      await M.p.locator('.room[data-key="game"]').tap(); await M.p.waitForSelector('#map.zoomed:not(.pushing)', { timeout: 4000 });
+      const tr0 = await M.p.evaluate(() => document.querySelector('#inner').style.transform);
+      await leaveMark(M.p); await M.p.locator('#doorlinks a.main').tap(); await M.p.waitForURL(/game-atelier/);
+      const lv = JSON.parse(await M.p.evaluate(() => sessionStorage.getItem('lv')));
+      assert(/leaving/.test(lv.cls) && /scale\(1\.06\)/.test(lv.tr) && lv.tr.endsWith(tr0), '문 링크 — 누르면 확대된 방이 더 커지며 사라지기 시작한다(넘어가길 기다리지 않는다): ' + JSON.stringify(lv));
+      await M.p.waitForURL(/game-atelier/); await M.p.goBack(); await M.p.waitForSelector('.room'); await M.p.waitForTimeout(400);
+      assert(!/leaving/.test(await M.p.evaluate(() => document.querySelector('#map').className)), '뒤로 오면 — 원래대로');
+      assert.deepEqual(M.errors, [], '연출 오류 없음 — 전환 한 줄이 목록(VT_READY)에 없는 공방으로는 전환을 걸지 않아 그쪽 콘솔에도 오류가 없다');
+      /* 한 줄이 들어간 곳(허브의 즐겨찾기 페이지)으로는 문서 간 전환이 실제로 걸린다 — 들어온 쪽의 pagereveal 에 viewTransition 이 있다 */
+      const V = await open({}, () => { addEventListener('pagereveal', e => { try { sessionStorage.setItem('vt:' + location.pathname, e.viewTransition ? '1' : '0'); } catch (x) {} }); });
+      await V.p.goto(BASE + '/?map=cave&time=day'); await V.p.waitForSelector('canvas.fx.ready', { timeout: 8000 }); await V.p.waitForFunction(() => !document.querySelector('#alice').hidden);
+      await V.p.evaluate(() => scrollTo(0, scrollSpan().span)); await V.p.waitForTimeout(1200);
+      await V.p.locator('.room[data-key="fav"]').tap(); await V.p.waitForSelector('#map.zoomed:not(.pushing)', { timeout: 4000 });
+      await V.p.locator('#doorlinks a.main').tap(); await V.p.waitForURL(/favorites\.html/); await V.p.waitForTimeout(500);
+      assert.equal(await V.p.evaluate(() => sessionStorage.getItem('vt:/favorites.html')), '1', '즐겨찾기 페이지로 — 문서 간 전환이 걸린다');
+      assert.deepEqual(V.errors, [], '전환 오류 없음'); await V.ctx.close();
+      await M.p.evaluate(() => { localStorage.removeItem('atelier_hub_last_v1'); localStorage.setItem('atelier_hub_map_v1', 'cave'); }); await M.ctx.close();
+      /* 밤(시간대 조명)과 겹쳐도 — 미는 동안은 셰이더가 빛을 그리고(CSS 덮개 숨음), 끝나면 CSS 덮개가 맡는다 */
+      const P = await lightOpen('/?map=cave&time=night'); await P.p.waitForFunction(() => document.querySelector('#stage').classList.contains('fxlit'), null, { timeout: 8000 }); await P.p.waitForFunction(() => !document.querySelector('#alice').hidden);
+      await P.p.locator('.room[data-key="game"]').tap(); await P.p.waitForSelector('#map.zoomed.pushing', { timeout: 3000 });
+      const p0 = await lightState(P.p); assert(p0.cvOpacity === '1' && p0.els.every(e => !e.shown), '밤 — 미는 동안은 캔버스가 빛을 그린다(CSS 덮개 숨음): ' + JSON.stringify(p0));
+      await P.p.waitForSelector('#map.zoomed:not(.pushing)', { timeout: 3000 });
+      const p1 = await lightState(P.p), u1 = await P.p.evaluate(() => { const gl = FX.gl; return gl.getUniform(gl.getParameter(gl.CURRENT_PROGRAM), FX.u.kind); });
+      assert(p1.els.every(e => e.shown) && u1 === 0, '밤 — 끝나는 순간 캔버스는 빛 없는 한 장으로, CSS 덮개가 맡는다(두 번 어두워지지 않는다): ' + JSON.stringify([p1.els.map(e => e.shown), u1]));
+      await P.p.waitForTimeout(350); assert.equal((await lightState(P.p)).cvOpacity, '0', '밤 — 그 뒤 캔버스가 감춰진다');
+      await P.p.locator('#back').tap(); await P.p.waitForSelector('#map.pushing:not(.zoomed)', { timeout: 2000 });
+      const p2 = await lightState(P.p), u2 = await P.p.evaluate(() => { const gl = FX.gl; return gl.getUniform(gl.getParameter(gl.CURRENT_PROGRAM), FX.u.kind); });
+      assert(p2.cvOpacity === '1' && p2.els.every(e => !e.shown) && u2 === 3, '밤 — 나올 때는 바로 빛을 그리는 캔버스로: ' + JSON.stringify([p2.cvOpacity, u2]));
+      assert.deepEqual(P.errors, [], '밤 연출 오류 없음'); await P.p.evaluate(() => { localStorage.removeItem('atelier_hub_last_v1'); }); await P.ctx.close();
+      console.log('PASS 방에 들어가는 연출: 확대 동안 캔버스를 보인 채 민다(평소보다 세게) · 앨리스가 문으로 사라지고 문 빛 · 문 패널은 바로 · 기다림 그대로 · 끝나면 캔버스 감춤 · 지도 자리 · 누르는 자리 · 문 패널은 움직임 끔 때와 같다 · 나올 때 반대로 · 문 링크는 바로 가고 방이 커지며 사라진다 · 밤 덮개와 맞바꿈 · 움직임 끔이면 연출 없음');
     }
     console.log('PASS 공방 지도: 방 열여섯(공방 열 · 도구 다섯 · 도시공방 준비 중, 두 층 1:3)·칩·이름표·카드 · 지도 고르기(대미궁 · 왕국 — 지명 · 구역 · 기억 · ?map=) · 빛나기·미리보기 · 다가가기·문·주소·Esc·뒤로 가기 · 오늘 불·오늘 줄·오늘의 판·새 소식·다녀간 자국 · 세로/가로/PC 넘침 없음, 가로는 폭을 정해 굴린다 · 깊이 패럴랙스(344×882 — 깊이 그림 · 누르는 자리 그대로 · 앨리스 · 안드로이드 기울기/iOS 는 굴림만 · 움직임 끔/못 받음/왕국은 정지 그림)');
   } finally { await br.close(); server.close(); }

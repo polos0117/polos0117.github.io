@@ -16,6 +16,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&display=swap">
+<!-- 공방으로 넘어가는 전환(2026-11-12) — 문서 간 view transition. 넘어가는 쪽 공방 페이지에도 같은 한 줄이 있어야 된다(README 「방에 들어가는 연출」). 움직임 끔이면 아래 스크립트가 media 를 'not all' 로 바꿔 끈다 -->
+<style id="vt">@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }</style>
 <!--
   첫 화면 = 공방 지도 한 장(img/cave4.webp 1024×3072 세로 — 산속 드워프 대미궁, 2026-10-30 · 2026-11-10 1:2 · 2026-11-11 두 층 1:3 — 위층 공방 열 · 나선 계단 · 아래층 「도구의 층」 다섯, 허브 하단 버튼이던 도구들이 방이 됐다). 절벽 폭포 옆 동굴 입구 → 계단 → 가운데 둥근 지하 호수를 도는 길 → 왼쪽 다섯·오른쪽 다섯의 방 열(방마다 계단 · 다리로 호숫가 길에 닿는다 — 2026-11-11 Blender 구조(blender-cloud scenes/cave_hub.py)를 첨부해 칠한 그림. 다각형 · 이름표는 그 구조의 방 색깔 지도에서, 등불 길은 구조 좌표에서 그대로), 가운데 호수의 바위섬이 원소의 섬.
   방 자리는 ROOMS 표의 다각형(1024×3072 기준 좌표 — 그림 크기 그대로)이고
@@ -43,6 +45,14 @@
   캔버스가 빛을 그릴 때 앨리스는 캔버스 위라 셰이더의 빛을 받지 않는다 — 그때는 CSS filter 로 시간대만큼만 어둡게 맞춘다(밤 0.7 · 새벽 0.82). CSS 덮개일 때는 덮개가 앨리스도 덮는다.
   주소 ?time=dawn|morning|day|night 가 기기 시각을 이긴다(?fx= 처럼 폰에서 바로 견줘 보려고). 빛 그림을 하나라도 못 받으면 낮처럼. 왕국은 이번 범위가 아니다(빛 그림 없음).
   왜: 지도가 늘 같은 불빛이라 하루의 때가 느껴지지 않았다 — 다시 칠하지 않고 빛만 바꾼다.
+  방에 들어가는 연출(2026-11-12, 대미궁만 · 새 그림 없이 지금 재료로 · 기다림은 늘지 않는다 — 걷기 0.9초 + 확대 0.7초 그대로):
+  ① 밀고 들어가는 확대 — 확대(.inner transform 0.7초) 동안 캔버스를 숨기지 않고, 셰이더의 기울임을 그 방 가운데에서 바깥으로 세게(FX_PX 의 2.5배, 그동안만 · 사인 한 봉우리) 밀어 가까운 벽이 먼저 다가온다.
+     평소 기울임은 그동안 0 으로 줄여 끝날 때 정지 그림과 똑같아지고, 확대가 끝나면 캔버스를 0.15초에 감춘다(그림이 보인다). 나올 때는 반대로(바로 캔버스, 안으로 당기며 평소 기울임이 돌아온다).
+     시간대 조명과 겹칠 때: 미는 동안은 셰이더가 빛을 그리고(CSS 덮개 숨김), 끝나는 순간 빛 없는 한 장을 그려 두고 CSS 덮개와 맞바꾼 뒤 감춘다 — 두 번 어두워지거나 번쩍이지 않게.
+  ② 앨리스가 문으로 — 문 앞에 닿은 앨리스가 문 쪽으로 반 걸음 걸으며 0.25초에 사라지고(확대와 같이 간다), 문 자리에서 방 색(--c) 빛이 한 번 번진다(.doorglow — radial-gradient · screen · 0.6초). 지도로 돌아오면 문 앞에 다시 선다.
+  ③ 공방으로 넘어가는 전환 — 문 링크를 누르면 확대된 방이 살짝 더 커지며 사라지고(.leaving 0.28초 — 넘어가길 기다리지 않는다, 누르자마자 간다) 공방 페이지가 페이드로 들어온다(@view-transition — 그쪽 페이지에도 같은 한 줄이 있어야).
+     문서 간 전환을 모르는 브라우저는 지금처럼 그냥 넘어간다. 뒤로 와서 다시 보이면(pageshow) 원래대로.
+  움직임 끔(AtelierMotion, 없으면 동작 줄이기)이면 ① ② ③ 모두 없이 전과 같다. 왜: 방을 눌러도 그림이 그냥 커지기만 해서 「들어간다」는 느낌이 없었다.
 -->
 <style>
 :root {
@@ -179,7 +189,7 @@ body.zoomed .rail { opacity: 0; pointer-events: none; }
 /* 깊이 패럴랙스(2026-11-12, 대미궁만) — 그림 위에 얹는 WebGL 캔버스. 다각형 · 이름표 · 누르는 자리는 그 위(SVG)라 움직이지 않는다. 다가가면 정지 그림으로 */
 .inner > canvas.fx { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; opacity: 0; transition: opacity .3s; }
 .inner > canvas.fx.ready { opacity: 1; }
-.map.zoomed .inner > canvas.fx { opacity: 0; }
+.map.zoomed .inner > canvas.fx { opacity: 0; }   /* 아래 「방에 들어가는 연출」 이 확대 동안은 보이게 덮어쓴다 */
 /* 시간대 조명(2026-11-12, 대미궁만) — CSS 덮개 둘(곱하기 · 더하기, 정지). 캔버스가 없을 때(움직임 끔 · WebGL 없음)와 방에 다가간 동안만 보인다 — 평소에는 캔버스 셰이더가 빛을 그린다. 그림 · 캔버스 · 앨리스(z 1) 위, 방 다각형 · 등불(SVG, z 3) 아래. 누름은 받지 않는다 */
 .inner > svg { z-index: 3; }
 .inner > img.light { z-index: 2; pointer-events: none; }
@@ -188,8 +198,21 @@ body.zoomed .rail { opacity: 0; pointer-events: none; }
 .inner > img.light[hidden] { display: none; }
 /* 캔버스(셰이더)가 빛을 그리는 동안(.fxlit)은 CSS 덮개를 숨긴다 — 겹치면 두 번 어두워진다. 방에 다가가 캔버스가 쉬면(정지 그림) 그동안만 CSS 덮개가 맡는다. 바꿔 끼울 때 캔버스가 천천히 흐려지면 둘이 겹치니 그때는 바로 */
 .stage.fxlit .inner > img.light { display: none; }
-.map.zoomed .stage.fxlit .inner > img.light:not([hidden]) { display: block; }
+.map.zoomed:not(.pushing) .stage.fxlit .inner > img.light:not([hidden]) { display: block; }   /* 밀고 들어가는 동안(.pushing)은 아직 캔버스가 빛을 그린다 */
 .stage.fxlit .inner > canvas.fx { transition: none; }
+/* 방에 들어가는 연출(2026-11-12) ① 밀고 들어가는 확대 — 확대 · 축소 0.7초 동안(.pushing) 캔버스를 보인 채 셰이더가 그 방 쪽으로 세게 민다. 확대가 끝나면 0.15초에 감추고 그림을 보인다 */
+.map.pushing .inner > canvas.fx.ready { opacity: 1; transition: none; }
+.map.zoomed:not(.pushing) .inner > canvas.fx { opacity: 0; transition: opacity .15s; }
+/* ② 앨리스가 문으로 — 문 쪽으로 반 걸음(--gx · --gy) 가며 0.25초에 사라진다. 돌아오면 문 앞에 다시(0.2초에 나타난다) */
+.alice { transition: opacity .2s; }
+.alice.gone { opacity: 0; transform: translate(calc(-50% + var(--gx, 0px)), calc(-97% + var(--gy, 0px))); transition: opacity .25s ease-in, transform .25s ease-out; }
+/*    문 자리에서 방 색 빛이 한 번 번진다 — 덮개 위 · 방 다각형 아래, 누름 없음 */
+.doorglow { position: absolute; z-index: 2; width: 26%; aspect-ratio: 1; margin: -13% 0 0 -13%; border-radius: 50%; pointer-events: none; opacity: 0; mix-blend-mode: screen;
+  background: radial-gradient(circle, color-mix(in srgb, var(--c, #ffd27a) 70%, #fff) 0%, color-mix(in srgb, var(--c, #ffd27a) 60%, transparent) 32%, transparent 68%); }
+.doorglow.on { animation: doorglow .6s ease-out both; }
+@keyframes doorglow { 0% { opacity: 0; transform: scale(.25); } 35% { opacity: .85; } 100% { opacity: 0; transform: scale(1.15); } }
+/* ③ 공방으로 넘어가는 전환 — 문 링크를 누르면 확대된 방이 살짝 더 커지며 사라진다(넘어가길 기다리지 않는다 — 그 사이에 흐른다). 공방 페이지는 @view-transition 의 페이드로 */
+.map.leaving .inner { opacity: 0; transition: transform .28s ease-in, opacity .28s ease-in; }
 /* 앨리스는 캔버스 위라 셰이더의 빛을 받지 않는다 — 그때만 시간대만큼 어둡게 맞춘다(CSS 덮개일 때는 덮개가 앨리스도 덮는다) */
 .map:not(.zoomed) .stage.fxlit[data-time="night"] .alice { filter: brightness(.7) saturate(.85) drop-shadow(0 2px 2px #000c); }
 .map:not(.zoomed) .stage.fxlit[data-time="dawn"] .alice { filter: brightness(.82) drop-shadow(0 2px 2px #000c); }
@@ -208,7 +231,7 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .inner, .pin, .pin .peek, .room polygon { transition: none; }
+  .inner, .pin, .pin .peek, .room polygon, .alice, .alice.gone { transition: none; }
   .lamp { display: none; }
   .glow { animation: none; opacity: .55; }
 }
@@ -239,6 +262,7 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
       <div class="alice" id="alice" hidden aria-hidden="true"><i></i></div>
       <img class="light mul" id="light-mul" alt="" aria-hidden="true" decoding="async" hidden>
       <img class="light add" id="light-glow" alt="" aria-hidden="true" decoding="async" hidden>
+      <div class="doorglow" id="doorglow" aria-hidden="true"></div>
     </div>
     <div class="pins" id="pins" aria-hidden="true"></div>
   </div>
@@ -532,6 +556,7 @@ function enter(k, push) {
     <div class="links back"><button type="button" id="back">← 지도로</button></div>`;
   $('#back').addEventListener('click', () => leave(true));
   if (push && location.hash !== '#' + k) history.pushState({ room: k }, '', '#' + k);
+  doorBack(); fxPush(k, 1); aliceGone(k);   /* 연출 — 확대와 같이 간다(기다림 없음). 움직임 끔이면 아무것도 안 한다 */
   requestAnimationFrame(fit);
   /* 세로로 긴 지도 — 무대가 화면보다 크면 다가간 방(무대 가운데)이 보이게 가운데로, 아니면 무대 위로 */
   /* 다가간 방은 무대 가운데 — 세로 화면은 그 방이 화면 위쪽(떠 있는 문 패널 위)에 오게, 가로는 무대 가운데로 */
@@ -545,6 +570,8 @@ function leave(push) {
   map.classList.remove('zoomed'); document.body.classList.remove('zoomed'); map.style.removeProperty('--c');
   for (const el of rooms.querySelectorAll('.room')) el.classList.remove('on');
   doors.innerHTML = '';
+  map.classList.remove('leaving'); clearTimeout(doorOut.t);
+  if (was) fxPush(was, -1); aliceBack();   /* 연출 — 나올 때는 반대로, 앨리스는 문 앞에 다시 */
   inner.style.transform = '';
   if (push && location.hash && location.hash !== '#all') history.pushState({}, '', location.pathname + location.search);
   /* 지도로 돌아오면 — 그 방 높이로 굴리고(다가간 동안엔 무대 가운데에 있었다 — 아래층 방이면 화면 밖이었다), 앨리스는 그 문 앞에 남는다(굴려야 다시 걷는다) */
@@ -605,7 +632,7 @@ addEventListener('resize', () => requestAnimationFrame(onScroll));
 /* ── 앨리스 — 책 공방 도트(book-atelier-img sprites/alice, 4K 칸 192×256 · 오른쪽을 본다)가 대미궁 길 지도(img/cave4-nav.json — blender-cloud 의 보행 그래프)를 걷는다.
    굴리면 「맨 위 → 입구」 안내 길에서 화면 가운데 높이의 점으로, 방을 누르면 그 문 앞 점까지 걸어간 뒤 문이 열린다. 그림 · 길을 못 받으면 앨리스 없이 바로 열린다 */
 const ALICE = { base: '/book-atelier-img/sprites/alice/', walk: { file: 'alice_begin_walk_4k.png', frames: 6, ms: [200, 200, 200, 200, 200, 200] }, idle: { file: 'alice_begin_idle_4k.png', frames: 4, ms: [700, 220, 140, 220] } };
-const A = { el: $('#alice'), i: $('#alice i'), nav: null, ok: false, img: 0, door: 0, node: -1, x: 0, y: 0, path: [], speed: 260, done: null, sheet: '', frame: 0, ft: 0, last: 0, goal: -1 };
+const A = { el: $('#alice'), i: $('#alice i'), nav: null, ok: false, img: 0, door: 0, node: -1, x: 0, y: 0, path: [], speed: 260, done: null, sheet: '', frame: 0, ft: 0, last: 0, goal: -1, exit: 0 };
 function bfs(s, t) {
   const adj = A.nav.adj, prev = new Int32Array(adj.length).fill(-1); prev[s] = s; const q = [s];
   for (let i = 0; i < q.length && prev[t] < 0; i++) for (const y of adj[q[i]]) if (prev[y] < 0) { prev[y] = q[i]; q.push(y); }
@@ -651,9 +678,22 @@ function go(k) {
   clearTimeout(A.door); A.door = setTimeout(open, 1200);
   aliceWalk(bfs(A.node, A.nav.doors[k]), 0.9, open);
 }
+/* 방에 들어가는 연출 ② — 문 앞의 앨리스가 문 쪽(방 가운데 쪽)으로 반 걸음 걸으며 사라지고, 문 자리에서 방 색 빛이 한 번 번진다. 확대와 같이 가서 기다림은 없다 */
+function aliceGone(k) {
+  const g = $('#doorglow'); A.el.classList.remove('gone'); g.classList.remove('on');
+  if (!aliceOn() || !fxMotion() || A.nav.doors[k] === undefined) return;
+  const r = ROOMS.find(q => q.key === k), b = bbox(r), n = A.nav.n[A.nav.doors[k]];
+  const dx = b.x + b.w / 2 - n[0], dy = b.y + b.h / 2 - n[1], d = Math.hypot(dx, dy) || 1, px = stage.clientWidth / IW, step = 14;   /* 반 걸음 = 그림 14px */
+  A.el.style.setProperty('--gx', (dx / d * step * px).toFixed(1) + 'px'); A.el.style.setProperty('--gy', (dy / d * step * px).toFixed(1) + 'px');
+  if (Math.abs(dx) > 0.5) A.el.classList.toggle('flip', dx < 0);
+  A.exit = performance.now() + 250;
+  g.style.left = ((n[0] + dx / d * 16) / IW * 100) + '%'; g.style.top = ((n[1] + dy / d * 16 - 14) / IH * 100) + '%';
+  void A.el.offsetWidth; A.el.classList.add('gone'); g.classList.add('on');
+}
+function aliceBack() { A.exit = 0; A.el.classList.remove('gone'); $('#doorglow').classList.remove('on'); }
 function aliceTo(k) { if (aliceOn() && A.nav.doors[k] !== undefined) { A.goal = -1; aliceJump(A.nav.doors[k]); } }
 function aliceDraw() {
-  const moving = A.path.length > 0, st = moving ? ALICE.walk : ALICE.idle, sheet = moving ? 'walk' : 'idle';
+  const moving = A.path.length > 0 || performance.now() < A.exit, st = moving ? ALICE.walk : ALICE.idle, sheet = moving ? 'walk' : 'idle';
   if (A.sheet !== sheet) { A.sheet = sheet; A.frame = 0; A.ft = 0; A.i.style.backgroundImage = `url(${ALICE.base + st.file})`; A.i.style.backgroundSize = (st.frames * 100) + '% 100%'; }
   A.i.style.backgroundPosition = (A.frame / (st.frames - 1) * 100) + '% 0';
   A.el.style.left = (A.x / IW * 100) + '%'; A.el.style.top = (A.y / IH * 100) + '%';
@@ -674,7 +714,7 @@ function aliceTick(ts) {
       }
       if (!A.path.length && A.done) { const f = A.done; A.done = null; f(); }
     }
-    const st = A.path.length ? ALICE.walk : ALICE.idle, k = A.path.length ? Math.max(0.35, 260 / A.speed) : 1;
+    const st = A.path.length || ts < A.exit ? ALICE.walk : ALICE.idle, k = A.path.length ? Math.max(0.35, 260 / A.speed) : 1;
     if (!REDUCED) { A.ft += dt * 1000; if (A.ft >= st.ms[A.frame % st.frames] * k) { A.ft = 0; A.frame = (A.frame + 1) % st.frames; } }
     aliceDraw();
   }
@@ -701,7 +741,7 @@ function aliceLoad() {
    주소에 ?fx=<px>(0~40)를 붙이면 그 세기로 — 폰에서 바로 견줘 보려고 */
 const FX_PX = (() => { const v = parseFloat(new URLSearchParams(location.search).get('fx')); return v >= 0 && v <= 40 ? v : 8; })(), FX_HALF = 0.25, FX_DEPTH = 'img/cave4-depth.webp?v=1';
 const FX = { cv: null, gl: null, u: null, ok: false, fail: false, dimg: null, dpx: null, dw: 0, dh: 0, vis: true, raf: 0, last: 0, ro: null, io: null,
-  cy: 0, tx: 0, ty: 0, wx: 0, wy: 0, drawn: '', gyro: null, tex: null, lit: false, anim: false };
+  cy: 0, tx: 0, ty: 0, wx: 0, wy: 0, drawn: '', gyro: null, tex: null, lit: false, anim: false, push: null, pushT: 0, unlit: false };
 const fxClamp = v => v < -1 ? -1 : v > 1 ? 1 : v;
 function fxMotion() {
   const M = window.AtelierMotion; if (M && M.enabled) { try { return !!M.enabled(); } catch (e) {} }
@@ -736,7 +776,7 @@ precision highp float;
 #else
 precision mediump float;
 #endif
-varying vec2 v; uniform sampler2D img, dep, lmul, lglow; uniform vec2 k, tilt, view; uniform float kind, sec;   /* view = (짚는 높이, FX_HALF) — 그림 높이 0~1. kind = 시간대(0 낮 · 1 새벽 · 2 아침 · 3 밤), sec = 흐른 초 */
+varying vec2 v; uniform sampler2D img, dep, lmul, lglow; uniform vec2 k, tilt, view, pk; uniform vec4 push; uniform float kind, sec;   /* push = (방 가운데 uv, 1 ÷ 방 반지름 uv), pk = (밀기 세기 — FX_PX 의 몇 배 · 부호가 방향, 평소 기울임 배율) */   /* view = (짚는 높이, FX_HALF) — 그림 높이 0~1. kind = 시간대(0 낮 · 1 새벽 · 2 아침 · 3 밤), sec = 흐른 초 */
 float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }
@@ -744,7 +784,8 @@ float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
 float beat(vec2 c) { float a = h21(c), b = h21(c + 7.31), d = h21(c + 19.7);
   return 0.6 * sin(sec * (3.0 + 5.0 * a) + 6.2832 * b) + 0.4 * sin(sec * (8.0 + 9.0 * d) + 6.2832 * a); }
 void main() {
-  vec2 t = clamp(vec2(tilt.x, clamp((v.y - view.x) / view.y, -1.0, 1.0) + tilt.y), -1.0, 1.0), o = k * t, uv = v;
+  vec2 t = clamp(vec2(tilt.x, clamp((v.y - view.x) / view.y, -1.0, 1.0) + tilt.y), -1.0, 1.0) * pk.y
+    + pk.x * clamp((v - push.xy) * push.zw, -1.0, 1.0), o = k * t, uv = v;   /* 방에 들어갈 때 — 그 방 가운데에서 바깥으로 밀면 가까운 벽이 먼저 다가온다 */
   for (int i = 0; i < 3; i++) uv = v - o * (texture2D(dep, uv).r - 0.5);
   uv = clamp(uv, 0.0, 1.0);
   vec3 c = texture2D(img, uv).rgb;
@@ -794,8 +835,8 @@ function fxMount() {
   if (gl.getError() !== gl.NO_ERROR) { FX.fail = true; return; }
   gl.uniform1i(gl.getUniformLocation(pr, 'img'), 0); gl.uniform1i(gl.getUniformLocation(pr, 'dep'), 1);
   gl.uniform1i(gl.getUniformLocation(pr, 'lmul'), 2); gl.uniform1i(gl.getUniformLocation(pr, 'lglow'), 3);   /* 시간대 빛 그림 — fxLight 가 올린다 */
-  FX.u = { k: gl.getUniformLocation(pr, 'k'), tilt: gl.getUniformLocation(pr, 'tilt'), view: gl.getUniformLocation(pr, 'view'), kind: gl.getUniformLocation(pr, 'kind'), sec: gl.getUniformLocation(pr, 'sec') };
-  gl.uniform1f(FX.u.kind, 0); gl.uniform1f(FX.u.sec, 0); FX.tex = tex; FX.lit = FX.anim = false;
+  FX.u = { k: gl.getUniformLocation(pr, 'k'), tilt: gl.getUniformLocation(pr, 'tilt'), view: gl.getUniformLocation(pr, 'view'), kind: gl.getUniformLocation(pr, 'kind'), sec: gl.getUniformLocation(pr, 'sec'), push: gl.getUniformLocation(pr, 'push'), pk: gl.getUniformLocation(pr, 'pk') };
+  gl.uniform1f(FX.u.kind, 0); gl.uniform1f(FX.u.sec, 0); gl.uniform4f(FX.u.push, 0.5, 0.5, 1, 1); gl.uniform2f(FX.u.pk, 0, 1); FX.tex = tex; FX.lit = FX.anim = FX.unlit = false;
   cv.addEventListener('webglcontextlost', () => { if (FX.cv !== cv) return; FX.fail = true; fxUnmount(); });   /* 기기가 GPU 를 거둬 가면 — 정지 그림으로 */
   img.after(cv); FX.cv = cv; FX.gl = gl; FX.ok = true; FX.drawn = '';
   if (window.ResizeObserver) { FX.ro = new ResizeObserver(() => fxKick(true)); FX.ro.observe(stage); }
@@ -805,6 +846,7 @@ function fxMount() {
 function fxUnmount() {
   if (FX.ro) FX.ro.disconnect(); if (FX.io) FX.io.disconnect(); FX.ro = FX.io = null;
   if (FX.raf) cancelAnimationFrame(FX.raf); FX.raf = 0;
+  clearTimeout(FX.pushT); FX.push = null; FX.unlit = false; map.classList.remove('pushing');
   const cv = FX.cv, gl = FX.gl; FX.cv = FX.gl = FX.u = FX.tex = null; FX.ok = FX.lit = FX.anim = false; stage.classList.remove('fxlit'); fxGyro(false);   /* fxlit 을 떼면 CSS 덮개가 다시 맡는다 */
   if (gl) { const x = gl.getExtension('WEBGL_lose_context'); if (x && !gl.isContextLost()) x.loseContext(); }   /* 텍스처(그림 1024×3072)를 곧장 돌려준다 */
   if (cv) cv.remove();
@@ -820,9 +862,9 @@ function fxKick(resize) {
   if (resize) FX.drawn = '';
   if (FX.ok && !FX.raf) FX.raf = requestAnimationFrame(fxFrame);
 }
-function fxFrame(ts) {
-  FX.raf = 0;
-  if (!FX.ok || document.hidden || !FX.vis || on) { FX.last = 0; return; }
+function fxFrame(ts, force) {   /* force — 다가간 채로도 한 장 그린다(밀기를 시작 · 끝낼 때) */
+  if (!force) FX.raf = 0;
+  if (!FX.ok || document.hidden || !FX.vis || (on && !FX.push && !force)) { FX.last = 0; return; }
   const dt = FX.last ? Math.min(0.1, (ts - FX.last) / 1000) : 0.016; FX.last = ts;
   /* 마우스 · 기울기는 부드럽게 따라간다(0.12초) — 손떨림에 화면이 떨지 않게 */
   const a = 1 - Math.exp(-dt / 0.12);
@@ -835,17 +877,42 @@ function fxFrame(ts) {
   const gl = FX.gl, cv = FX.cv, dpr = Math.min(window.devicePixelRatio || 1, 2.5, IW / W), cw = Math.round(W * dpr), ch = Math.round(H * dpr);
   if (cv.width !== cw || cv.height !== ch) { cv.width = cw; cv.height = ch; FX.drawn = ''; }
   /* 깜빡임 · 안개(밤 · 새벽)는 1초에 스무 번만 다시 그린다 — 은은한 움직임이라 그 정도면 되고 배터리를 아낀다. 아침 · 낮은 기울임이 바뀔 때만 */
-  const key = [cw, ch, FX.cy.toFixed(4), FX.tx.toFixed(3), FX.ty.toFixed(3), FX.anim ? Math.floor(ts / 50) : 0].join();
-  if (key !== FX.drawn) {
+  /* 방에 들어가는 연출 ① — 밀기: 0.7초 동안 사인 한 봉우리(0 → FX_PUSH 배 → 0), 그동안 평소 기울임은 들어갈 때 1 → 0 · 나올 때 0 → 1. 끝나면 정지 그림과 똑같다 */
+  let pAmt = 0, pTilt = on ? 0 : 1, pKey = '';
+  if (FX.push) { const q = Math.min(1, Math.max(0, (performance.now() - FX.push.t0) / ENTER_MS)), e = FX.push.dir > 0 ? q : 1 - q;
+    pAmt = FX_PUSH * Math.sin(Math.PI * q) * FX.push.dir; pTilt = 1 - e; pKey = q.toFixed(3);
+    gl.uniform4f(FX.u.push, FX.push.c[0], FX.push.c[1], FX.push.inv[0], FX.push.inv[1]); }
+  const key = [cw, ch, FX.cy.toFixed(4), FX.tx.toFixed(3), FX.ty.toFixed(3), FX.anim && !FX.unlit ? Math.floor(ts / 50) : 0, pKey, FX.unlit].join();
+  if (key !== FX.drawn || force) {
     FX.drawn = key;
     gl.viewport(0, 0, cw, ch);
     gl.uniform2f(FX.u.k, 2 * FX_PX / W, 2 * FX_PX / H); gl.uniform2f(FX.u.tilt, FX.tx, FX.ty); gl.uniform2f(FX.u.view, FX.cy, FX_HALF);
+    gl.uniform2f(FX.u.pk, pAmt, pTilt); gl.uniform1f(FX.u.kind, FX.lit && !FX.unlit ? LIGHT_TIMES.indexOf(TIME) + 1 : 0);
     gl.uniform1f(FX.u.sec, FX.anim ? (ts / 1000) % 600 : 0);   /* 600초마다 되감는다 — 큰 수의 sin 이 흐려지지 않게 */
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     if (!cv.classList.contains('ready')) cv.classList.add('ready');
     stage.classList.toggle('fxlit', FX.lit);   /* 빛을 넣어 그린 뒤에야 CSS 덮개를 걷는다 — 둘이 겹쳐 두 번 어두워지지 않게 */
   }
-  if (settling || FX.anim) fxKick();
+  if (!force && (settling || FX.anim || FX.push)) fxKick();
+}
+/* 방에 들어가는 연출 ① 밀고 들어가는 확대 — enter · leave 가 부른다. 캔버스가 없거나 움직임 끔이면 아무것도 안 한다(전처럼 정지 그림으로 바로) */
+const ENTER_MS = 700, FX_PUSH = 2.5;   /* .inner 의 transform 0.7초와 같이 간다. 세기는 FX_PX 의 2.5배(8px 이면 20px — 그동안만) */
+function fxPush(k, dir) {
+  clearTimeout(FX.pushT); FX.push = null; map.classList.remove('pushing');
+  const r = ROOMS.find(q => q.key === k);
+  if (!FX.ok || !r || !fxMotion()) { FX.unlit = false; return; }
+  const b = bbox(r);
+  FX.push = { c: [(b.x + b.w / 2) / IW, (b.y + b.h / 2) / IH], inv: [IW / (b.w * 0.75), IH / (b.h * 0.75)], dir, t0: performance.now() };
+  FX.unlit = false; fxFrame(performance.now(), true);   /* 보이기 전에 한 장 — 나올 때 빛 없는 정지 장면이 한 번 번쩍이지 않게 */
+  map.classList.add('pushing'); fxKick();
+  FX.pushT = setTimeout(fxPushEnd, ENTER_MS);
+}
+function fxPushEnd() {
+  clearTimeout(FX.pushT); if (!FX.push) return;
+  const dir = FX.push.dir; FX.push = null;
+  /* 들어간 뒤 — 빛 없는 한 장(= 정지 그림과 똑같다)을 그려 두고 CSS 덮개와 맞바꾼 다음 캔버스를 0.15초에 감춘다. 두 번 어두워지거나 번쩍이지 않는다 */
+  if (dir > 0 && on && FX.ok) { FX.unlit = true; fxFrame(performance.now(), true); }
+  map.classList.remove('pushing'); FX.drawn = ''; fxKick();
 }
 /* 시간대 빛 그림을 셰이더에 올린다 — 캔버스와 빛 그림 두 장이 다 준비됐을 때(어느 쪽이 먼저든). 못 올리면 CSS 덮개가 그대로 맡는다 */
 function fxLight() {
@@ -853,7 +920,6 @@ function fxLight() {
   const gl = FX.gl;
   try { FX.tex(2, LIGHT.els[0], false); FX.tex(3, LIGHT.els[1], false); } catch (e) { return; }
   if (gl.getError() !== gl.NO_ERROR) return;
-  gl.uniform1f(FX.u.kind, LIGHT_TIMES.indexOf(TIME) + 1);
   FX.lit = true; FX.anim = TIME === 'dawn' || TIME === 'night'; FX.drawn = ''; fxKick();
 }
 /* PC — 마우스 자리(화면 가운데에서 얼마나). 눈이 마우스 쪽으로 가니 가까운 것은 반대로 */
@@ -913,6 +979,32 @@ function lightMap() {
   }
   lightShow();
 }
+
+/* ── 방에 들어가는 연출 ③ 공방으로 넘어가는 전환(2026-11-12) — 문 링크를 누르면 확대된 방이 살짝 더 커지며 사라진다(.leaving 0.28초). 넘어가길 기다리지 않는다 — 누르자마자 가고, 그 사이에 흐른다.
+   공방 페이지는 머리의 @view-transition(#vt) 으로 페이드 — 그쪽에도 같은 한 줄이 있어야 한다. 문서 간 전환을 모르는 브라우저 · 움직임 끔 · 새 탭으로 열기는 지금처럼 그냥 */
+const vtOK = () => 'CSSViewTransitionRule' in window && fxMotion();
+function vtSync() {   /* 바뀔 때만 만진다 — 들어오는 전환이 도는 중에 media 를 다시 적으면(같은 값이어도) 브라우저가 전환을 그만둔다 */
+  const el = document.getElementById('vt'), want = fxMotion() ? '' : 'not all'; if (el && el.media !== want) el.media = want; }
+function doorOut(e) {
+  const a = e.target.closest && e.target.closest('#doorlinks a[href]');
+  if (!a || !on || e.defaultPrevented || e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || a.target === '_blank' || !vtOK()) return;
+  const W = stage.clientWidth, H = stage.clientHeight;
+  fxPushEnd(); map.classList.add('leaving');
+  inner.style.transform = `translate(${(W / 2).toFixed(1)}px, ${(H / 2).toFixed(1)}px) scale(1.06) translate(${(-W / 2).toFixed(1)}px, ${(-H / 2).toFixed(1)}px) ` + inner.style.transform;
+  clearTimeout(doorOut.t); doorOut.t = setTimeout(doorBack, 2500);   /* 못 넘어갔으면(받기 창 · 막힘) 원래대로 */
+}
+function doorBack() { clearTimeout(doorOut.t); if (!map.classList.contains('leaving')) return; map.classList.remove('leaving'); fit(); }
+doors.addEventListener('click', doorOut);
+addEventListener('pageshow', doorBack);   /* 뒤로 와서 다시 보일 때(bfcache) */
+/* 넘어가는 쪽에 그 한 줄이 없는데 전환을 걸면 브라우저가 그 페이지 콘솔에 오류를 남긴다(「Transition was aborted … opt-in disabled」) — 그래서 한 줄이 들어간 곳(VT_READY)으로 갈 때만 전환을 걸고,
+   나머지는 여기서 그만둔다(지금처럼 그냥 넘어간다). 공방 저장소에 한 줄을 넣으면 그 경로를 여기에 더한다(README 「방에 들어가는 연출」). 끝이 / 면 그 아래 모두 */
+const VT_READY = ['/favorites.html', '/status.html', '/sweep.html', '/review.html', '/dot.html', '/prompt.html'];
+addEventListener('pageswap', e => { const t = e.viewTransition; if (!t) return;
+  let ok = false; try { const u = new URL(e.activation.entry.url); ok = u.origin === location.origin && VT_READY.some(p => u.pathname === p || (p.endsWith('/') && u.pathname.startsWith(p))); } catch (err) {}
+  if (!ok) t.skipTransition();
+  for (const k of ['ready', 'finished', 'updateCallbackDone']) if (t[k] && t[k].catch) t[k].catch(() => {}); });
+vtSync(); if (window.AtelierMotion && window.AtelierMotion.subscribe) window.AtelierMotion.subscribe(vtSync);
+try { const mq = matchMedia('(prefers-reduced-motion: reduce)'); mq.addEventListener ? mq.addEventListener('change', vtSync) : mq.addListener(vtSync); } catch (e) {}
 
 /* 지도 고르기 — 다가가 있었으면 그 방 그대로 새 지도에서 다가간다 */
 function setMap(k) {
