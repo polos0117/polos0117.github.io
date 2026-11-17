@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>일상컷 목록</title>
+<meta name="description" content="세 공방(삼국지 · 원소 · 포켓몬)의 일상컷이 무엇으로 그려졌는지 글로만 — 필수 갈래 · 의상 · 게임 코스프레.">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0f0e12">
+<link rel="icon" href="icon-192.png">
+<link rel="manifest" href="app.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&display=swap">
+<!--
+  일상컷 목록 — 세 공방(삼국지 · 원소 · 포켓몬)의 일상컷 색인(/<저장소>/data/casual-index.json)을 글로만 보인다(2026-11-17).
+  사용자 「필수컷 만들 때 뜬 갈래랑 의상이랑, 게임코스튬 때 쓴 게임, 케릭터, 의상갈래 정도만 알 수 있으면 좋겠는데」 · 「우리쪽에서 고르는건 한글로 표시되게 해줘. gpt 쪽은 영어로 설계하니까 그건 어쩔 수 없이 놔두고」.
+  색인은 공방마다 tools/casual-index.cjs 가 쓴다 — 여기는 읽기만(셈은 casual.js). 그림은 받지 않는다. 색인이 없는 공방은 「색인이 아직 없다」.
+  위: 공방 고르개(?a=) + 요약(필수 갈래별 · 게임별(비율) · 캐릭터별 장수). 아래: 컷 표, 거르기(?f= all · required · cosplay · free).
+  꼴 · 색은 그림 현황(status.html)과 같다.
+-->
+<style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }</style><script>addEventListener('pageswap', e => { const t = e.viewTransition; if (t) { t.skipTransition(); t.ready.catch(() => {}); } }); addEventListener('pagereveal', e => { const t = e.viewTransition; if (t) t.ready.catch(() => {}); });</script>   <!-- 허브의 다른 쪽과 같은 한 줄(README 「방에 들어가는 연출」) -->
+<style>
+:root {
+  --bg: #0b0a0e; --card: #18161d; --line: #ffffff1a; --text: #f1ece2; --muted: #a8a09a; --gold: #d9b45a; --ok: #8fd9a8; --miss: #ff8f8f; --gpt: #9fc4ff;
+  --serif: 'Noto Serif KR', 'Apple Myungjo', 'Nanum Myeongjo', Georgia, serif;
+  --sans: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  --mono: ui-monospace, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 15px/1.55 var(--sans); overflow-x: hidden; min-height: 100vh; min-height: 100dvh;
+  background-image: radial-gradient(90% 50% at 50% -10%, #1b1726 0%, transparent 70%); background-repeat: no-repeat; }
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: calc(16px + env(safe-area-inset-top)) 16px 8px; max-width: 1100px; margin: 0 auto; }
+.head h1 { margin: 0; font: 900 clamp(24px, 3.6vw, 36px)/1.1 var(--serif); letter-spacing: -.02em;
+  background: linear-gradient(180deg, #fff 30%, var(--gold) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.head h1 small { display: block; margin-bottom: 6px; -webkit-text-fill-color: var(--gold); color: var(--gold); font: 700 11px/1 var(--serif); letter-spacing: .4em; }
+.home { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid #ffffff33; border-radius: 99px; background: #000b;
+  color: var(--text); text-decoration: none; font: 600 13px/1 var(--sans); white-space: nowrap; }
+.home:hover { border-color: var(--gold); color: var(--gold); }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px calc(40px + env(safe-area-inset-bottom)); }
+.lede { margin: 2px 0 14px; color: var(--muted); font-size: 13px; word-break: keep-all; }
+.lede a { color: var(--gold); }
+
+/* 공방마다 한 줄 — 누르면 아래가 그 공방으로 */
+.sum { width: 100%; border-collapse: collapse; margin: 0 0 16px; font-size: 14px; }
+.sum th, .sum td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.sum th:first-child, .sum td:first-child { text-align: left; }
+.sum thead th { color: var(--muted); font-weight: 600; font-size: 12px; }
+.sum td { font-family: var(--mono); font-size: 13px; }
+.sum td:first-child { font-family: var(--sans); }
+.sum button { --c: var(--gold); display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; margin: -6px 0 -6px -10px; border: 1px solid transparent; border-radius: 99px; background: none; cursor: pointer; font-weight: 700; font-size: 14px; }
+.sum button::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.sum button[aria-pressed="true"] { border-color: var(--c); background: color-mix(in srgb, var(--c) 14%, #000); }
+.sum .none { color: var(--muted); font-family: var(--sans); }
+.sum-wrap { overflow-x: auto; margin: 0 -16px; padding: 0 16px; }
+
+/* 요약 — 필수 갈래 · 게임 · 캐릭터 */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin: 0 0 16px; }
+.stat { padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); min-width: 0; }
+.stat h2 { margin: 0 0 6px; font: 700 13px/1.3 var(--sans); color: var(--muted); }
+.stat h2 span { font-family: var(--mono); font-weight: 400; }
+.stat ul { list-style: none; margin: 0; padding: 0; }
+.stat li { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; font-size: 13px; }
+.stat li > span:first-child { min-width: 0; word-break: keep-all; overflow-wrap: anywhere; }
+.stat li b { font: 400 12px/1.6 var(--mono); white-space: nowrap; }
+.stat li small { color: var(--muted); }
+.stat .bar { display: block; height: 3px; margin-top: 2px; border-radius: 2px; background: #ffffff14; overflow: hidden; }
+.stat .bar i { display: block; height: 100%; background: var(--gold); }
+.stat .g { flex-direction: column; gap: 0; }
+.stat .g > div { display: flex; justify-content: space-between; gap: 10px; }
+.stat .empty { color: var(--muted); font-size: 13px; }
+.stat.chars ul { max-height: 260px; overflow-y: auto; }
+
+.tools { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0 -16px 10px; padding: 8px 16px; background: color-mix(in srgb, var(--bg) 94%, transparent); border-bottom: 1px solid var(--line); backdrop-filter: blur(6px); }
+.seg { display: inline-flex; border: 1px solid #ffffff2b; border-radius: 99px; overflow: hidden; }
+.seg button { min-height: 40px; padding: 0 12px; border: 0; background: none; cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.seg button + button { border-left: 1px solid #ffffff2b; }
+.seg button[aria-pressed="true"] { background: var(--gold); color: #1a1408; }
+.count { margin: 0; color: var(--muted); font-size: 12px; font-family: var(--mono); }
+
+/* 컷 표 — 옆으로 넘치면 표 안에서만 민다 */
+.cuts-wrap { overflow-x: auto; margin: 0 -16px; padding: 0 16px; }
+.cuts { width: 100%; min-width: 920px; border-collapse: collapse; font-size: 13px; }
+.cuts th, .cuts td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.cuts thead th { color: var(--muted); font-weight: 600; font-size: 12px; white-space: nowrap; }
+.cuts .d, .cuts .n { font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+.cuts .n { text-align: right; }
+.cuts .nm { font-weight: 700; white-space: nowrap; }
+.cuts .w { color: var(--muted); white-space: nowrap; }
+.cuts .rq { white-space: nowrap; }
+.cuts .no { color: #ffffff40; }
+.cuts .en { font-family: var(--mono); font-size: 12px; color: #d8d2c8; overflow-wrap: anywhere; }
+.cuts .fr { max-width: 340px; }
+.cuts .kind { display: block; font-weight: 600; }
+.gpt { display: inline-block; margin-left: 4px; padding: 1px 6px; border: 1px solid color-mix(in srgb, var(--gpt) 50%, transparent); border-radius: 99px; color: var(--gpt); font: 700 10px/1.4 var(--sans); white-space: nowrap; vertical-align: 1px; }
+.cuts details summary { cursor: pointer; list-style: none; }
+.cuts details summary::-webkit-details-marker { display: none; }
+.cuts details summary .more { color: var(--gold); font-family: var(--sans); font-size: 11px; margin-left: 4px; white-space: nowrap; }
+.cuts details[open] summary .short { display: none; }
+.cuts details:not([open]) summary .less { display: none; }
+.note { color: var(--muted); font-size: 13px; padding: 12px 0; }
+@media (max-width: 600px) { .seg button { padding: 0 9px; } }
+</style>
+</head>
+<body>
+<header class="head">
+  <h1><small>ATELIER</small>일상컷 목록</h1>
+  <a class="home" href="./">← 공방 지도</a>
+</header>
+<main class="wrap">
+  <p class="lede">세 공방의 일상컷이 무엇으로 그려졌는지 글로만 본다 — 필수 갈래 · 의상 · 게임 코스프레. 우리가 고른 값은 한글, GPT 가 지은 글은 영어 그대로. 그림은 받지 않는다. 칸이 찼는지는 <a href="status.html">그림 현황</a>.</p>
+  <div class="sum-wrap"><table class="sum" id="sum" aria-label="공방마다">
+    <thead><tr><th>공방</th><th>컷</th><th>필수</th><th>코스프레</th><th>자유 설계</th><th>색인</th></tr></thead>
+    <tbody></tbody>
+  </table></div>
+  <section class="stats" id="stats" aria-label="요약"></section>
+  <div class="tools">
+    <div class="seg" role="group" aria-label="거르기" id="filter">
+      <button type="button" data-f="all">전부</button><button type="button" data-f="required">필수만</button><button type="button" data-f="cosplay">코스프레만</button><button type="button" data-f="free">자유 설계만</button>
+    </div>
+    <p class="count" id="count" role="status" aria-live="polite"></p>
+  </div>
+  <div class="cuts-wrap" id="cuts-wrap"><table class="cuts" id="cuts" aria-label="일상컷">
+    <thead><tr><th scope="col">날짜</th><th scope="col">카드</th><th scope="col">세계</th><th scope="col">번호</th><th scope="col">필수</th><th scope="col">의상</th><th scope="col">코스프레</th><th scope="col">자유 설계</th></tr></thead>
+    <tbody></tbody>
+  </table></div>
+</main>
+<script src="casual.js"></script>
+<script>
+const C = window.AtelierCasual, $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const q = new URLSearchParams(location.search), CUT = 70;   /* 자유 설계 Outfit 줄 — 이보다 길면 줄여 보이고 펼친다 */
+let asked = C.ATELIERS.some(a => a.key === q.get('a'));
+let cur = asked ? q.get('a') : 'element';
+let filter = C.FILTERS.includes(q.get('f')) ? q.get('f') : 'all';
+const result = {};   // 공방 → {index, sum} · 'none'(파일 없음 · 못 읽음 · 꼴이 다름)
+function load(a) {
+  return fetch(a.path, { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(a.path + ' ' + r.status); return r.json(); })
+    .then(j => { if (!C.valid(j)) throw new Error('꼴'); result[a.key] = { index: j, sum: C.summary(j.rows) }; })
+    .catch(() => { result[a.key] = 'none'; }).then(settle);
+}
+/* 주소에 공방이 없고 기본 공방에 색인이 없으면 색인이 있는 첫 공방으로 */
+function settle() {
+  if (!asked && result[cur] === 'none' && C.ATELIERS.every(a => result[a.key])) { const ok = C.ATELIERS.find(a => result[a.key] !== 'none'); if (ok) cur = ok.key; }
+  render();
+}
+function sumHTML() {
+  return C.ATELIERS.map(a => {
+    const r = result[a.key], btn = `<button type="button" data-a="${a.key}" style="--c:${a.c}" aria-pressed="${a.key === cur}">${esc(a.name)}</button>`;
+    if (!r) return `<tr><td>${btn}</td><td colspan="5" class="none">읽는 중</td></tr>`;
+    if (r === 'none') return `<tr><td>${btn}</td><td colspan="5" class="none">색인이 아직 없다</td></tr>`;
+    const s = r.sum, built = String(r.index.built || '').slice(0, 10);
+    return `<tr><td>${btn}</td><td>${s.total}</td><td>${s.required}</td><td>${s.cosplay}</td><td>${s.free}</td><td>${esc(built)}</td></tr>`;
+  }).join('');
+}
+function statsHTML(s) {
+  const empty = t => `<p class="empty">${t}</p>`;
+  const reqs = s.reqs.length ? '<ul>' + s.reqs.map(x => `<li><span>${esc(x.ko)}</span><b>${x.n}</b></li>`).join('') + '</ul>' : empty('필수 컷이 없다');
+  const games = s.games.length ? '<ul>' + s.games.map(x => `<li class="g"><div><span>${esc(x.ko)}</span><b>${x.n} <small>${x.pct}%</small></b></div><span class="bar" aria-hidden="true"><i style="width:${x.pct}%"></i></span></li>`).join('') + '</ul>' : empty('코스프레 컷이 없다');
+  const multi = s.games.length > 1;
+  const chars = s.chars.length ? '<ul>' + s.chars.map(x => `<li><span>${esc(x.name)}${multi ? ` <small>${esc(x.gameKo)}</small>` : ''}</span><b>${x.n}</b></li>`).join('') + '</ul>' : empty('코스프레 컷이 없다');
+  return `<div class="stat reqs"><h2>필수 갈래 <span>${s.required}</span></h2>${reqs}</div>`
+    + `<div class="stat games"><h2>코스프레 게임 <span>${s.cosplay}</span>${s.gpt ? ` · GPT 고름 <span>${s.gpt}</span>` : ''}</h2>${games}</div>`
+    + `<div class="stat chars"><h2>캐릭터 <span>${s.chars.length}</span></h2>${chars}</div>`;
+}
+function freeHTML(f) {
+  if (!f) return '<span class="no">—</span>';
+  const o = f.outfit ? String(f.outfit) : '';
+  let out = '';
+  if (o.length > CUT) out = `<details><summary><span class="en short">${esc(o.slice(0, CUT).trimEnd())}…</span><span class="more short">펼치기</span><span class="en less">${esc(o)}</span><span class="more less">접기</span></summary></details>`;
+  else if (o) out = `<span class="en">${esc(o)}</span>`;
+  return `<span class="kind">${esc(f.kindKo || f.kind || '')}</span>${out}`;
+}
+function rowHTML(r) {
+  const dash = '<span class="no">—</span>', c = r.cosplay, outfit = C.outfitText(r);
+  const cos = c ? esc(C.cosplayText(r)) + (c.by === 'gpt' ? '<span class="gpt" title="캐릭터를 GPT 가 골랐다">GPT 고름</span>' : '') : dash;
+  return `<tr data-card="${esc(r.card)}"><td class="d">${esc(r.date)}</td><td class="nm">${esc(r.name || r.card)}</td><td class="w">${r.worldKo ? esc(r.worldKo) : dash}</td><td class="n">${esc(r.n)}</td>`
+    + `<td class="rq">${r.required ? esc(r.requiredKo || r.required) : dash}</td><td class="of">${outfit ? esc(outfit) : dash}</td><td class="cs">${cos}</td><td class="fr">${freeHTML(r.free)}</td></tr>`;
+}
+function render() {
+  $('#sum tbody').innerHTML = sumHTML();
+  document.querySelectorAll('#filter button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.f === filter)));
+  const a = C.ATELIERS.find(x => x.key === cur), r = result[cur];
+  const off = msg => { $('#count').textContent = a.name + ' — ' + msg; $('#stats').innerHTML = ''; $('#cuts tbody').innerHTML = ''; $('#cuts-wrap').hidden = true; };
+  if (!r) return off('읽는 중');
+  if (r === 'none') return off('색인이 아직 없다');
+  const list = C.filter(r.index.rows, filter);
+  $('#stats').innerHTML = statsHTML(r.sum);
+  $('#cuts-wrap').hidden = false;
+  $('#count').textContent = `${a.name} — 컷 ${r.sum.total} 가운데 ${list.length} 보임 (${C.FILTER_KO[filter]})`;
+  $('#cuts tbody').innerHTML = list.length ? list.map(rowHTML).join('') : '<tr><td colspan="8" class="note">이 거르기에 맞는 컷이 없다</td></tr>';
+}
+function remember() { const u = new URL(location.href); u.searchParams.set('a', cur); u.searchParams.set('f', filter); history.replaceState(null, '', u); }
+$('#sum').addEventListener('click', e => { const b = e.target.closest('button[data-a]'); if (!b) return; cur = b.dataset.a; asked = true; remember(); render(); });
+$('#filter').addEventListener('click', e => { const b = e.target.closest('button[data-f]'); if (!b) return; filter = b.dataset.f; remember(); render(); });
+render();
+C.ATELIERS.forEach(load);
+</script>
+</body>
+</html>

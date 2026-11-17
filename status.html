@@ -44,6 +44,7 @@ button, input { font: inherit; color: inherit; }
 .home:hover { border-color: var(--gold); color: var(--gold); }
 .wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px calc(40px + env(safe-area-inset-bottom)); }
 .lede { margin: 2px 0 14px; color: var(--muted); font-size: 13px; word-break: keep-all; }
+.lede a { color: var(--gold); }
 
 /* 공방마다 한 줄 — 누르면 아래 목록이 그 공방으로 */
 .sum { width: 100%; border-collapse: collapse; margin: 0 0 18px; font-size: 14px; }
@@ -93,7 +94,7 @@ button, input { font: inherit; color: inherit; }
   <a class="home" href="./">← 공방 지도</a>
 </header>
 <main class="wrap">
-  <p class="lede" id="lede">공방 일곱의 그림 등록부를 글로만 본다 — 대상마다 어느 칸이 찼는지. 그림은 받지 않는다.</p>
+  <p class="lede" id="lede">공방 일곱의 그림 등록부를 글로만 본다 — 대상마다 어느 칸이 찼는지. 그림은 받지 않는다. 일상컷이 무엇으로 그려졌는지는 <a href="casual.html" id="casual-link">일상컷 목록</a>.</p>
   <div class="sum-wrap"><table class="sum" id="sum" aria-label="공방마다">
     <thead><tr><th>공방</th><th>대상</th><th>다 참</th><th>일부</th><th>없음</th><th>그림</th><th>일상컷</th></tr></thead>
     <tbody></tbody>
