@@ -37,7 +37,7 @@ const server = http.createServer((q, s) => {
 }).listen(PORT);
 const ROOMS = ['gundam', 'book', 'samguk', 'pokemon', 'myth', 'game', 'dot', 'image', 'element', 'style', 'city', 'fav', 'status', 'sweep', 'review', 'blender'];
 const CARDS = ROOMS.filter(k => k !== 'city');   /* 도시공방은 아직 없다 — 지도에만(문 없이 「준비 중」), 맨 아래 칩엔 없다 */
-const TOOLS = { fav: 'favorites.html', status: 'status.html', sweep: 'sweep.html', review: 'review.html', blender: '/blender-cloud/' };   /* 2026-11-11 하단 버튼 줄 → 대미궁 아래층 · 왕국 남쪽 바다의 방 */
+const TOOLS = { fav: 'favorites.html', status: ['status.html', 'casual.html'], sweep: 'sweep.html', review: 'review.html', blender: '/blender-cloud/' };   /* 기록실만 둘 — 그림 현황 · 일상컷 목록(2026-11-17 사용자 「허브쪽에 버튼으로도 추가해줘」) */   /* 2026-11-11 하단 버튼 줄 → 대미궁 아래층 · 왕국 남쪽 바다의 방 */
 /* 오늘 기록 — 서재는 오늘 2판 1승에 오늘의 판을 끝냈고 방금(앞으로 한 시간 뒤까지) 다녀갔다, 대장간은 1판, 격납고는 판은 없고 하루 전에 다녀갔다(그 뒤 배포 → 새 소식) */
 const NOW = Date.now(), SEED = {
   'atelier_today_v1:book': { d: T.today(), n: 2, w: 1, daily: true, at: NOW, seen: NOW + 3600e3 },
@@ -131,7 +131,7 @@ const NOW = Date.now(), SEED = {
       assert.deepEqual(cardLinks, doorLinks, '칩의 링크 = 방마다 큰 문');
       assert(cardLinks.every(h => /^\/?([a-z-]+\/)?([a-z]+\.html)?$/.test(h)), '링크 꼴');
       /* 도구 다섯(2026-11-11) — 하단 버튼이던 것이 방이 됐다: 문 하나, 오늘의 판은 없다 */
-      assert.deepEqual(await p.evaluate(() => Object.fromEntries(ROOMS.filter(r => r.tool).map(r => [r.key, r.links.map(l => l[1])]))), Object.fromEntries(Object.entries(TOOLS).map(([k, v]) => [k, [v]])), name + ' 도구 다섯의 문');
+      assert.deepEqual(await p.evaluate(() => Object.fromEntries(ROOMS.filter(r => r.tool).map(r => [r.key, r.links.map(l => l[1])]))), Object.fromEntries(Object.entries(TOOLS).map(([k, v]) => [k, [].concat(v)])), name + ' 도구 다섯의 문');
       await p.goto(BASE + '/#review'); await p.waitForSelector('#map.zoomed');
       assert.equal(await p.locator('#doors h2').textContent(), '그림 검수판', name + ' 검수의 방'); assert.equal(await p.locator('#doors a.main').getAttribute('href'), 'review.html');
       /* 도트 공방·이미지 공방 — 허브 안의 쪽으로 가는 문 하나씩, 오늘의 판은 없다 */

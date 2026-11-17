@@ -357,8 +357,8 @@ const ROOMS = [
   { key: 'status', name: '기록실', title: '그림 현황', sub: '공방마다 어느 칸이 찼는지 글로만', num: '13 / RECORDS', c: '#c9b48a', tint: '#1a160f', tool: true,
     poly: [[147, 2223], [123, 2237], [98, 2271], [93, 2351], [120, 2378], [156, 2393], [210, 2394], [242, 2382], [276, 2350], [285, 2293], [272, 2259], [212, 2220]], at: [186, 2307],
     peek: 'img/cave4-status.webp', cover: 'img/cave4-status.webp',
-    desc: '두루마리와 장부가 쌓인 기록실 — 공방마다 어느 그림 칸이 찼고 어디가 비었는지 글로만 본다.',
-    links: [['그림 현황', 'status.html']] },
+    desc: '두루마리와 장부가 쌓인 기록실 — 공방마다 어느 그림 칸이 찼고 어디가 비었는지 글로만 본다. 일상컷 목록(필수 갈래 · 의상 · 게임 코스프레)도 여기서.',
+    links: [['그림 현황', 'status.html'], ['일상컷 목록', 'casual.html']] },   /* 2026-11-17 사용자 「허브쪽에 버튼으로도 추가해줘」 — 기록실 문 패널에 둘째 버튼 */
   { key: 'sweep', name: '저울 시험실', title: '세부 항목 시험', sub: '생성 도구가 작은 차이를 받아들이는지', num: '14 / SCALES', c: '#e0c060', tint: '#1c180c', tool: true,
     poly: [[829, 1943], [792, 1954], [764, 1978], [739, 2069], [758, 2100], [851, 2123], [890, 2112], [923, 2086], [932, 2023], [899, 1962]], at: [838, 2035],
     peek: 'img/cave4-sweep.webp', cover: 'img/cave4-sweep.webp',
@@ -999,7 +999,7 @@ addEventListener('pageshow', doorBack);   /* 뒤로 와서 다시 보일 때(bfc
 /* 넘어가는 쪽에 그 한 줄이 없는데 전환을 걸면 브라우저가 그 페이지 콘솔에 오류를 남긴다(「Transition was aborted … opt-in disabled」) — 그래서 한 줄이 들어간 곳(VT_READY)으로 갈 때만 전환을 걸고,
    나머지는 여기서 그만둔다(지금처럼 그냥 넘어간다). 공방 저장소에 한 줄을 넣으면 그 경로를 여기에 더한다(README 「방에 들어가는 연출」). 끝이 / 면 그 아래 모두.
    그 한 줄에는 「여기서 나갈 때는 전환을 그만둔다」(pageswap)도 들어 있다 — 전환은 이 지도에서 나갈 때만 걸리고, 공방 안에서 쪽을 옮길 때 · 공방에서 지도로 돌아올 때는 전과 같다 */
-const VT_READY = ['/favorites.html', '/status.html', '/sweep.html', '/review.html', '/dot.html', '/prompt.html',
+const VT_READY = ['/favorites.html', '/status.html', '/casual.html', '/sweep.html', '/review.html', '/dot.html', '/prompt.html',
   '/atelier/', '/book-atelier/', '/sam-atelier/', '/pkm-atelier/', '/myth-atelier/', '/game-atelier/', '/element-atelier/', '/style-atelier/', '/blender-cloud/'];   /* 공방 저장소 아홉(2026-11-12 — 페이지마다 한 줄을 넣었다) */
 /* 목록 아래에 있어도 한 줄이 없는 페이지 — 삼국지 쟁탈전(draft.html)은 「게임은 그대로 둔다」(sam-atelier CLAUDE.md)라 넣지 않았다. 여기로는 전환을 걸지 않는다 */
 const VT_NOT = ['/sam-atelier/draft.html'];
