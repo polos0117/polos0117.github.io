@@ -36,7 +36,7 @@ const server = http.createServer((q, s) => {
   fs.readFile(f, (e, d) => { if (e) { s.writeHead(404); return s.end(); } s.setHeader('Content-Type', MIME[path.extname(f)] || 'application/octet-stream'); s.setHeader('Last-Modified', LM.toUTCString()); s.end(d); });
 }).listen(PORT);
 const ROOMS = ['gundam', 'book', 'samguk', 'pokemon', 'myth', 'game', 'dot', 'image', 'element', 'style', 'city', 'fav', 'status', 'sweep', 'review', 'blender'];
-const CARDS = ROOMS.filter(k => k !== 'city');   /* 도시공방은 아직 없다 — 지도에만(문 없이 「준비 중」), 맨 아래 칩엔 없다 */
+const CARDS = ROOMS;   /* 도시공방도 2026-11-19 문을 열어 맨 아래 칩에 든다 */
 const TOOLS = { fav: 'favorites.html', status: ['status.html', 'casual.html'], sweep: 'sweep.html', review: 'review.html', blender: '/blender-cloud/' };   /* 기록실만 둘 — 그림 현황 · 일상컷 목록(2026-11-17 사용자 「허브쪽에 버튼으로도 추가해줘」) */   /* 2026-11-11 하단 버튼 줄 → 대미궁 아래층 · 왕국 남쪽 바다의 방 */
 /* 오늘 기록 — 서재는 오늘 2판 1승에 오늘의 판을 끝냈고 방금(앞으로 한 시간 뒤까지) 다녀갔다, 대장간은 1판, 격납고는 판은 없고 하루 전에 다녀갔다(그 뒤 배포 → 새 소식) */
 const NOW = Date.now(), SEED = {
@@ -60,7 +60,7 @@ const NOW = Date.now(), SEED = {
       await p.goto(BASE + '/'); await p.waitForSelector('.room'); await p.waitForFunction(() => document.querySelector('#stage img').complete);
       /* 방 열여섯 — 다각형·이름표, 맨 아래 칩(공방마다 메인 화면 하나) */
       assert.deepEqual(await p.locator('.room').evaluateAll(es => es.map(e => e.dataset.key)), ROOMS, name + ' 방 열여섯');
-      assert.equal(await p.locator('.pin').count(), 16, '이름표 열여섯'); assert.deepEqual(await p.locator('.chip').evaluateAll(es => es.map(e => e.dataset.key)), CARDS, '칩 열다섯(도시공방 빼고)');
+      assert.equal(await p.locator('.pin').count(), 16, '이름표 열여섯'); assert.deepEqual(await p.locator('.chip').evaluateAll(es => es.map(e => e.dataset.key)), CARDS, '칩 열여섯');
       assert.equal(await p.locator('.all-fav, .card').count(), 0, name + ' 하단 버튼 줄 · 카드 줄 없음');
       assert.equal(await p.locator('#lamps circle').count(), 5, name + ' 대미궁 등불 길 다섯');
       for (const k of ROOMS) assert((await p.locator(`.pin[data-key="${k}"] b`).textContent()).length > 2, k + ' 이름');
@@ -123,8 +123,8 @@ const NOW = Date.now(), SEED = {
       /* 주소로 바로 */
       await p.goto(BASE + '/#pokemon'); await p.waitForSelector('#map.zoomed'); assert.equal(await p.locator('#doors h2').textContent(), '포켓몬 메카 연구소', '#pokemon 으로 열면 바로 그 방');
       await p.goto(BASE + '/#city'); await p.waitForSelector('#map.zoomed');
-      assert.equal(await p.locator('#doors h2').textContent(), '도시공방', name + ' 도시공방'); assert.equal(await p.locator('#doorlinks a').count(), 0, name + ' 도시공방은 문이 없다');
-      assert.match(await p.locator('#doorlinks .soon').textContent(), /준비 중/, name + ' 도시공방 준비 중');
+      assert.equal(await p.locator('#doors h2').textContent(), '도시공방', name + ' 도시공방'); assert.equal(await p.locator('#doorlinks a').first().getAttribute('href'), '/city-atelier/', name + ' 도시공방 문은 지구본');
+      assert.equal(await p.locator('#doorlinks .soon').count(), 0, name + ' 도시공방은 이제 준비 중이 아니다');
       /* 맨 아래 칩 = 방마다 큰 문(메인 화면) 하나 */
       const cardLinks = await p.locator('.chip').evaluateAll(es => es.map(e => e.getAttribute('href')));
       const doorLinks = await p.evaluate(() => ROOMS.filter(r => !r.soon).map(r => r.links[0][1]));
@@ -530,6 +530,6 @@ const NOW = Date.now(), SEED = {
       assert.deepEqual(P.errors, [], '밤 연출 오류 없음'); await P.p.evaluate(() => { localStorage.removeItem('atelier_hub_last_v1'); }); await P.ctx.close();
       console.log('PASS 방에 들어가는 연출: 확대 동안 캔버스를 보인 채 민다(평소보다 세게) · 앨리스가 문으로 사라지고 문 빛 · 문 패널은 바로 · 기다림 그대로 · 끝나면 캔버스 감춤 · 지도 자리 · 누르는 자리 · 문 패널은 움직임 끔 때와 같다 · 나올 때 반대로 · 문 링크는 바로 가고 방이 커지며 사라진다 · 밤 덮개와 맞바꿈 · 움직임 끔이면 연출 없음');
     }
-    console.log('PASS 공방 지도: 방 열여섯(공방 열 · 도구 다섯 · 도시공방 준비 중, 두 층 1:3)·칩·이름표·카드 · 지도 고르기(대미궁 · 왕국 — 지명 · 구역 · 기억 · ?map=) · 빛나기·미리보기 · 다가가기·문·주소·Esc·뒤로 가기 · 오늘 불·오늘 줄·오늘의 판·새 소식·다녀간 자국 · 세로/가로/PC 넘침 없음, 가로는 폭을 정해 굴린다 · 깊이 패럴랙스(344×882 — 깊이 그림 · 누르는 자리 그대로 · 앨리스 · 안드로이드 기울기/iOS 는 굴림만 · 움직임 끔/못 받음/왕국은 정지 그림)');
+    console.log('PASS 공방 지도: 방 열여섯(공방 열하나 · 도구 다섯, 두 층 1:3)·칩·이름표·카드 · 지도 고르기(대미궁 · 왕국 — 지명 · 구역 · 기억 · ?map=) · 빛나기·미리보기 · 다가가기·문·주소·Esc·뒤로 가기 · 오늘 불·오늘 줄·오늘의 판·새 소식·다녀간 자국 · 세로/가로/PC 넘침 없음, 가로는 폭을 정해 굴린다 · 깊이 패럴랙스(344×882 — 깊이 그림 · 누르는 자리 그대로 · 앨리스 · 안드로이드 기울기/iOS 는 굴림만 · 움직임 끔/못 받음/왕국은 정지 그림)');
   } finally { await br.close(); server.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
