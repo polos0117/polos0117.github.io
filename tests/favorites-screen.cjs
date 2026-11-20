@@ -42,7 +42,7 @@ const memory = () => { const m = {}; return { getItem: k => (k in m ? m[k] : nul
 /* 지도의 방 색 — favorites.html 의 ROOM 이 같아야 한다(즐겨찾기의 pkm = 지도의 pokemon) */
 const index = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8'), favHTML = fs.readFileSync(path.join(ROOT, 'favorites.html'), 'utf8');
 const mapColor = {}; for (const m of index.matchAll(/\{ key: '(\w+)', name: '([^']+)'[^\n]*? c: '(#[0-9a-f]{6})'/g)) mapColor[m[1]] = { name: m[2], c: m[3] };
-const ROOM_OF = { gundam: 'gundam', book: 'book', pkm: 'pokemon', myth: 'myth', game: 'game', element: 'element', samguk: 'samguk' };
+const ROOM_OF = { gundam: 'gundam', book: 'book', pkm: 'pokemon', myth: 'myth', game: 'game', element: 'element', samguk: 'samguk', city: 'city' };
 for (const [a, room] of Object.entries(ROOM_OF)) {
   const m = favHTML.match(new RegExp(`\\b${a}: \\{ room: '${room}', name: '([^']+)', c: '(#[0-9a-f]{6})'`));
   assert(m && mapColor[room], a + ' 공방 표가 있다');
@@ -206,7 +206,7 @@ const SIZES = [['344', { width: 344, height: 882 }, true], ['1280', { width: 128
       const { ctx, p, errors } = await page(vp, mobile);
       await p.goto(BASE + '/favorites.html'); await p.waitForSelector('#empty');
       assert.equal(await p.locator('.tile').count(), 0); assert(await p.locator('#tools').isHidden(), name + ' 빈 자리엔 칩이 없다');
-      assert.deepEqual(await p.locator('#empty .doors a').evaluateAll(es => es.map(e => e.getAttribute('href'))), ['/atelier/dex.html', '/book-atelier/dex.html', '/pkm-atelier/dex.html', '/myth-atelier/dex.html', '/game-atelier/dex.html', '/element-atelier/dex.html', '/sam-atelier/dex.html'], name + ' 공방 도감으로 가는 문');
+      assert.deepEqual(await p.locator('#empty .doors a').evaluateAll(es => es.map(e => e.getAttribute('href'))), ['/atelier/dex.html', '/book-atelier/dex.html', '/pkm-atelier/dex.html', '/myth-atelier/dex.html', '/game-atelier/dex.html', '/element-atelier/dex.html', '/sam-atelier/dex.html', '/city-atelier/index.html?tab=dex'], name + ' 공방 도감으로 가는 문');
       await targets(p, '#empty .doors a', name); await noOverflow(p, name + ' 빈 자리');
       /* 다른 탭에서 담으면 곧바로 뜬다 */
       await p.evaluate(([k, v]) => { localStorage.setItem(k, v); dispatchEvent(new StorageEvent('storage', { key: k })); }, [KEY, JSON.stringify(SEED.slice(0, 2))]);
@@ -226,7 +226,7 @@ const SIZES = [['344', { width: 344, height: 882 }, true], ['1280', { width: 128
       assert.equal(await p.locator('#fav-link').textContent(), '즐겨찾기 8', name + ' 머리의 즐겨찾기 수');
       assert.equal(await p.locator('#fav-link').getAttribute('href'), 'favorites.html');
       assert.equal(await p.locator('.chip[data-key="fav"]').getAttribute('href'), 'favorites.html', name + ' 맨 아래 칩');
-      assert.equal(await p.locator('.chip').count(), 15, name + ' 칩 열다섯(공방 열 · 도구 다섯 — 도시공방은 준비 중이라 없다)');
+      assert.equal(await p.locator('.chip').count(), 16, name + ' 칩 열여섯(공방 열하나 · 도구 다섯 — 도시공방 문을 연 뒤 2026-11-19)');
       const r = await p.locator('#fav-link').boundingBox(); assert(r.height >= 44, name + ' 머리 링크 누르는 자리');
       await noOverflow(p, name + ' 지도');
       await p.goto(BASE + '/#fav'); await p.waitForSelector('#map.zoomed');
