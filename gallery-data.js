@@ -86,7 +86,7 @@
   function casualOf(r, places, groups) {
     var s = r.s || {}, en = !!s.en, pl = en ? '' : (s.pl || ''), g = pl && places ? places[pl] || '' : '';
     return {
-      family: r.family || '', familyKo: r.familyKo || '', item: r.item || '', itemKo: r.itemKo || '', shade: r.shade || '', shadeKo: r.shadeKo || '',
+      family: r.family || '', familyKo: r.familyKo || '', item: r.item || '', itemKo: r.itemKo || '', cls: r.cls || '', clsKo: r.clsKo || '', shade: r.shade || '', shadeKo: r.shadeKo || '',
       required: r.required || '', requiredKo: r.requiredKo || '', design: designOf(r), cosplay: r.cosplay || null, free: r.free || null,
       place: pl, placeKo: pl, placeGroup: pl ? (g || 'etc') : '', placeGroupKo: pl ? (g ? (groups && groups[g]) || g : '그 밖의 장소') : '',
       act: en ? '' : (s.act || ''), actKo: en ? '' : (s.act || ''), frameKo: en ? '' : (s.fr || ''), exprKo: s.ex || '', en: en, ar: s.ar || '', raw: r
@@ -158,6 +158,7 @@
     { key: 'st', ko: '화풍', of: function (r) { return r.style; }, label: function (v, meta) { return (meta && meta.styles && meta.styles[v]) || v; } },
     { key: 'd', ko: '일상컷 설계', casual: true, of: function (r) { return cz(r).design || ''; }, label: function (v) { return DESIGN_KO[v] || v; }, order: function (v) { return DESIGN_ORDER.indexOf(v); } },
     { key: 'fam', ko: '갈래', casual: true, of: function (r) { return cz(r).family || ''; }, label: function (v, meta, ko) { return ko || v; } , ko_of: function (r) { return cz(r).familyKo; } },
+    { key: 'cl', ko: '실루엣 갈래', casual: true, many: true, of: function (r) { return cz(r).clsKo || ''; } },   /* 2026-11-25 — 색인 cls(수영복 · 란제리 · 역할극 … 계열의 재단 갈래) */
     { key: 'it', ko: '의상', casual: true, many: true, of: function (r) { return cz(r).itemKo || ''; } },
     { key: 'sh', ko: '색', casual: true, many: true, of: function (r) { return cz(r).shadeKo || ''; } },
     { key: 'cg', ko: '코스프레 게임', casual: true, many: true, of: function (r) { var c = cz(r).cosplay; return c ? c.gameKo || c.game || '' : ''; } },
@@ -201,7 +202,7 @@
   function hay(r) {
     if (r._hay) return r._hay;
     var c = r.casual || {}, co = c.cosplay || {}, f = c.free || {};
-    return (r._hay = [r.cardName, r.card, r.file, r.worldKo, r.formKo, r.styleKo, r.ctx ? r.ctx.def.name : '', KIND_KO[r.kind], c.familyKo, c.itemKo, c.shadeKo, c.requiredKo,
+    return (r._hay = [r.cardName, r.card, r.file, r.worldKo, r.formKo, r.styleKo, r.ctx ? r.ctx.def.name : '', KIND_KO[r.kind], c.familyKo, c.clsKo, c.itemKo, c.shadeKo, c.requiredKo,
       c.place, c.placeGroupKo, c.act, c.frameKo, c.exprKo, co.gameKo, co.game, co.characterKo, co.character, co.cutKo, f.kindKo, (c.raw && c.raw.s && c.raw.s.en) ? [c.raw.s.pl, c.raw.s.act].join(' ') : '']
       .filter(Boolean).join('\n').toLowerCase());
   }
