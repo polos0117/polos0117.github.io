@@ -21,6 +21,11 @@
   새것부터 2:3 썸네일. 공방 칩으로 거른다(주소 ?a=book). 누르면 크게 보기 — ← → 키·밀기·Esc, 「그 공방에서 보기」(칸의 link), 빼기.
   감상 모드는 6초마다 천천히 겹쳐 넘어가고, 손을 대면 멈춘다. 움직임 줄이기면 잠긴다. 저장이 막힌 브라우저면 그렇다고 말한다.
   색과 이름은 공방 지도(index.html)의 ROOMS 와 같다 — 지도에서 바꾸면 아래 ROOM 도 같이(tests/favorites-screen.cjs 가 견준다).
+  2026-11-25(사용자 「그 우리 가로보기랑 크게보기 만든거 이거를 공방허브에 즐겨찾기 모음해놓은곳에도 적용해줘. 그리고 즐겨찾기 모음은 최대 한도가 500장인건가?」):
+  · 꽉 채우기 — 공방 크게 보기와 같은 몸통(fill-core.js, 원본 style-atelier shared). 휴대폰 세로에서 1:1 · 3:2 그림이면 「⤢ 꽉 채우기」(단추 · 두 번 누르기) →
+    칸 높이에 맞춰 펴고 옆으로 민다. 펴 있는 동안 밀기는 넘기지 않는다(‹ › · 키는 넘기고, 넘기면 맞춤으로). 감상 모드는 펴면 멈춘다.
+  · 휴대폰 가로 — 그림만 화면 높이 가득, 닫기만 오른쪽 위에 작게 · ‹ › 는 그림 위.
+  · 한도 — 담은 수 「n / 3000」. 가득 차면 공방 도감이 더 담지 않고 그렇다고 말한다(전엔 500칸, 넘치면 오래된 것이 몰래 빠졌다).
 -->
 <style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }</style><script>addEventListener('pageswap', e => { const t = e.viewTransition; if (t) { t.skipTransition(); t.ready.catch(() => {}); } }); addEventListener('pagereveal', e => { const t = e.viewTransition; if (t) t.ready.catch(() => {}); });</script>   <!-- 허브 지도의 문에서 넘어올 때 페이드로 들어온다(2026-11-12 — index.html 「방에 들어가는 연출」). 여기서 나갈 때는 전환을 걸지 않는다(공방 저장소에 넣은 것과 같은 한 줄). 모르는 브라우저는 그냥 넘어온다 -->
 <style>
@@ -51,6 +56,11 @@ button { font: inherit; color: inherit; }
 .wrap { max-width: 1280px; margin: 0 auto; padding: 0 16px calc(40px + env(safe-area-inset-bottom)); }
 .lede { margin: 2px 0 14px; color: var(--muted); font-size: 13px; word-break: keep-all; }
 .lede b { color: var(--text); font-weight: 700; }
+/* 담은 수 / 한도(favorites.js MAX) — 곧 차면 금빛, 다 차면 붉게 */
+.limit { display: inline-block; margin-left: 6px; padding: 1px 8px; border: 1px solid var(--line); border-radius: 99px; color: var(--muted); font: 600 11.5px/1.5 ui-monospace, Menlo, monospace; white-space: nowrap; }
+.limit.near { border-color: #d9b45a88; color: var(--gold); }
+.limit.full { border-color: #ff8a7a99; color: #ffb0a4; }
+.lede .warn { display: block; margin-top: 4px; color: #ffb0a4; }
 
 /* ── 거르기 칩 — 공방마다 지도의 그 색 ── */
 .tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 16px; }
@@ -130,6 +140,13 @@ button { font: inherit; color: inherit; }
 .v-prev { left: 8px; } .v-next { right: 8px; }
 .v-paused { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); padding: 5px 12px; border-radius: 99px; background: #000c; color: #ffd9a8; font: 600 12px/1.3 var(--sans); pointer-events: none; }
 .v-paused[hidden] { display: none; }
+/* 꽉 채우기(fill-core.js, 2026-11-25) — 휴대폰 세로에서 1:1 · 3:2 그림을 칸 높이에 맞춰 펴고 옆으로 민다. 단추는 그림 오른쪽 아래, 칸의 크기를 바꾸지 않게 위에 얹는다 */
+.v-fill { position: absolute; right: 10px; bottom: 10px; z-index: 2; background: #000a; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.v-fill[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+.v-stage.is-fill > img { visibility: hidden; }
+.v-stage .fill-scroll { position: absolute; inset: 0; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; touch-action: pan-x pinch-zoom; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.v-stage .fill-scroll::-webkit-scrollbar { display: none; }
+.v-stage .fill-scroll > img { position: static; display: block; width: var(--fill-w); height: var(--fill-h); max-width: none; padding: 0; opacity: 1; transition: none; object-fit: cover; }
 .v-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; padding: 8px 14px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: #0b0a0ee6; }
 .v-text { min-width: 0; flex: 1 1 200px; }
 .v-text h2 { margin: 0; font: 900 clamp(18px, 2.4vw, 24px)/1.25 var(--serif); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -137,17 +154,19 @@ button { font: inherit; color: inherit; }
 .v-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .v-actions .main { --c: var(--gold); background: var(--c); border-color: var(--c); color: #111; font-weight: 800; }
 .v-actions .main:hover, .v-actions .main:focus-visible { color: #111; filter: brightness(1.08); outline-color: #fff; }
+/* 휴대폰 가로(2026-11-25 — 공방 크게 보기와 같게) — 그림만 화면 높이 가득. 위 줄 · 아래 막대는 숨기고 닫기만 오른쪽 위에 반투명으로, ‹ › 는 그림 위 */
 @media (orientation: landscape) and (max-height: 500px) {
-  .viewer { grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr) minmax(220px, 300px); }
-  .v-bar { grid-column: 2; grid-row: 1; align-self: start; flex-wrap: wrap; padding-top: calc(10px + env(safe-area-inset-top)); }
-  .v-stage { grid-column: 1; grid-row: 1; }
-  .v-foot { grid-column: 2; grid-row: 1; align-self: end; border-top: 0; background: none; flex-direction: column; align-items: stretch; }
-  .v-text { flex: 0 0 auto; }
-  .v-actions { flex-direction: column; }
+  .viewer { grid-template-rows: minmax(0, 1fr); }
+  .v-stage { grid-row: 1; }
+  .v-stage img { padding: 6px max(6px, env(safe-area-inset-right)) 6px max(6px, env(safe-area-inset-left)); }
+  .v-foot { display: none; }
+  .v-bar { position: fixed; top: calc(6px + env(safe-area-inset-top)); right: calc(6px + env(safe-area-inset-right)); z-index: 3; padding: 0; }
+  .v-bar > :not(#v-close) { display: none; }
+  #v-close { background: #0006; border-color: #fff5; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
 }
 
-.toast { position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 60; max-width: calc(100vw - 32px);
-  padding: 9px 16px; border-radius: 99px; background: #f1ece2; color: #111; font: 700 13px/1.3 var(--sans); text-align: center; box-shadow: 0 10px 30px #000a; }
+.toast { position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 60; max-width: calc(100vw - 32px); width: max-content; word-break: keep-all;
+  padding: 9px 16px; border-radius: 18px; background: #f1ece2; color: #111; font: 700 13px/1.3 var(--sans); text-align: center; box-shadow: 0 10px 30px #000a; }
 .toast:empty { display: none; }
 footer { text-align: center; color: #6f6973; font-size: 12px; padding: 0 16px calc(24px + env(safe-area-inset-bottom)); }
 
@@ -186,6 +205,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 0 16px ca
     <button type="button" class="v-nav v-prev" id="v-prev" aria-label="이전 그림">‹</button>
     <button type="button" class="v-nav v-next" id="v-next" aria-label="다음 그림">›</button>
     <span class="v-paused" id="v-paused" hidden>감상 모드를 멈췄어요</span>
+    <button type="button" class="v-btn v-fill fill-toggle" id="v-fill" aria-pressed="false" hidden>⤢ 꽉 채우기</button>
   </div>
   <div class="v-foot">
     <div class="v-text"><h2 id="v-title"></h2><p id="v-sub"></p></div>
@@ -197,8 +217,9 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 0 16px ca
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="favorites.js"></script>
-<script>
+<script src="favorites.js?v=2"></script>
+<script type="module">
+import { attach } from './fill-core.js?v=1';
 /* 공방 — 색·이름은 지도(index.html)의 ROOMS 와 같다. 즐겨찾기의 a(공방 열쇠)는 pkm 이고 지도의 방 열쇠는 pokemon 이다 */
 const ROOM = {
   gundam: { room: 'gundam', name: '건담 격납고', c: '#7fb3ff', dex: '/atelier/dex.html' },
@@ -259,7 +280,12 @@ function paint() {
   note.innerHTML = '';
   tools.hidden = false;
   const rooms = ORDER.filter(a => counts[a]).concat(Object.keys(counts).filter(a => ORDER.indexOf(a) < 0));
-  lede.innerHTML = `공방 ${rooms.length}곳에서 담은 그림 <b>${all.length}장</b> — 새것부터`;
+  /* 한도 — 가득 차면 공방 도감이 더 담지 않는다(favorites.js). 곧 차면(남은 자리 1할 아래) 미리 말한다 */
+  const max = F.MAX || 0, left = max - all.length, near = max && left <= Math.max(10, Math.round(max / 10));
+  lede.innerHTML = `공방 ${rooms.length}곳에서 담은 그림 <b>${all.length}장</b> — 새것부터`
+    + (max ? ` <span class="limit${left <= 0 ? ' full' : near ? ' near' : ''}" id="limit" title="즐겨찾기는 이 브라우저에 ${max}장까지 담아요">${all.length} / ${max}</span>` : '')
+    + (max && left <= 0 ? `<span class="warn" id="limit-warn">가득 찼어요 — 몇 장 빼야 공방 도감에서 새로 담을 수 있어요</span>`
+      : near ? `<span class="warn" id="limit-warn">곧 가득 차요 — 남은 자리 ${left}장</span>` : '');
   chips.innerHTML = [['all', '전체', all.length]].concat(rooms.map(a => [a, roomOf(a).name, counts[a]]))
     .map(([a, label, n]) => `<button type="button" class="chip" data-a="${esc(a)}" aria-pressed="${filter === a}" style="--c:${a === 'all' ? 'var(--gold)' : roomOf(a).c}">${esc(label)} <b>${n}</b></button>`).join('');
   grid.innerHTML = shown.map((e, i) => { const r = roomOf(e.a);
@@ -281,6 +307,7 @@ const imgs = [$('#v-a'), $('#v-b')];
 function show(i, slow) {
   if (!shown.length) return closeViewer();
   at = (i + shown.length) % shown.length;
+  fill.reset();   /* 넘기면 맞춤으로 — 새 그림이 오면(load) 다시 잰다 */
   const e = shown[at], r = roomOf(e.a), next = imgs[1 - layer], cur = imgs[layer];
   viewer.classList.toggle('slow', !!slow && !reduced.matches);
   next.onerror = () => { if (e.thumb && next.src !== e.thumb) next.src = e.thumb; };
@@ -305,7 +332,7 @@ function openViewer(i, from) {
 }
 function closeViewer(fromPop) {
   if (viewer.hidden) return;
-  stopPlay(false);
+  stopPlay(false); fill.reset();
   viewer.hidden = true; document.body.style.overflow = '';
   for (const im of imgs) { im.classList.remove('on'); im.removeAttribute('src'); }
   if (pushed && !fromPop) { pushed = false; try { history.back(); } catch (e) {} } else pushed = false;
@@ -320,8 +347,8 @@ $('#v-close').addEventListener('click', () => closeViewer());
 $('#v-remove').addEventListener('click', () => {
   pause();
   const e = shown[at]; if (!e) return;
-  F.remove(e.a, e.file);
-  toast('즐겨찾기에서 뺐어요 · ' + e.title);
+  if (F.remove(e.a, e.file)) toast('즐겨찾기에서 뺐어요 · ' + e.title);
+  else toast(F.message() || '저장이 막혀 빼지 못했어요 — 담아 둔 그림은 그대로예요');
   /* onChange 가 다시 그린 뒤 같은 자리(다음 그림)를 띄운다 */
 });
 /* ← → · Esc · Tab 은 안에서만 */
@@ -338,10 +365,13 @@ document.addEventListener('keydown', ev => {
     else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
   }
 });
-/* 밀어 넘기기 — 가로로 40px 넘게, 세로보다 확실히 */
+/* 꽉 채우기 — 맞춤 보기의 지금 그림을 재어 칸보다 뚜렷이 넓으면 단추를 띄운다(fill-core.js). 펴면 감상 모드는 멈춘다 */
+const fill = attach($('#v-stage'), { img: () => imgs[layer], button: $('#v-fill'), labels: ['⤢ 꽉 채우기', '⤡ 맞춰 보기'], box: 'stage', before: $('#v-prev'),
+  hit: e => !(e.target.closest && e.target.closest('button')), onToggle: on => { if (on) pause(); } });
+/* 밀어 넘기기 — 가로로 40px 넘게, 세로보다 확실히. 꽉 채운 동안은 그림을 옆으로 굴리고 넘기지 않는다 */
 let touch = null;
-$('#v-stage').addEventListener('pointerdown', ev => { if (ev.target.closest('button')) return; touch = { x: ev.clientX, y: ev.clientY }; });
-$('#v-stage').addEventListener('pointerup', ev => { if (!touch) return; const dx = ev.clientX - touch.x, dy = ev.clientY - touch.y; touch = null;
+$('#v-stage').addEventListener('pointerdown', ev => { if (ev.target.closest('button') || fill.on) return; touch = { x: ev.clientX, y: ev.clientY }; });
+$('#v-stage').addEventListener('pointerup', ev => { if (!touch || fill.on) { touch = null; return; } const dx = ev.clientX - touch.x, dy = ev.clientY - touch.y; touch = null;
   if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) { pause(); step(dx < 0 ? 1 : -1); } });
 $('#v-stage').addEventListener('pointercancel', () => { touch = null; });
 

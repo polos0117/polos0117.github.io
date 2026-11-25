@@ -1,7 +1,9 @@
 /* 내 즐겨찾기(favorites.html) — 공방 넷의 도감이 atelier_favorites_v1 에 담은 그림을 모아 본다.
    네 공방의 칸을 심어 두고: 새것부터 2:3 칸 · 공방 칩(지도 ROOMS 의 색)으로 거르기(?a=, 새로 고쳐도) · 크게 보기(← → 키·밀기·Esc·초점 되돌림·
    「그 공방에서 보기」= 칸의 link) · 빼기(저장소에서 빠지고 다음 그림이 뜬다) · 감상 모드(6초마다, 손대면 멈춤, 움직임 줄이기면 잠김) ·
-   빈 자리(공방 도감 넷으로 가는 문) · 저장이 막힌 브라우저 · 공방 지도의 「즐겨찾기 n」 과 목록 아래 줄 · favorites.js 동작(500칸·같은 그림 하나·막힌 저장).
+   빈 자리(공방 도감 넷으로 가는 문) · 저장이 막힌 브라우저 · 공방 지도의 「즐겨찾기 n」 과 목록 아래 줄 · favorites.js 동작(MAX 칸 · 가득이면 거절 · 같은 그림 하나 · 막힌 저장 · 저장 공간 모자람).
+   2026-11-25: 담은 수 「n / MAX」 · 곧 참 · 가득 · 빼기가 저장 공간에 막힘 · 꽉 채우기(390×844 터치 — 1:1 이면 단추 · 펴면 칸 높이 · 옆으로 구르고 밀어도 안 넘어감 ·
+   두 번 누르기 · 넘기면 맞춤 · 2:3 은 단추 없음 · PC 1:1 단추 없음) · 휴대폰 가로 844×390(그림만 가득 · 닫기만).
    344×882 · 1280×900 에서 옆으로 넘치지 않고 누르는 자리 44px.
    바깥 그림은 받지 않는다 — 옆 저장소에 같은 파일이 있으면 그것, 없으면 색 칸(SVG). SHOT_DIR 을 주면 344×882 · 1280×900 화면을 찍는다.
    Run: CHROMIUM_PATH=<chrome> NODE_PATH=<playwright 가 있는 node_modules> node tests/favorites-screen.cjs   (FAV_PORT 로 자리 바꾸기, 기본 8767) */
@@ -27,8 +29,13 @@ const memory = () => { const m = {}; return { getItem: k => (k in m ? m[k] : nul
   assert(!isNaN(Date.parse(F.list()[0].at)), '담은 때');
   assert.equal(F.toggle(e(1)), false, '다시 누르면 빠진다'); assert.equal(F.count(), 1);
   assert.equal(F.remove('book', 'f2.webp'), true); assert.equal(F.remove('book', 'f2.webp'), false, '없는 것은 못 뺀다'); assert.equal(F.count(), 0);
-  for (let i = 0; i < 520; i++) F.toggle(e(i));
-  assert.equal(F.count(), 500, '500칸까지'); assert.equal(F.list()[0].file, 'f519.webp', '넘치면 오래된 것부터 빠진다');
+  assert.equal(F.MAX, 3000, '3000칸');
+  st.setItem(KEY, JSON.stringify(Array.from({ length: F.MAX - 1 }, (_, i) => e(i + 10))));
+  assert.equal(F.room(), 1); assert.equal(F.toggle(e(1)), true, '마지막 한 자리'); assert.equal(F.count(), F.MAX);
+  assert.equal(F.toggle(e(2)), false, '가득 차면 못 담는다'); assert.equal(F.error(), 'full'); assert.match(F.message(), /가득 찼어요\(3000장\)/);
+  assert.equal(F.count(), F.MAX, '가득이어도 오래된 것을 빼지 않는다'); assert.equal(F.list()[F.MAX - 1].file, 'f' + (F.MAX + 8) + '.webp', '가장 오래된 칸 그대로'); assert.equal(F.room(), 0);
+  assert.equal(F.toggle(e(1)), false, '가득이어도 빼기는 된다'); assert.equal(F.error(), ''); assert.equal(F.toggle(e(2)), true, '빼면 다시 담긴다');
+  st.setItem(KEY, '[]');
   assert(events.includes('atelier-favorites'), '같은 탭 알림');
   st.setItem(KEY, '{bad'); assert.equal(F.list().length, 0, '깨진 값은 빈 목록');
   st.setItem(KEY, JSON.stringify([{ a: 'book' }, null, { a: 'myth', file: 'm.webp', title: 1 }])); assert.deepEqual(Array.from(F.list(), x => x.file), ['m.webp'], '모양이 틀린 칸은 건너뛴다');
@@ -36,7 +43,13 @@ const memory = () => { const m = {}; return { getItem: k => (k in m ? m[k] : nul
   const no = () => { throw new Error('blocked'); };
   const { F: B } = sandbox({ getItem: no, setItem: no, removeItem: no });
   assert.equal(B.available(), false); assert.equal(B.list().length, 0); assert.equal(B.toggle(e(1)), false, '막힌 저장소 — 못 담았다'); assert.equal(B.remove('book', 'f1.webp'), false);
+  B.toggle(e(1)); assert.equal(B.error(), 'blocked'); assert.equal(B.message(), '', '막힘 말은 공방 낱말 표가 맡는다');
   const { F: N } = sandbox(undefined); assert.equal(N.available(), false); assert.equal(N.toggle(e(1)), false, '저장소가 없어도 던지지 않는다');
+  /* 저장 공간이 모자라면(QuotaExceededError) 못 담았다고만 — 담아 둔 칸은 그대로 */
+  const qm = memory(); qm.setItem(KEY, JSON.stringify([e(7)]));
+  const { F: Q } = sandbox({ getItem: qm.getItem, removeItem: qm.removeItem, setItem: () => { const x = new Error('quota'); x.name = 'QuotaExceededError'; x.code = 22; throw x; } });
+  assert.equal(Q.toggle(e(8)), false, '저장 공간이 모자라면 못 담는다'); assert.equal(Q.error(), 'quota'); assert.match(Q.message(), /저장 공간이 모자라/);
+  assert.deepEqual(Array.from(Q.list(), x => x.file), ['f7.webp'], '못 담아도 담아 둔 칸은 그대로');
 }
 
 /* 지도의 방 색 — favorites.html 의 ROOM 이 같아야 한다(즐겨찾기의 pkm = 지도의 pokemon) */
@@ -91,7 +104,7 @@ const SIZES = [['344', { width: 344, height: 882 }, true], ['1280', { width: 128
   const br = await chromium.launch({ headless: true, ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox', '--disable-dev-shm-usage'] } : {}) });
   const stored = p => p.evaluate(k => JSON.parse(localStorage.getItem(k) || '[]'), KEY);
   async function page(vp, mobile, opt = {}) {
-    const ctx = await br.newContext({ viewport: vp, isMobile: mobile, hasTouch: mobile, reducedMotion: opt.reduced ? 'reduce' : 'no-preference' });
+    const ctx = await br.newContext({ viewport: vp, isMobile: mobile, hasTouch: mobile, deviceScaleFactor: process.env.SHOT_DIR ? 2 : 1, reducedMotion: opt.reduced ? 'reduce' : 'no-preference' });
     if (opt.seed) await ctx.addInitScript(([k, v]) => { if (!sessionStorage.getItem('seeded')) { localStorage.setItem(k, v); sessionStorage.setItem('seeded', '1'); } }, [KEY, JSON.stringify(opt.seed)]);
     if (opt.blocked) await ctx.addInitScript(() => { const no = () => { throw new DOMException('blocked', 'SecurityError'); }; Storage.prototype.setItem = no; Storage.prototype.getItem = no; Storage.prototype.removeItem = no; });
     await routeArt(ctx);
@@ -109,6 +122,8 @@ const SIZES = [['344', { width: 344, height: 882 }, true], ['1280', { width: 128
       /* 새것부터 — 심은 차례 그대로 */
       assert.deepEqual(await p.locator('.tile').evaluateAll(es => es.map(e => e.dataset.file)), SEED.map(e => e.file), name + ' 새것부터');
       assert.match(await p.locator('#lede').textContent(), /4곳.*8장/, name + ' 머리말 수');
+      assert.equal(await p.locator('#limit').textContent(), '8 / 3000', name + ' 담은 수 / 한도'); assert.equal(await p.locator('#limit-warn').count(), 0, name + ' 넉넉하면 경고 없음');
+      assert.equal(await p.locator('#v-fill').isVisible(), false, name + ' 2:3 · 닫힌 크게 보기엔 꽉 채우기 없음');
       /* 2:3 칸 */
       const face = await p.locator('.tile .face').first().boundingBox();
       assert(Math.abs(face.width / face.height - 2 / 3) < .02, name + ' 2:3 ' + JSON.stringify(face));
@@ -171,6 +186,114 @@ const SIZES = [['344', { width: 344, height: 882 }, true], ['1280', { width: 128
       await ctx.close();
     }
 
+    /* 한도 — 곧 참(남은 자리 1할 아래) · 가득 · 빼기가 저장 공간에 막히면 */
+    {
+      const many = n => Array.from({ length: n }, (_, i) => ({ ...SEED[i % SEED.length], file: 'n' + i + '_' + SEED[i % SEED.length].file }));
+      const { ctx, p, errors } = await page({ width: 390, height: 844 }, true, { seed: many(2950) });
+      await p.goto(BASE + '/favorites.html'); await p.waitForSelector('.tile');
+      assert.equal(await p.locator('#limit').textContent(), '2950 / 3000'); assert.match(await p.locator('#limit-warn').textContent(), /곧 가득.*50장/, '곧 가득');
+      assert.match(await p.locator('#limit').getAttribute('class'), /near/);
+      await p.evaluate(([k, v]) => { localStorage.setItem(k, v); dispatchEvent(new StorageEvent('storage', { key: k })); }, [KEY, JSON.stringify(many(3000))]);
+      await p.waitForFunction(() => document.querySelector('#limit').textContent === '3000 / 3000');
+      assert.match(await p.locator('#limit-warn').textContent(), /가득 찼어요/, '가득'); assert.match(await p.locator('#limit').getAttribute('class'), /full/);
+      if (process.env.SHOT_DIR) await p.screenshot({ path: path.join(process.env.SHOT_DIR, 'favorites-full-390x844.png') });
+      await noOverflow(p, '가득');
+      /* 가득일 때 공방 도감이 담으려 하면 — favorites.js 가 거절하고 알릴 말을 준다(화면은 그 말을 알림으로) */
+      const r = await p.evaluate(s => { const F = window.AtelierFavorites, n0 = F.count(), on = F.toggle({ ...s, file: 'new.webp' }); return { on, n0, n1: F.count(), why: F.error(), msg: F.message() }; }, SEED[0]);
+      assert.deepEqual([r.on, r.why, r.n1], [false, 'full', r.n0], '가득이면 거절 ' + JSON.stringify(r)); assert.match(r.msg, /가득 찼어요\(3000장\).*빼면/);
+      /* 빼기가 저장 공간에 막히면 — 알리고, 칸은 그대로 */
+      await p.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException('quota', 'QuotaExceededError'); }; });
+      await p.locator('.tile').first().tap(); await p.waitForSelector('#viewer:not([hidden])');
+      await p.locator('#v-remove').tap();
+      assert.match(await p.locator('#toast').textContent(), /저장 공간이 모자라/, '빼기 막힘 알림');
+      assert.equal(await p.evaluate(k => JSON.parse(localStorage.getItem(k)).length, KEY), 3000, '막히면 칸 그대로');
+      assert.deepEqual(errors, [], '한도 오류 없음');
+      await ctx.close();
+    }
+    /* 꽉 채우기 · 휴대폰 가로(공방 크게 보기와 같은 몸통 fill-core.js) — 1:1 · 2:3 그림을 따로 심는다 */
+    {
+      const sq = i => ({ ...SEED[i], file: 'sq' + i + '.webp', thumb: G + '/fill-test/thumb/sq' + i + '.webp', full: G + '/fill-test/sq' + i + '.webp' });
+      const SQ = [sq(0), sq(1), sq(2)], TALL = [{ ...SEED[3], file: 'tall.webp', thumb: G + '/fill-test/thumb/tall.webp', full: G + '/fill-test/tall.webp' }];
+      const art = async ctx => ctx.route(/\/fill-test\//, r => { const tall = /tall/.test(r.request().url()), w = 1024, h = tall ? 1536 : 1024, c = ['#6a8', '#a86', '#68a'][+(r.request().url().match(/sq(\d)/) || [0, 0])[1] % 3];
+        r.fulfill({ contentType: 'image/svg+xml', body: `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="${c}"/><circle cx="${w / 2}" cy="${h / 2}" r="${w / 3}" fill="#fff8"/><rect width="${w / 10}" height="${h}" fill="#0004"/><rect x="${w * .9}" width="${w / 10}" height="${h}" fill="#0004"/></svg>` }); });
+      const open = async (p, i = 0) => { await p.goto(BASE + '/favorites.html'); await p.waitForSelector('.tile'); await p.locator('.tile').nth(i).click(); await p.waitForSelector('#viewer:not([hidden])');
+        await p.waitForFunction(() => { const i = document.querySelector('#v-stage img.on'); return i && i.complete && i.naturalWidth > 0; }); await p.waitForTimeout(250); };
+      const src = p => p.locator('#v-stage img.on').getAttribute('src');
+      const fillState = p => p.evaluate(() => { const sc = document.querySelector('#v-stage .fill-scroll'); if (!sc) return null; const i = sc.querySelector('img').getBoundingClientRect(), st = document.querySelector('#v-stage');
+        return { h: i.height, w: i.width, ch: sc.clientHeight, cw: sc.clientWidth, sw: sc.scrollWidth, sl: sc.scrollLeft, stageH: st.clientHeight }; });
+      const swipe = async (p, x0, x1, y) => { const c = await p.context().newCDPSession(p);
+        await c.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x0, y }] });
+        for (let i = 1; i <= 10; i++) { await c.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x0 + (x1 - x0) * i / 10, y }] }); await p.waitForTimeout(16); }
+        await c.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await c.detach(); };
+      const dbl = async p => { const b = await p.locator('#v-stage').boundingBox(), x = b.x + b.width / 2, y = b.y + b.height / 2; await p.touchscreen.tap(x, y); await p.waitForTimeout(90); await p.touchscreen.tap(x, y); };
+      /* ① 폰 세로 390×844 · 1:1 */
+      { const ctx = await br.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+        await ctx.addInitScript(([k, v]) => { if (!sessionStorage.getItem('seeded')) { localStorage.setItem(k, v); sessionStorage.setItem('seeded', '1'); } }, [KEY, JSON.stringify(SQ)]);
+        await routeArt(ctx); await art(ctx);
+        const p = await ctx.newPage(), errors = []; p.on('pageerror', e => errors.push(String(e)));
+        await open(p);
+        const btn = p.locator('#v-fill'); await btn.waitFor({ state: 'visible', timeout: 5000 });
+        assert.equal(await btn.getAttribute('aria-pressed'), 'false'); assert.match(await btn.textContent(), /꽉 채우기/, '꽉 채우기 단추');
+        const bb = await btn.boundingBox(); assert(bb.height >= 44, '단추 44 ' + bb.height);
+        const fit = await p.evaluate(() => { const i = document.querySelector('#v-stage img.on'), r = i.getBoundingClientRect(), cs = getComputedStyle(i), pw = r.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight), ph = r.height - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom), k = Math.min(pw / i.naturalWidth, ph / i.naturalHeight); return { h: i.naturalHeight * k }; });
+        if (process.env.SHOT_DIR) await p.screenshot({ path: path.join(process.env.SHOT_DIR, 'favorites-fit-1x1-390x844.png') });
+        const s0 = await src(p);
+        await btn.tap(); await p.waitForSelector('#v-stage .fill-scroll img'); await p.waitForTimeout(250);
+        assert.equal(await btn.getAttribute('aria-pressed'), 'true'); assert.match(await btn.textContent(), /맞춰 보기/);
+        let f = await fillState(p);
+        assert(Math.abs(f.h - f.stageH) <= 2 && Math.abs(f.ch - f.stageH) <= 2, '그림 높이 = 칸 높이 ' + JSON.stringify(f));
+        assert(f.h > fit.h * 1.3, '맞춤보다 뚜렷이 크다 ' + f.h + ' > ' + fit.h);
+        assert(f.sw > f.cw + 10, '옆으로 구른다 ' + JSON.stringify(f)); assert(Math.abs(f.sl - (f.sw - f.cw) / 2) <= 3, '가운데부터 ' + f.sl);
+        assert(await p.locator('#v-fill').isVisible(), '펴도 단추는 보인다');
+        if (process.env.SHOT_DIR) await p.screenshot({ path: path.join(process.env.SHOT_DIR, 'favorites-fill-1x1-390x844.png') });
+        const y = (await p.locator('#v-stage .fill-scroll').boundingBox()).y + f.ch / 2;
+        await swipe(p, 300, 80, y); await p.waitForTimeout(300);
+        assert.equal(await src(p), s0, '꽉 채운 채 밀어도 그림은 그대로'); assert.equal(await p.locator('#v-count').textContent(), '1 / 3');
+        assert.equal(await btn.getAttribute('aria-pressed'), 'true', '밀어도 꽉 채우기 그대로');
+        const f2 = await fillState(p); assert(f2.sl > f.sl + 20, '밀면 옆으로 구른다 ' + f.sl + ' → ' + f2.sl);
+        await btn.tap(); await p.waitForSelector('#v-stage .fill-scroll', { state: 'detached' }); assert.equal(await btn.getAttribute('aria-pressed'), 'false', '단추로 맞춤');
+        await p.waitForTimeout(400);
+        await dbl(p); await p.waitForSelector('#v-stage .fill-scroll img', { timeout: 3000 }); assert.equal(await btn.getAttribute('aria-pressed'), 'true', '두 번 누르면 꽉 채우기');
+        await p.waitForTimeout(400);
+        await dbl(p); await p.waitForSelector('#v-stage .fill-scroll', { state: 'detached', timeout: 3000 }); assert(await p.locator('#viewer:not([hidden])').count(), '두 번 누르기는 닫지 않는다');
+        /* 맞춤에선 밀면 넘어간다 */
+        await p.waitForTimeout(400); await swipe(p, 320, 60, 420); await p.waitForFunction(() => document.querySelector('#v-count').textContent === '2 / 3', null, { timeout: 3000 });
+        /* 꽉 채운 채 › 로 넘기면 맞춤으로 — 새 그림에서 다시 잰다 */
+        await p.waitForFunction(() => { const i = document.querySelector('#v-stage img.on'); return i && i.complete && i.naturalWidth > 0; }); await p.waitForTimeout(300);
+        await btn.tap(); await p.waitForSelector('#v-stage .fill-scroll img');
+        await p.locator('#v-next').tap(); await p.waitForSelector('#v-stage .fill-scroll', { state: 'detached', timeout: 3000 });
+        assert.equal(await p.locator('#v-count').textContent(), '3 / 3', '› 로 넘어간다'); await btn.waitFor({ state: 'visible', timeout: 3000 });
+        assert.equal(await btn.getAttribute('aria-pressed'), 'false', '넘기면 맞춤');
+        assert.deepEqual(errors, [], '꽉 채우기 오류 없음'); await ctx.close(); }
+      /* ② 폰 세로 · 2:3 — 단추 없음, ③ PC · 1:1 — 단추 없음 */
+      for (const [label, seed, vp, mob] of [['2:3', TALL, { width: 390, height: 844 }, true], ['PC 1:1', SQ, { width: 1280, height: 900 }, false]]) {
+        const ctx = await br.newContext({ viewport: vp, isMobile: mob, hasTouch: mob });
+        await ctx.addInitScript(([k, v]) => { localStorage.setItem(k, v); }, [KEY, JSON.stringify(seed)]);
+        await routeArt(ctx); await art(ctx);
+        const p = await ctx.newPage(), errors = []; p.on('pageerror', e => errors.push(String(e)));
+        await open(p);
+        assert.equal(await p.locator('#v-fill').isVisible(), false, label + ' 꽉 채우기 없음'); assert.deepEqual(errors, []);
+        await ctx.close();
+      }
+      /* ④ 폰 가로 844×390 · 1:1 — 그림만 화면 높이 가득, 닫기만 */
+      { const ctx = await br.newContext({ viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+        await ctx.addInitScript(([k, v]) => { localStorage.setItem(k, v); }, [KEY, JSON.stringify(SQ)]);
+        await routeArt(ctx); await art(ctx);
+        const p = await ctx.newPage(), errors = []; p.on('pageerror', e => errors.push(String(e)));
+        await open(p);
+        const shown = await p.evaluate(() => { const i = document.querySelector('#v-stage img.on'), r = i.getBoundingClientRect(), cs = getComputedStyle(i);
+          const pw = r.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight), ph = r.height - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom), k = Math.min(pw / i.naturalWidth, ph / i.naturalHeight);
+          return { h: i.naturalHeight * k, w: i.naturalWidth * k, top: r.top, bottom: r.bottom }; });
+        assert(shown.h >= 390 - 12 - 3, '가로: 그림 높이 ≈ 화면 높이 ' + JSON.stringify(shown)); assert(shown.top >= 0 && shown.bottom <= 391, '가로: 화면 안');
+        for (const sel of ['#v-room', '#v-count', '#v-play', '#v-title', '#v-link', '#v-remove']) assert.equal(await p.locator(sel).isVisible(), false, '가로: 숨김 ' + sel);
+        assert.equal(await p.locator('#v-fill').isVisible(), false, '가로: 꽉 채우기 없음');
+        for (const sel of ['#v-prev', '#v-next']) assert(await p.locator(sel).isVisible(), '가로: ' + sel + ' 는 그림 위');
+        const c = p.locator('#v-close'), cb = await c.boundingBox(); assert(await c.isVisible() && cb.width >= 44 && cb.height >= 44 && cb.y < 60 && cb.x > 844 - 70, '가로: 닫기는 오른쪽 위 44 ' + JSON.stringify(cb));
+        if (process.env.SHOT_DIR) await p.screenshot({ path: path.join(process.env.SHOT_DIR, 'favorites-landscape-844x390.png') });
+        await p.locator('#v-next').tap(); assert.equal(await p.locator('#v-count').textContent(), '2 / 3', '가로: › 로 넘긴다');
+        await c.tap(); await p.waitForSelector('#viewer[hidden]', { state: 'attached' });
+        assert.deepEqual(errors, [], '가로 오류 없음'); await ctx.close(); }
+    }
     /* 감상 모드 — 6초마다 넘어가고(천천히 겹쳐), 손대면 멈춘다 */
     {
       const { ctx, p, errors } = await page({ width: 1280, height: 900 }, false, { seed: SEED, clock: true });
@@ -235,6 +358,6 @@ const SIZES = [['344', { width: 344, height: 882 }, true], ['1280', { width: 128
       assert.deepEqual(errors, [], name + ' 오류 없음');
       await ctx.close();
     }
-    console.log('PASS 내 즐겨찾기: favorites.js(새것 앞·500칸·같은 그림·막힌 저장) · 지도 색 = 칩 색 · 네 공방 8장 새것부터 2:3 · 칩 거르기·주소 · 크게 보기 ← → 밀기 Esc 뒤로 가기 초점 · 그 공방에서 보기 · 빼기 · 감상 모드 6초·멈춤·움직임 줄이기 · 빈 자리·다른 탭·저장 막힘 · 지도의 즐겨찾기 n · 다섯 크기 넘침 없음·44px');
+    console.log('PASS 내 즐겨찾기: favorites.js(새것 앞·3000칸·가득이면 거절·같은 그림·막힌 저장·저장 공간) · n / 3000 · 곧 참 · 가득 · 빼기 막힘 · 꽉 채우기(1:1 단추·높이·구름·밀어도 그대로·두 번 누르기·넘기면 맞춤·2:3·PC 없음) · 휴대폰 가로(그림만·닫기) · 지도 색 = 칩 색 · 네 공방 8장 새것부터 2:3 · 칩 거르기·주소 · 크게 보기 ← → 밀기 Esc 뒤로 가기 초점 · 그 공방에서 보기 · 빼기 · 감상 모드 6초·멈춤·움직임 줄이기 · 빈 자리·다른 탭·저장 막힘 · 지도의 즐겨찾기 n · 다섯 크기 넘침 없음·44px');
   } finally { await br.close(); server.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
