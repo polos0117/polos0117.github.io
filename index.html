@@ -241,7 +241,7 @@ footer { position: relative; z-index: 2; background: var(--bg); text-align: cent
 
 <header class="head">
   <h1><small>ATELIER</small>공방 모음</h1>
-  <p>방을 누르면 들어간다 · <a href="#all">목록으로 보기</a> · <a href="favorites.html" id="fav-link">즐겨찾기</a></p>
+  <p>방을 누르면 들어간다 · <a href="#all">목록으로 보기</a> · <a href="favorites.html" id="fav-link">즐겨찾기</a> · <a href="search.html" id="search-link">전체 그림 찾기</a></p>
 </header>
 <div class="mapsel" id="mapsel" role="group" aria-label="지도 고르기"><span>지도</span><button type="button" data-map="cave" aria-pressed="true">대미궁</button><button type="button" data-map="kingdom" aria-pressed="false">왕국</button></div>
 
@@ -352,8 +352,8 @@ const ROOMS = [
   { key: 'fav', name: '보물고', title: '내 즐겨찾기', sub: '공방 도감에서 하트로 담은 그림을 한곳에서', num: '12 / VAULT', c: '#ff8fb1', tint: '#1f1016', tool: true,
     poly: [[106, 1982], [92, 2019], [92, 2074], [132, 2111], [215, 2118], [268, 2097], [282, 2079], [271, 1999], [235, 1956], [195, 1943], [157, 1946]], at: [185, 2034],
     peek: 'img/cave4-fav.webp', cover: 'img/cave4-fav.webp',
-    desc: '하트 보석이 진열된 보물고 — 네 공방의 도감에서 하트로 담은 그림을 새것부터 모아 본다. 공방 칩으로 거르고, 크게 보기 · 감상 모드.',
-    links: [['즐겨찾기', 'favorites.html']] },
+    desc: '하트 보석이 진열된 보물고 — 네 공방의 도감에서 하트로 담은 그림을 새것부터 모아 본다. 공방 칩으로 거르고, 크게 보기 · 감상 모드. 전체 그림 찾기로 공방 여덟의 그림을 한꺼번에 거른다.',
+    links: [['즐겨찾기', 'favorites.html'], ['전체 그림 찾기', 'search.html']] },   /* 2026-11-25 사용자 「새기능중에 공방넘나드는 검색,도감 추가해줘」 — 보물고 문 패널에 둘째 버튼 */
   { key: 'status', name: '기록실', title: '그림 현황', sub: '공방마다 어느 칸이 찼는지 글로만', num: '13 / RECORDS', c: '#c9b48a', tint: '#1a160f', tool: true,
     poly: [[147, 2223], [123, 2237], [98, 2271], [93, 2351], [120, 2378], [156, 2393], [210, 2394], [242, 2382], [276, 2350], [285, 2293], [272, 2259], [212, 2220]], at: [186, 2307],
     peek: 'img/cave4-status.webp', cover: 'img/cave4-status.webp',
@@ -999,7 +999,7 @@ addEventListener('pageshow', doorBack);   /* 뒤로 와서 다시 보일 때(bfc
 /* 넘어가는 쪽에 그 한 줄이 없는데 전환을 걸면 브라우저가 그 페이지 콘솔에 오류를 남긴다(「Transition was aborted … opt-in disabled」) — 그래서 한 줄이 들어간 곳(VT_READY)으로 갈 때만 전환을 걸고,
    나머지는 여기서 그만둔다(지금처럼 그냥 넘어간다). 공방 저장소에 한 줄을 넣으면 그 경로를 여기에 더한다(README 「방에 들어가는 연출」). 끝이 / 면 그 아래 모두.
    그 한 줄에는 「여기서 나갈 때는 전환을 그만둔다」(pageswap)도 들어 있다 — 전환은 이 지도에서 나갈 때만 걸리고, 공방 안에서 쪽을 옮길 때 · 공방에서 지도로 돌아올 때는 전과 같다 */
-const VT_READY = ['/favorites.html', '/status.html', '/casual.html', '/sweep.html', '/review.html', '/dot.html', '/prompt.html',
+const VT_READY = ['/favorites.html', '/search.html', '/status.html', '/casual.html', '/sweep.html', '/review.html', '/dot.html', '/prompt.html',
   '/atelier/', '/book-atelier/', '/sam-atelier/', '/pkm-atelier/', '/myth-atelier/', '/game-atelier/', '/element-atelier/', '/style-atelier/', '/blender-cloud/'];   /* 공방 저장소 아홉(2026-11-12 — 페이지마다 한 줄을 넣었다) */
 /* 목록 아래에 있어도 한 줄이 없는 페이지 — 삼국지 쟁탈전(draft.html)은 「게임은 그대로 둔다」(sam-atelier CLAUDE.md)라 넣지 않았다. 여기로는 전환을 걸지 않는다 */
 const VT_NOT = ['/sam-atelier/draft.html'];

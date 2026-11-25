@@ -37,7 +37,7 @@ const server = http.createServer((q, s) => {
 }).listen(PORT);
 const ROOMS = ['gundam', 'book', 'samguk', 'pokemon', 'myth', 'game', 'dot', 'image', 'element', 'style', 'city', 'fav', 'status', 'sweep', 'review', 'blender'];
 const CARDS = ROOMS;   /* 도시공방도 2026-11-19 문을 열어 맨 아래 칩에 든다 */
-const TOOLS = { fav: 'favorites.html', status: ['status.html', 'casual.html'], sweep: 'sweep.html', review: 'review.html', blender: '/blender-cloud/' };   /* 기록실만 둘 — 그림 현황 · 일상컷 목록(2026-11-17 사용자 「허브쪽에 버튼으로도 추가해줘」) */   /* 2026-11-11 하단 버튼 줄 → 대미궁 아래층 · 왕국 남쪽 바다의 방 */
+const TOOLS = { fav: ['favorites.html', 'search.html'], status: ['status.html', 'casual.html'], sweep: 'sweep.html', review: 'review.html', blender: '/blender-cloud/' };   /* 기록실만 둘 — 그림 현황 · 일상컷 목록(2026-11-17 사용자 「허브쪽에 버튼으로도 추가해줘」) */   /* 2026-11-11 하단 버튼 줄 → 대미궁 아래층 · 왕국 남쪽 바다의 방 */
 /* 오늘 기록 — 서재는 오늘 2판 1승에 오늘의 판을 끝냈고 방금(앞으로 한 시간 뒤까지) 다녀갔다, 대장간은 1판, 격납고는 판은 없고 하루 전에 다녀갔다(그 뒤 배포 → 새 소식) */
 const NOW = Date.now(), SEED = {
   'atelier_today_v1:book': { d: T.today(), n: 2, w: 1, daily: true, at: NOW, seen: NOW + 3600e3 },

@@ -82,6 +82,10 @@ button { font: inherit; color: inherit; }
   color: #ffd9a8; cursor: pointer; font: 600 13px/1 var(--sans); white-space: nowrap; }
 .play:hover, .play:focus-visible { border-color: #ffd9a8; }
 .play:disabled { opacity: .45; cursor: default; }
+/* 전체 그림 찾기(search.html, 2026-11-25) — 공방 여덟의 그림을 한꺼번에 거르는 쪽으로 */
+.play.find { border-color: #8fd0ff77; background: #0f1820b3; color: #cfe9ff; text-decoration: none; }
+.play.find:hover, .play.find:focus-visible { border-color: #cfe9ff; }
+.empty .find-line { margin: 18px auto 0; font-size: 13px; color: var(--muted); }
 .play svg { width: 14px; height: 14px; fill: currentColor; }
 
 /* ── 그림 칸 — 2:3, 새것부터 ── */
@@ -203,6 +207,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 0 16px ca
   <div class="tools" id="tools" hidden>
     <div class="chips" id="chips" role="group" aria-label="공방으로 거르기"></div>
     <button type="button" class="play" id="play"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg>감상 모드</button>
+    <a class="play find" id="find" href="search.html"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7 2a5 5 0 0 1 3.9 8.1l3 3-1.1 1.1-3-3A5 5 0 1 1 7 2zm0 1.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z"/></svg>전체 그림 찾기</a>
   </div>
   <ul class="grid" id="grid" aria-label="담은 그림"></ul>
   <div id="note"></div>
@@ -234,6 +239,7 @@ footer { text-align: center; color: #6f6973; font-size: 12px; padding: 0 16px ca
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="favorites.js?v=3"></script>
+<script src="cnote.js?v=1"></script>
 <script>AtelierFavorites && AtelierFavorites.setMessages && AtelierFavorites.setMessages({ full: '즐겨찾기가 가득 찼어요({max}장) — 몇 장 빼면 다시 담을 수 있어요', quota: '이 브라우저의 저장 공간이 모자라 저장하지 못했어요 — 담아 둔 그림은 그대로예요' });</script>
 <script type="module">
 import { attach } from './fill-core.js?v=1';
@@ -291,7 +297,8 @@ function paint() {
     note.innerHTML = `<section class="empty" id="empty"><svg class="heart" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z"/></svg>
       <h2>아직 담은 그림이 없어요</h2>
       <p>공방 도감에서 마음에 드는 그림을 열고 ♡ 즐겨찾기를 누르면 여기 모여요. 한 장씩, 새것부터.</p>
-      <nav class="doors" aria-label="공방 도감">${doorsHTML()}</nav></section>`;
+      <nav class="doors" aria-label="공방 도감">${doorsHTML()}</nav>
+      <p class="find-line"><a class="play find" href="search.html">전체 그림 찾기</a><br>공방 여덟의 그림을 한꺼번에 거르고, 거기서도 ♡ 로 담을 수 있어요.</p></section>`;
     return;
   }
   note.innerHTML = '';
@@ -399,11 +406,9 @@ $('#v-stage').addEventListener('pointercancel', () => { touch = null; });
    일상컷(파일 이름 _casualN.webp)이고 색인이 있는 공방(삼국지 · 원소 · 포켓몬 · 도시)만 — 그 공방의 data/casual-index.json 을 처음 볼 때 한 번 받아 이 쪽에 둔다.
    우리 값은 한글, GPT 가 지은 글(Outfit 줄 · 자유 설계 장면)은 영어 그대로. 펼침은 공방 화면과 같은 열쇠(sessionStorage cnote-open)로 이 탭 동안 기억 ── */
 const CN_REPO = { samguk: 'sam-atelier', element: 'element-atelier', pkm: 'pkm-atelier', city: 'city-atelier' };
-const CN_W = { req: '필수', gpt: 'GPT 고름', more: '더 보기', less: '접기', gptscene: 'GPT 설계', gptmade: 'GPT 가 설계',
-  f: { ex: '표정', gz: '시선', bd: '몸 방향', cam: '카메라', ln: '렌즈', lt: '빛', tm: '시간대', ss: '계절', wt: '날씨', mo: '순간', cp: '화면 구성', si: '상황 노출', os: '옷 꾸밈', free: '자유 설계', world: '세계', era: '시대', ar: '화면비' } };
-const CN_MORE = ['ex', 'gz', 'bd', 'cam', 'ln', 'lt', 'tm', 'ss', 'wt', 'mo', 'cp', 'si', 'os'], CN_CUT = 90;
+/* 설명 글은 cnote.js(AtelierCnote — 전체 그림 찾기와 같이 쓴다, 2026-11-25) */
+const cnFile = r => AtelierCnote.rowFile(r);
 const cnIdx = new Map();
-const cnFile = r => String(r.card).replace(/ /g, '_') + '_' + (r.world ? r.world + '_' : '') + r.style + '_f_casual' + r.n + '.webp';
 function cnLoad(a) {
   if (!cnIdx.has(a)) cnIdx.set(a, fetch('/' + CN_REPO[a] + '/data/casual-index.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).then(j => {
     const m = new Map(); for (const r of (j && Array.isArray(j.rows) ? j.rows : [])) if (r && r.card && r.style && r.n) m.set(cnFile(r), r); return m;
@@ -411,28 +416,7 @@ function cnLoad(a) {
   return cnIdx.get(a);
 }
 let cnOpen = (() => { try { return sessionStorage.getItem('cnote-open') === '1'; } catch (e) { return false; } })(), cnRow = null;
-const cnJoin = (l, s) => l.filter(Boolean).join(s);
-function cnHTML(r) {
-  const c = r.cosplay, f = r.free, s = r.s || {};
-  let lead = '', rest = '', gpt = false, outfit = null;
-  if (r.required === 'own') { lead = r.requiredKo || ''; rest = r.itemKo || ''; }
-  else if (c) { lead = r.required ? cnJoin([CN_W.req, r.requiredKo || r.familyKo], ' · ') : (r.familyKo || ''); rest = cnJoin([c.gameKo || c.game, c.characterKo || c.character, c.cutKo || r.itemKo], ' · '); gpt = c.by === 'gpt'; }
-  else if (f) { lead = cnJoin([f.kindKo || f.kind, r.familyKo], ' · '); rest = cnJoin([r.itemKo, r.shadeKo], ' · '); outfit = f.outfit || null; }
-  else { lead = r.required ? cnJoin([CN_W.req, r.requiredKo], ' · ') : (r.familyKo || ''); rest = cnJoin([r.itemKo, r.shadeKo], ' · '); }
-  const scene = cnJoin([s.pl, s.act, s.fr], ' · ');
-  if (!lead && !rest && !outfit && !scene) return '';
-  const more = CN_MORE.filter(k => s[k]).map(k => [CN_W.f[k], s[k]]);
-  if (f) more.push([CN_W.f.free, cnJoin([f.kindKo || f.kind, CN_W.gptmade], ' — ')]);
-  const own = more.length;
-  if (r.worldKo) more.push([CN_W.f.world, r.worldKo]); if (s.era) more.push([CN_W.f.era, s.era]); if (s.ar) more.push([CN_W.f.ar, s.ar]);
-  const list = own || s.era || s.ar ? more : [], cut = !!outfit && outfit.length > CN_CUT, can = cut || list.length > 0;
-  const o = outfit ? '<span lang="en">' + esc(cut && !cnOpen ? outfit.slice(0, CN_CUT).replace(/\s+\S*$/, '') + ' …' : outfit) + '</span>' : '';
-  return '<p class="cnote-l1">' + (lead ? '<b>' + esc(lead) + '</b>' : '') + (lead && (rest || o) ? ' — ' : '') + esc(rest) + (rest && o ? ' · ' : '') + o + (gpt ? '<small class="cnote-gpt">' + CN_W.gpt + '</small>' : '') + '</p>' +
-    (scene ? '<p class="cnote-l2">' + (s.en ? '<small class="cnote-tag">' + CN_W.gptscene + '</small><span lang="en">' + esc(scene) + '</span>' : esc(scene)) + '</p>' : '') +
-    (can ? '<button type="button" class="cnote-more" aria-expanded="' + cnOpen + '"' + (list.length ? ' aria-controls="v-cnote-list"' : '') + '>' + (cnOpen ? CN_W.less : CN_W.more) + '</button>' : '') +
-    (list.length ? '<dl class="cnote-list" id="v-cnote-list"' + (cnOpen ? '' : ' hidden') + '>' + list.map(([k, v]) => '<div><dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd></div>').join('') + '</dl>' : '');
-}
-function cnPaint() { const box = $('#v-cnote'), h = cnRow ? cnHTML(cnRow) : ''; box.innerHTML = h; box.hidden = !h; }
+function cnPaint() { const box = $('#v-cnote'), h = cnRow ? AtelierCnote.html(cnRow, cnOpen, 'v-cnote-list') : ''; box.innerHTML = h; box.hidden = !h; }
 function cnote(e) {
   cnRow = null; cnPaint();
   if (!e || !CN_REPO[e.a] || !/_casual\d+\.webp$/.test(e.file || '')) return;   /* 세계 그림 · 색인 없는 공방 — 아무것도 없다 */

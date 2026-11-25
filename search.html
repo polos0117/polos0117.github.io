@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>전체 그림 찾기</title>
+<meta name="description" content="공방 여덟의 그림을 한꺼번에 — 공방 · 세계 · 화풍 · 일상컷 갈래 · 의상 · 장소 · 하는 일 · 구도 · 화면비로 거르고 크게 본다.">
+<meta name="theme-color" content="#0f0e12">
+<link rel="icon" href="icon-192.png">
+<link rel="manifest" href="app.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&display=swap">
+<!--
+  전체 그림 찾기(2026-11-25) — 사용자 「새기능중에 공방넘나드는 검색,도감 추가해줘」.
+  공방 여덟(건담 · 책 · 포켓몬 · 신화 · 게임 · 원소 · 삼국지 · 도시)의 그림 등록부와 일상컷 색인을 한 줄 꼴로 모아(gallery-data.js) 한꺼번에 거른다.
+  「모든 공방 · 수영복 · 3:2 · 놀이공원」 · 「삼국지 + 도시 · 역할극 · 허리 위」 같은 거르기가 주소(?a=samguk&a=city&fam=roleplay&fr=허리 위)에 남아 북마크 · 뒤로 가기가 된다.
+  칸마다 「고르면 몇 장」(그 칸만 빼고 거른 수)이 붙고, 0장인 값은 흐리게. 결과는 2:3 칸의 그림 격자 — 보이는 줄만 그린다(1만 장이 넘어도 칸 수십 개).
+  누르면 크게 보기 — 즐겨찾기 화면과 같은 몸통(fill-core.js 꽉 채우기 · 휴대폰 가로 그림만 · 일상컷 설명 cnote.js · ← → · 밀기 · Esc), 하트(favorites.js), 「그 공방에서 보기」.
+  색과 이름은 지도 ROOMS · favorites.html ROOM 과 같다(gallery-data.js ATELIERS — tests/search-screen.cjs 가 견준다).
+-->
+<style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }</style><script>addEventListener('pageswap', e => { const t = e.viewTransition; if (t) { t.skipTransition(); t.ready.catch(() => {}); } }); addEventListener('pagereveal', e => { const t = e.viewTransition; if (t) t.ready.catch(() => {}); });</script>   <!-- 허브 지도의 문에서 넘어올 때 페이드로 들어온다(index.html 「방에 들어가는 연출」 — 즐겨찾기와 같은 한 줄) -->
+<style>
+:root {
+  --bg: #0b0a0e; --card: #18161d; --line: #ffffff1a; --text: #f1ece2; --muted: #a8a09a; --gold: #d9b45a; --sky: #8fd0ff;
+  --serif: 'Noto Serif KR', 'Apple Myungjo', 'Nanum Myeongjo', Georgia, serif;
+  --sans: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  --mono: ui-monospace, Menlo, Consolas, monospace;
+  --side: 300px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 15px/1.55 var(--sans); overflow-x: hidden; min-height: 100vh; min-height: 100dvh;
+  background-image: radial-gradient(90% 50% at 50% -10%, #1b1726 0%, transparent 70%); background-repeat: no-repeat; }
+a { color: inherit; }
+button, input, select { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+/* ── 머리 — 즐겨찾기와 같은 결 ── */
+.head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: calc(16px + env(safe-area-inset-top)) 16px 6px; max-width: 1400px; margin: 0 auto; }
+.head h1 { margin: 0; font: 900 clamp(24px, 3.6vw, 36px)/1.1 var(--serif); letter-spacing: -.02em;
+  background: linear-gradient(180deg, #fff 30%, var(--sky) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.head h1 small { display: block; margin-bottom: 6px; -webkit-text-fill-color: var(--gold); color: var(--gold); font: 700 11px/1 var(--serif); letter-spacing: .4em; }
+.home { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid #ffffff33; border-radius: 99px; background: #000b;
+  color: var(--text); text-decoration: none; font: 600 13px/1 var(--sans); white-space: nowrap; transition: border-color .15s, color .15s; }
+.home:hover, .home:focus-visible { border-color: var(--gold); color: var(--gold); }
+.lede { max-width: 1400px; margin: 0 auto; padding: 0 16px 10px; color: var(--muted); font-size: 13px; word-break: keep-all; }
+.lede a { color: var(--text); text-underline-offset: 3px; }
+
+/* ── 판 — PC 는 왼쪽에 거르기 칸이 붙어 있고, 휴대폰은 「거르기」 단추가 화면 가득 시트로 연다 ── */
+.layout { max-width: 1400px; margin: 0 auto; padding: 0 16px calc(40px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+@media (min-width: 1000px) { .layout { grid-template-columns: var(--side) minmax(0, 1fr); } }
+
+.panel { min-width: 0; }
+.p-head { display: flex; align-items: center; gap: 8px; padding: 4px 0 8px; }
+.p-head h2 { margin: 0 auto 0 0; font: 900 18px/1.2 var(--serif); }
+.p-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 44px; min-height: 44px; padding: 0 14px; border: 1px solid #ffffff2b; border-radius: 99px;
+  background: #ffffff08; cursor: pointer; font: 600 13px/1 var(--sans); white-space: nowrap; text-decoration: none; transition: border-color .15s, color .15s; }
+.p-btn:hover, .p-btn:focus-visible { border-color: var(--sky); color: #dff1ff; }
+.p-btn:disabled { opacity: .4; cursor: default; }
+.p-btn.main { background: var(--sky); border-color: var(--sky); color: #08131c; font-weight: 800; }
+.p-foot { display: none; }
+#p-close { display: none; }
+@media (min-width: 1000px) {
+  .panel { position: sticky; top: 8px; align-self: start; max-height: calc(100dvh - 16px); overflow-y: auto; overscroll-behavior: contain; padding-right: 6px; scrollbar-width: thin; }
+}
+@media (max-width: 999.98px) {
+  .panel { position: fixed; inset: 0; z-index: 40; display: none; flex-direction: column; background: #0b0a0ef7; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .panel.open { display: flex; }
+  .p-head { padding: calc(8px + env(safe-area-inset-top)) 16px 8px; border-bottom: 1px solid var(--line); }
+  #p-close { display: inline-flex; }
+  .p-body { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding: 4px 16px 16px; }
+  .p-foot { display: flex; gap: 8px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: #0b0a0e; }
+  .p-foot .main { flex: 1 1 auto; }
+  body.sheet { overflow: hidden; }
+}
+.group { margin: 6px 0 2px; color: var(--gold); font: 700 11px/1.4 var(--serif); letter-spacing: .3em; }
+.group small { display: block; margin-top: 2px; color: var(--muted); font: 500 11.5px/1.4 var(--sans); letter-spacing: 0; word-break: keep-all; }
+.facet { border-bottom: 1px solid var(--line); }
+.facet > summary { display: flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; list-style: none; font: 700 14px/1.3 var(--sans); }
+.facet > summary::-webkit-details-marker { display: none; }
+.facet > summary::after { content: ''; margin-left: auto; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg) translate(-2px, -2px); transition: transform .15s; }
+.facet[open] > summary::after { transform: rotate(-135deg) translate(-2px, -2px); }
+.facet > summary b { color: var(--sky); font: 700 12px/1 var(--mono); }
+.fbody { padding: 0 0 12px; }
+.fsearch { width: 100%; min-height: 40px; margin: 0 0 8px; padding: 0 12px; border: 1px solid #ffffff2b; border-radius: 10px; background: #ffffff08; }
+.fsearch:focus { border-color: var(--sky); outline: none; }
+.fchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.fc { --c: var(--sky); display: inline-flex; align-items: center; gap: 6px; min-height: 44px; max-width: 100%; padding: 0 12px; border: 1px solid #ffffff2b; border-radius: 99px; background: #ffffff08;
+  cursor: pointer; font: 600 13px/1.2 var(--sans); text-align: left; transition: border-color .15s, background .15s, opacity .15s; }
+.fc span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.fc b { flex: none; font: 700 11px/1 var(--mono); color: var(--muted); }
+.fc.dot::before { content: ''; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px color-mix(in srgb, var(--c) 60%, transparent); }
+.fc:hover { border-color: color-mix(in srgb, var(--c) 70%, transparent); }
+.fc[aria-pressed="true"] { border-color: var(--c); background: color-mix(in srgb, var(--c) 18%, #000); color: #fff; }
+.fc[aria-pressed="true"] b { color: color-mix(in srgb, var(--c) 70%, #fff); }
+.fc.zero:not([aria-pressed="true"]) { opacity: .38; }
+.fc.wait b { color: var(--gold); }
+.fmore { min-height: 44px; padding: 0 12px; border: 0; background: none; color: var(--sky); cursor: pointer; font: 700 12.5px/1 var(--sans); text-decoration: underline dotted; text-underline-offset: 3px; }
+
+/* ── 위 막대 — 찾기 칸 · 거르기 · 줄 세우기 ── */
+.bar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 -16px 8px; padding: 8px 16px; background: color-mix(in srgb, var(--bg) 94%, transparent); border-bottom: 1px solid var(--line); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.find { position: relative; flex: 1 1 260px; min-width: 0; }
+.find svg { position: absolute; left: 14px; top: 50%; width: 16px; height: 16px; transform: translateY(-50%); fill: var(--muted); pointer-events: none; }
+#q { width: 100%; min-height: 44px; padding: 0 14px 0 38px; border: 1px solid #ffffff33; border-radius: 99px; background: #000b; }
+#q:focus { border-color: var(--sky); outline: none; }
+#q::placeholder { color: #8d867f; }
+#open-panel b { min-width: 18px; padding: 2px 6px; border-radius: 99px; background: var(--sky); color: #08131c; font: 800 11px/1.2 var(--mono); }
+#open-panel b:empty { display: none; }
+@media (min-width: 1000px) { #open-panel { display: none; } }
+.sortsel { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 4px 0 8px; border: 1px solid #ffffff2b; border-radius: 99px; background: #ffffff08; font: 600 13px/1 var(--sans); }
+.sortsel select { min-height: 42px; border: 0; background: transparent; padding: 0 8px 0 2px; cursor: pointer; }
+.sortsel select option { background: #18161d; }
+#reshuffle { font-size: 16px; }
+
+.load { display: flex; align-items: center; gap: 10px; margin: 4px 0 8px; color: var(--muted); font-size: 12.5px; }
+.load .meter { flex: 0 0 120px; height: 4px; border-radius: 4px; background: #ffffff14; overflow: hidden; }
+.load .meter i { display: block; height: 100%; width: 0; background: var(--sky); transition: width .3s; }
+.load .err { color: #ffb0a4; }
+.load .err button { min-height: 32px; margin-left: 4px; padding: 0 10px; border: 1px solid #ffb0a488; border-radius: 99px; background: none; color: #ffd2cb; cursor: pointer; }
+
+/* 고른 것 — 누르면 빠진다 */
+.active { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+@media (max-width: 600px) { .active { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px 8px; padding: 0 16px; scrollbar-width: none; } .active::-webkit-scrollbar { display: none; } }
+.ac { display: inline-flex; flex: none; align-items: center; gap: 6px; min-height: 36px; max-width: 70vw; padding: 0 6px 0 12px; border: 1px solid #8fd0ff66; border-radius: 99px; background: #0f1820; color: #dff1ff; cursor: pointer; font: 600 12.5px/1 var(--sans); }
+.ac span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ac i { font-style: normal; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #ffffff14; font-size: 11px; }
+.ac small { color: var(--muted); font-size: 11px; }
+.meta { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
+.count { flex: 1 1 auto; min-width: 0; margin: 0; color: var(--muted); font-size: 13px; }
+.count b { color: var(--text); font: 800 15px/1 var(--sans); }
+
+/* ── 그림 격자 — 2:3 칸, 보이는 줄만 그린다(칸 자리는 계산으로, 높이는 줄 수 × 줄 높이) ── */
+.grid { position: relative; list-style: none; margin: 0; padding: 0; contain: layout; }
+.grid > li { position: absolute; left: 0; top: 0; }
+.tile { --c: var(--gold); display: block; width: 100%; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; border-radius: 10px; }
+.tile .face { position: relative; display: block; aspect-ratio: 2 / 3; overflow: hidden; border-radius: 10px; background: #15131a; box-shadow: inset 0 0 0 1px #ffffff12, 0 8px 20px #0007; }
+.tile .face::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px transparent; transition: box-shadow .2s; }
+/* 정사각 · 가로 그림은 잘리지 않게 칸 안에 담는다(공방 목록과 같게) */
+.tile img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.tile[data-ar="2:3"] img { object-fit: cover; object-position: 50% 15%; }
+.tile:hover .face::after, .tile:focus-visible .face::after { box-shadow: inset 0 0 0 2px var(--c); }
+.tile:focus-visible { outline: none; }
+.tile:focus-visible .face { outline: 2px solid var(--c); outline-offset: 2px; }
+.tile .ph { position: absolute; inset: 0; display: grid; place-items: center; padding: 8px; color: var(--muted); font-size: 11px; text-align: center; }
+.tile .heart { position: absolute; right: 6px; top: 6px; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: #000a; color: #ff8fb1; font-size: 12px; line-height: 1; }
+.tile .badge { position: absolute; left: 6px; bottom: 6px; padding: 1px 6px; border-radius: 6px; background: #000b; color: #fff; font: 700 10px/1.5 var(--mono); }
+.tile .cap { display: block; padding: 5px 2px 0; min-width: 0; height: 40px; }
+.tile .cap b { display: block; font: 700 13px/1.3 var(--serif); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile .cap i { display: flex; align-items: center; gap: 5px; color: var(--muted); font: 500 11px/1.35 var(--sans); font-style: normal; min-width: 0; }
+.tile .cap i::before { content: ''; flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
+.tile .cap i span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 600px) { .tile .cap b { font-size: 12px; } .tile .cap i { font-size: 10.5px; } }
+
+.empty { max-width: 560px; margin: 28px auto 0; padding: 24px 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); text-align: center; word-break: keep-all; }
+.empty h2 { margin: 0 0 6px; font: 900 20px/1.3 var(--serif); }
+.empty p { margin: 0 0 14px; color: #d8d2c8; font-size: 14px; }
+
+/* ── 크게 보기 — 즐겨찾기 화면과 같은 몸통(두 겹 그림 · 꽉 채우기 · 휴대폰 가로) ── */
+.viewer { position: fixed; inset: 0; z-index: 50; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: #070609; color: var(--text); }
+.viewer[hidden] { display: none; }
+.v-bar { display: flex; align-items: center; gap: 8px; padding: calc(8px + env(safe-area-inset-top)) 12px 8px; }
+.v-room { --c: var(--gold); display: inline-flex; align-items: center; gap: 8px; min-width: 0; font: 700 13px/1.2 var(--serif); color: color-mix(in srgb, var(--c) 75%, #fff); }
+.v-room::before { content: ''; flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 10px var(--c); }
+.v-room span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v-count { margin-left: auto; color: var(--muted); font: 600 12px/1 var(--mono); white-space: nowrap; }
+.v-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 44px; min-height: 44px; padding: 0 12px; border: 1px solid #ffffff2b; border-radius: 99px;
+  background: #000b; cursor: pointer; font: 600 13px/1 var(--sans); white-space: nowrap; text-decoration: none; color: var(--text); transition: border-color .15s, color .15s; }
+.v-btn:hover, .v-btn:focus-visible { border-color: var(--gold); color: var(--gold); }
+.v-btn:disabled { opacity: .4; cursor: default; }
+#v-fav[aria-pressed="true"] { border-color: #ff8fb1; background: #2a1019; color: #ffc1d4; }
+.v-stage { position: relative; min-height: 0; overflow: hidden; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.v-stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 4px 12px; opacity: 0; transition: opacity .3s ease; pointer-events: none; }
+.v-stage img.on { opacity: 1; }
+.v-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 64px; border: 0; border-radius: 12px; background: #0009; color: #fff; font: 400 34px/1 var(--serif);
+  cursor: pointer; opacity: .75; transition: opacity .15s, background .15s; z-index: 1; }
+.v-nav:hover, .v-nav:focus-visible { opacity: 1; background: #000c; }
+.v-nav:disabled { opacity: 0; pointer-events: none; }
+.v-prev { left: 8px; } .v-next { right: 8px; }
+.v-fill { position: absolute; right: 10px; bottom: 10px; z-index: 2; background: #000a; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.v-fill[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+.v-stage.is-fill > img { visibility: hidden; }
+.v-stage .fill-scroll { position: absolute; inset: 0; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; touch-action: pan-x pinch-zoom; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.v-stage .fill-scroll::-webkit-scrollbar { display: none; }
+.v-stage .fill-scroll > img { position: static; display: block; width: var(--fill-w); height: var(--fill-h); max-width: none; padding: 0; opacity: 1; transition: none; object-fit: cover; }
+.v-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; padding: 8px 14px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: #0b0a0ee6; }
+.v-text { min-width: 0; flex: 1 1 220px; }
+.v-text h2 { margin: 0; font: 900 clamp(18px, 2.4vw, 24px)/1.25 var(--serif); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v-text p { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v-cnote { margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.5; word-break: keep-all; overflow-wrap: anywhere; max-height: 38dvh; overflow-y: auto; }
+.v-cnote[hidden] { display: none; }
+.v-cnote p { margin: 0; white-space: normal; overflow: visible; text-overflow: clip; font-size: 12px; }
+.v-cnote b { color: var(--text); font-weight: 800; }
+.v-cnote .cnote-gpt { margin-left: 6px; font-size: 11px; opacity: .75; }
+.v-cnote .cnote-tag { display: inline-block; margin-right: 6px; padding: 0 5px; border: 1px solid currentColor; border-radius: 4px; font-size: 10px; line-height: 1.5; opacity: .8; vertical-align: 1px; }
+.v-cnote .cnote-more { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; margin-left: -10px; padding: 0 10px; border: 0; border-radius: 10px; background: none;
+  color: var(--text); font: 700 12px/1 var(--sans); text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
+.v-cnote .cnote-more:focus-visible { outline: 2px solid var(--gold); outline-offset: -6px; }
+.v-cnote .cnote-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11em), 1fr)); gap: 2px 16px; margin: 0 0 4px; }
+.v-cnote .cnote-list[hidden] { display: none; }
+.v-cnote .cnote-list > div { display: flex; gap: 6px; min-width: 0; }
+.v-cnote .cnote-list dt { flex: none; opacity: .75; }
+.v-cnote .cnote-list dd { margin: 0; min-width: 0; color: var(--text); }
+.v-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.v-actions .main { --c: var(--gold); background: var(--c); border-color: var(--c); color: #111; font-weight: 800; }
+.v-actions .main:hover, .v-actions .main:focus-visible { color: #111; filter: brightness(1.08); outline-color: #fff; }
+/* 휴대폰 가로 — 그림만 화면 높이 가득. 위 줄 · 아래 막대는 숨기고 닫기만 오른쪽 위에 반투명으로, ‹ › 는 그림 위 */
+@media (orientation: landscape) and (max-height: 500px) {
+  .viewer { grid-template-rows: minmax(0, 1fr); }
+  .v-stage { grid-row: 1; }
+  .v-stage img { padding: 6px max(6px, env(safe-area-inset-right)) 6px max(6px, env(safe-area-inset-left)); }
+  .v-foot { display: none; }
+  .v-bar { position: fixed; top: calc(6px + env(safe-area-inset-top)); right: calc(6px + env(safe-area-inset-right)); z-index: 3; padding: 0; }
+  .v-bar > :not(#v-close) { display: none; }
+  #v-close { background: #0006; border-color: #fff5; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+}
+
+.toast { position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 60; max-width: calc(100vw - 32px); width: max-content; word-break: keep-all;
+  padding: 9px 16px; border-radius: 18px; background: #f1ece2; color: #111; font: 700 13px/1.3 var(--sans); text-align: center; box-shadow: 0 10px 30px #000a; }
+.toast:empty { display: none; }
+footer { text-align: center; color: #6f6973; font-size: 12px; padding: 0 16px calc(24px + env(safe-area-inset-bottom)); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="head">
+  <h1><small>ATELIER</small>전체 그림 찾기</h1>
+  <a class="home" href="./">← 공방 지도</a>
+</header>
+<p class="lede" id="lede">공방 여덟의 그림을 한꺼번에 거른다 · <a href="favorites.html" id="fav-link">내 즐겨찾기</a></p>
+
+<div class="layout">
+  <aside class="panel" id="panel" aria-labelledby="p-title">
+    <div class="p-head">
+      <h2 id="p-title">거르기</h2>
+      <button type="button" class="p-btn" id="p-clear">모두 지우기</button>
+      <button type="button" class="p-btn" id="p-close" aria-label="거르기 닫기">✕</button>
+    </div>
+    <div class="p-body" id="facets"></div>
+    <div class="p-foot"><button type="button" class="p-btn main" id="p-done">결과 보기</button></div>
+  </aside>
+
+  <main id="main">
+    <div class="bar">
+      <label class="find"><span class="sr">이름 · 의상 · 장소 · 하는 일로 찾기</span>
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7 2a5 5 0 0 1 3.9 8.1l3 3-1.1 1.1-3-3A5 5 0 1 1 7 2zm0 1.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z"/></svg>
+        <input type="search" id="q" placeholder="이름 · 의상 · 장소 · 하는 일" autocomplete="off" enterkeyhint="search"></label>
+      <button type="button" class="p-btn" id="open-panel" aria-haspopup="dialog" aria-controls="panel">거르기 <b id="nact"></b></button>
+    </div>
+    <div class="load" id="load" aria-live="polite"></div>
+    <div class="active" id="active" aria-label="고른 거르기 — 누르면 빠진다"></div>
+    <div class="meta">
+      <p class="count" id="count" aria-live="polite"></p>
+      <label class="sortsel"><span class="sr">차례</span><select id="sort" aria-label="줄 세우기"></select></label>
+      <button type="button" class="p-btn" id="reshuffle" aria-label="다시 섞기" title="다시 섞기" hidden>⟳</button>
+    </div>
+    <ul class="grid" id="grid" aria-label="찾은 그림"></ul>
+    <div id="note"></div>
+  </main>
+</div>
+<footer>그림 목록은 공방마다 등록부(data/img.json)와 일상컷 색인에서 이 쪽을 열 때 받는다 · 즐겨찾기는 이 브라우저에만 남는다</footer>
+
+<div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-labelledby="v-title" hidden>
+  <div class="v-bar">
+    <span class="v-room" id="v-room"><span></span></span>
+    <span class="v-count" id="v-count" aria-live="polite"></span>
+    <button type="button" class="v-btn" id="v-close" aria-label="닫기">✕</button>
+  </div>
+  <div class="v-stage" id="v-stage">
+    <img id="v-a" alt="" decoding="async"><img id="v-b" alt="" decoding="async">
+    <button type="button" class="v-nav v-prev" id="v-prev" aria-label="이전 그림">‹</button>
+    <button type="button" class="v-nav v-next" id="v-next" aria-label="다음 그림">›</button>
+    <button type="button" class="v-btn v-fill fill-toggle" id="v-fill" aria-pressed="false" hidden>⤢ 꽉 채우기</button>
+  </div>
+  <div class="v-foot">
+    <div class="v-text"><h2 id="v-title"></h2><p id="v-sub"></p><div class="v-cnote" id="v-cnote" hidden></div></div>
+    <div class="v-actions">
+      <button type="button" class="v-btn" id="v-fav" aria-pressed="false">♡ 즐겨찾기</button>
+      <a class="v-btn main" id="v-link" href="./">그 공방에서 보기</a>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="favorites.js?v=3"></script>
+<script>AtelierFavorites && AtelierFavorites.setMessages && AtelierFavorites.setMessages({ full: '즐겨찾기가 가득 찼어요({max}장) — 몇 장 빼면 다시 담을 수 있어요', quota: '이 브라우저의 저장 공간이 모자라 저장하지 못했어요 — 담아 둔 그림은 그대로예요' });</script>
+<script src="cnote.js?v=1"></script>
+<script src="gallery-data.js?v=1"></script>
+<script type="module" src="search.js?v=1"></script>
+</body>
+</html>
