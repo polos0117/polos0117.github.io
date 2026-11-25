@@ -361,6 +361,48 @@ const SIZES = [['344', { width: 344, height: 882 }, true], ['1280', { width: 128
       assert.deepEqual(errors, [], name + ' 오류 없음');
       await ctx.close();
     }
-    console.log('PASS 내 즐겨찾기: favorites.js(새것 앞·3000칸·가득이면 거절·같은 그림·막힌 저장·저장 공간) · n / 3000 · 곧 참 · 가득 · 빼기 막힘 · 꽉 채우기(1:1 단추·높이·구름·밀어도 그대로·두 번 누르기·넘기면 맞춤·2:3·PC 없음) · 휴대폰 가로(그림만·닫기) · 지도 색 = 칩 색 · 네 공방 8장 새것부터 2:3 · 칩 거르기·주소 · 크게 보기 ← → 밀기 Esc 뒤로 가기 초점 · 그 공방에서 보기 · 빼기 · 감상 모드 6초·멈춤·움직임 줄이기 · 빈 자리·다른 탭·저장 막힘 · 지도의 즐겨찾기 n · 다섯 크기 넘침 없음·44px');
+    /* 일상컷 설명(2026-11-25 — 공방 크게 보기와 같은 꼴) — 일상컷(_casualN)이면 그 공방의 data/casual-index.json 을 공방마다 한 번만 받아 제목 아래 두 줄 ·
+       더 보기 44px(aria-expanded, 펼치면 표정 · 시대 …, 다음 그림에도 펼친 채) · 세계 그림 · 색인 없는 공방 · 색인에 없는 컷은 아무것도 없다 · 휴대폰 가로엔 숨김 */
+    {
+      const C = [
+        { a: 'samguk', key: '조조', file: '조조_samguk_s1_f_casual1.webp', title: '조조', sub: '일상컷 1', ...pic('sam-atelier-img', '조조_samguk_s1_f_casual1.webp'), link: '/sam-atelier/dex.html' },
+        { a: 'samguk', key: '조조', file: '조조_samguk_s1_f.webp', title: '조조', sub: '세계 그림', ...pic('sam-atelier-img', '조조_samguk_s1_f.webp'), link: '/sam-atelier/dex.html' },
+        { a: 'samguk', key: '조조', file: '조조_samguk_s1_f_casual2.webp', title: '조조', sub: '일상컷 2', ...pic('sam-atelier-img', '조조_samguk_s1_f_casual2.webp'), link: '/sam-atelier/dex.html' },
+        { a: 'myth', key: '묠니르', file: '묠니르_game_keyart_f_casual1.webp', title: '묠니르', sub: '일상컷 1', ...pic('myth-atelier-img', '묠니르_game_keyart_f_casual1.webp'), link: '/myth-atelier/dex.html' },
+        { a: 'city', key: 'seoul', file: 'seoul_fantasy_s1_f_casual5.webp', title: '서울', sub: '일상컷 5', ...pic('city-atelier-img', 'seoul_fantasy_s1_f_casual5.webp'), link: '/city-atelier/index.html' },
+      ].map((e, i) => ({ ...e, at: new Date(t0 - i * 3600e3).toISOString() }));
+      const base = (card, world, n) => ({ card, name: card, world, worldKo: world === 'samguk' ? '무협' : '판타지', n, date: '2026-11-25', style: 's1', path: '', required: null, requiredKo: null, family: null, familyKo: null, item: null, itemKo: null, shade: null, shadeKo: null, cosplay: null, free: null });
+      const IDX = { sam: { version: 1, rows: [Object.assign(base('조조', 'samguk', 1), { required: 'swimwear', requiredKo: '노출 갈래(수영복)', family: 'swimwear', familyKo: '수영복', item: 'bikini', itemKo: '비키니', shade: 'orange', shadeKo: '코랄 · 오렌지',
+          s: { pl: '수영장', act: '잔을 든다', fr: '허리 위', ex: '차분함', tm: '아침', era: '지금 현실', ar: '2:3' } })] },
+        city: { version: 1, rows: [Object.assign(base('seoul', 'fantasy', 5), { free: { kind: 'ofree', kindKo: '옷 자유', outfit: 'a sage linen halter set' }, s: { pl: 'a rooftop garden', en: 1, tm: '한낮', ar: '2:3' } })] } };
+      for (const [vp, mob] of [[{ width: 344, height: 882 }, true], [{ width: 1280, height: 900 }, false], [{ width: 844, height: 390 }, true]]) {
+        const { ctx, p, errors } = await page(vp, mob, { seed: C }), got = {};
+        await ctx.route(/\/(sam|city|myth)-atelier\/data\/casual-index\.json/, r => { const k = r.request().url().match(/\/(sam|city|myth)-atelier\//)[1]; got[k] = (got[k] || 0) + 1; return IDX[k] ? r.fulfill({ contentType: 'application/json', body: JSON.stringify(IDX[k]) }) : r.fulfill({ status: 404, body: '' }); });
+        await p.goto(BASE + '/favorites.html'); await p.waitForSelector('.tile');
+        await (mob ? p.locator('.tile').first().tap() : p.locator('.tile').first().click());
+        const box = p.locator('#v-cnote'), name = vp.width + '×' + vp.height;
+        if (vp.height < 500) {
+          await p.waitForTimeout(400); assert.equal(await box.isVisible(), false, name + ' 휴대폰 가로 — 그림만(설명 숨김)'); assert.deepEqual(errors, []); await ctx.close(); continue;
+        }
+        await p.waitForFunction(() => /수영장/.test(document.querySelector('#v-cnote').textContent));
+        assert.equal((await box.locator('.cnote-l1').textContent()).trim(), '필수 · 노출 갈래(수영복) — 비키니 · 코랄 · 오렌지', name + ' 첫 줄');
+        assert.equal((await box.locator('.cnote-l2').textContent()).trim(), '수영장 · 잔을 든다 · 허리 위', name + ' 둘째 줄');
+        const more = box.locator('.cnote-more'); assert.equal(await more.getAttribute('aria-expanded'), 'false'); assert.equal(await box.locator('.cnote-list').isVisible(), false);
+        { const bb = await more.boundingBox(); assert(bb.width >= 44 && bb.height >= 44, name + ' 더 보기 44px ' + JSON.stringify(bb)); }
+        await more.click(); assert.equal(await box.locator('.cnote-more').getAttribute('aria-expanded'), 'true');
+        assert.deepEqual(await box.locator('.cnote-list dt').allTextContents(), ['표정', '시간대', '세계', '시대', '화면비'], name + ' 더 보기 칸');
+        if (process.env.SHOT_DIR && mob) await p.screenshot({ path: path.join(process.env.SHOT_DIR, 'favorites-cnote-344x882.png') });
+        await p.keyboard.press('ArrowRight'); await p.waitForTimeout(150); assert.equal(await box.isVisible(), false, name + ' 세계 그림 — 설명 없음');
+        await p.keyboard.press('ArrowRight'); await p.waitForTimeout(150); assert.equal(await box.isVisible(), false, name + ' 색인에 없는 일상컷 — 없음');
+        await p.keyboard.press('ArrowRight'); await p.waitForTimeout(150); assert.equal(await box.isVisible(), false, name + ' 색인이 없는 공방(신화) — 받지도 않는다');
+        await p.keyboard.press('ArrowRight'); await p.waitForFunction(() => /rooftop/.test(document.querySelector('#v-cnote').textContent));
+        assert.equal(await box.locator('.cnote-l2 .cnote-tag').textContent(), 'GPT 설계'); assert.equal(await box.locator('.cnote-l2 span[lang="en"]').textContent(), 'a rooftop garden', name + ' 자유 설계 장면은 영어 그대로');
+        assert.equal(await box.locator('.cnote-more').getAttribute('aria-expanded'), 'true', name + ' 펼침은 이 탭 동안 기억'); assert.deepEqual(await box.locator('.cnote-list dd').allTextContents(), ['한낮', '옷 자유 — GPT 가 설계', '판타지', '2:3']);
+        assert.deepEqual(got, { sam: 1, city: 1 }, name + ' 색인은 공방마다 한 번 — 신화는 안 받는다');
+        await targets(p, '#viewer button, #viewer a', name + ' 크게 보기(설명)'); await noOverflow(p, name + ' 설명');
+        assert.deepEqual(errors, [], name + ' 설명 콘솔'); await ctx.close();
+      }
+    }
+    console.log('PASS 내 즐겨찾기: favorites.js(새것 앞·3000칸·가득이면 거절·같은 그림·막힌 저장·저장 공간) · n / 3000 · 곧 참 · 가득 · 빼기 막힘 · 꽉 채우기(1:1 단추·높이·구름·밀어도 그대로·두 번 누르기·넘기면 맞춤·2:3·PC 없음) · 휴대폰 가로(그림만·닫기) · 지도 색 = 칩 색 · 네 공방 8장 새것부터 2:3 · 칩 거르기·주소 · 크게 보기 ← → 밀기 Esc 뒤로 가기 초점 · 그 공방에서 보기 · 빼기 · 감상 모드 6초·멈춤·움직임 줄이기 · 빈 자리·다른 탭·저장 막힘 · 지도의 즐겨찾기 n · 일상컷 설명(두 줄 · 더 보기 · 공방마다 한 번) · 다섯 크기 넘침 없음·44px');
   } finally { await br.close(); server.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
