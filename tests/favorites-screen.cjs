@@ -18,6 +18,9 @@ function sandbox(storage) {
   const events = [], win = { localStorage: storage, addEventListener() {}, removeEventListener() {}, dispatchEvent(e) { events.push(e.type); } };
   const box = { window: win, CustomEvent: function (t) { this.type = t; }, JSON, Date, Array, String };
   vm.createContext(box); vm.runInContext(fs.readFileSync(path.join(ROOT, 'favorites.js'), 'utf8'), box);
+  /* 말은 favorites.js 에 없다 — 공방 모음 화면(favorites.html)처럼 setMessages 로 준다(2026-11-25) */
+  const html = fs.readFileSync(path.join(ROOT, 'favorites.html'), 'utf8'), mm = html.match(/setMessages\((\{[\s\S]*?\})\);/);
+  if (mm) win.AtelierFavorites.setMessages(vm.runInNewContext('(' + mm[1] + ')'));
   return { F: win.AtelierFavorites, events };
 }
 const memory = () => { const m = {}; return { getItem: k => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: k => { delete m[k]; }, m }; };

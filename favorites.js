@@ -24,10 +24,10 @@
   'use strict';
   var KEY = 'atelier_favorites_v1', MAX = 3000, EVENT = 'atelier-favorites';
   var FIELDS = ['a', 'key', 'file', 'title', 'sub', 'thumb', 'full', 'link', 'at'];
-  var MESSAGES = {
-    full: '즐겨찾기가 가득 찼어요(' + MAX + '장) — 공방 모음의 내 즐겨찾기에서 몇 장 빼면 다시 담을 수 있어요',
-    quota: '이 브라우저의 저장 공간이 모자라 저장하지 못했어요 — 담아 둔 그림은 그대로예요'
-  };
+  /* 알림 말은 이 파일에 적지 않는다(공방 검사 「화면 코드에 한글 금지」) — 공방은 낱말 표 dex.fav.full · dex.fav.quota({max}),
+     공방 모음은 FAV.setMessages({ full, quota }) 로 준다. 둘 다 없으면 빈 글 → 화면은 제 「막혔다」 말을 쓴다 */
+  var MESSAGES = { full: '', quota: '' };
+  function setMessages(m) { for (var k in m) if (Object.prototype.hasOwnProperty.call(MESSAGES, k)) MESSAGES[k] = String(m[k] || ''); }
   var last = '';
   function store() { try { return root.localStorage || null; } catch (e) { return null; } }
   function valid(e) { return !!e && typeof e === 'object' && typeof e.a === 'string' && !!e.a && typeof e.file === 'string' && !!e.file; }
@@ -80,7 +80,10 @@
     return at(read(), entry.a, entry.file) >= 0;
   }
   function error() { return last; }
-  function message(why) { return MESSAGES[why === undefined ? last : why] || ''; }
+  function message(why) {
+    var k = why === undefined ? last : why, A = root.AtelierWords, t = A && A.table && A.table['dex.fav.' + k];
+    return String(t || MESSAGES[k] || '').replace(/\{max\}/g, MAX);
+  }
   function available() {
     var s = store(), t = KEY + ':probe';
     if (!s) return false;
@@ -93,7 +96,7 @@
     root.addEventListener(EVENT, fire);
     return function () { root.removeEventListener('storage', onStorage); root.removeEventListener(EVENT, fire); };
   }
-  var api = { KEY: KEY, MAX: MAX, EVENT: EVENT, has: has, list: list, count: count, room: room, toggle: toggle, remove: remove, error: error, message: message, onChange: onChange, available: available };
+  var api = { KEY: KEY, MAX: MAX, EVENT: EVENT, has: has, list: list, count: count, room: room, toggle: toggle, remove: remove, error: error, message: message, setMessages: setMessages, onChange: onChange, available: available };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.AtelierFavorites = api;
 })(typeof window !== 'undefined' ? window : this);
