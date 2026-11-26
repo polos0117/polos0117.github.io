@@ -510,8 +510,14 @@ function paint() {
   }
   if (on) { const r = ROOMS.find(q => q.key === on), st = $('#status'), d = doors.querySelector('a.daily'); if (st) st.innerHTML = statusText(r); if (d) d.outerHTML = dailyHTML(r); }
 }
+/* 묻기는 십 분에 한 번 — 공방에서 뒤로 와 지도가 다시 열릴 때마다 방 수만큼 HEAD 를 보내면 GitHub Pages 가 「Rate limit exceeded」로 막는다(사용자 2026-11-26 「공방에서 뒤로가기로 허브 이동한때마다 떠」).
+   받은 날짜는 이 브라우저에 두고 십 분 안에는 그걸 쓴다. Pages 도 파일을 십 분 캐시하므로 더 자주 물어도 새 것을 못 본다 */
+const SNIFF_KEY = 'hub_news_v1', SNIFF_GAP = 6e5;
 async function sniff() {
+  let kept = null; try { kept = JSON.parse(localStorage.getItem(SNIFF_KEY) || 'null'); } catch (e) {}
+  if (kept && kept.news && Date.now() - kept.at < SNIFF_GAP && Date.now() >= kept.at) { Object.assign(NEWS, kept.news); paint(); return; }
   await Promise.all(ROOMS.filter(r => r.links.length).map(async r => { try { const res = await fetch(r.links[0][1], { method: 'HEAD', cache: 'no-store' }); const lm = Date.parse(res.headers.get('last-modified')); if (res.ok && isFinite(lm)) NEWS[r.key] = lm; } catch (e) {} }));
+  try { localStorage.setItem(SNIFF_KEY, JSON.stringify({ at: Date.now(), news: NEWS })); } catch (e) {}
   paint();
 }
 addEventListener('pageshow', paint); addEventListener('focus', paint); document.addEventListener('visibilitychange', () => { if (!document.hidden) paint(); });
