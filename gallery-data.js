@@ -35,7 +35,7 @@
       link: function (card, file) { return '/element-atelier/index.html?' + qs({ n: String(card).split('-')[0], mode: 'list', card: card, pic: file }); } },
     { a: 'samguk', repo: 'sam-atelier', name: '삼국지 군막', c: '#c9a227', index: true, bases: [1, 2, 3].map(function (i) { return G + '/sam-atelier-img' + (i > 1 ? '-' + i : '') + '/img/'; }),
       link: function (card, file) { return '/sam-atelier/dex.html?' + qs({ card: card, pic: file }); } },
-    { a: 'city', repo: 'city-atelier', name: '도시공방', c: '#9fd3a8', index: true, bases: [G + '/city-atelier-img/img/'],
+    { a: 'city', repo: 'city-atelier', name: '도시공방', c: '#9fd3a8', index: true, bases: [1, 2].map(function (i) { return G + '/city-atelier-img' + (i > 1 ? '-' + i : '') + '/img/'; }),   /* 2026-11-28 둘째 저장소 city-atelier-img-2 — 사용자 「도시공방 이미지 저장소 바꿔줘. 2번으로」 */
       /* 도시는 ?tab=dex&city=<도시>&card=<도시 또는 도시-명소>&pic= (lib/walk-core.js · city-view.js 즐겨찾기 link 와 같다) */
       link: function (card, file) { return '/city-atelier/index.html?' + qs({ tab: 'dex', city: String(card).split('-')[0], card: card, pic: file }); } }
   ];
